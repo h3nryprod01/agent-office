@@ -37,6 +37,7 @@ for _ in $(seq 50); do
 done
 
 if ! curl -sf -o /dev/null "$URL"; then
+  # shellcheck disable=SC2088  # hiển thị cho người đọc, không phải path để mở
   LOG_HINT="~/Library/Logs/agent-office-daemon.log"
   [ "$(uname -s)" = "Linux" ] && LOG_HINT="journalctl --user -u agent-office-daemon"
   echo "daemon im lặng ở $URL — log: $LOG_HINT" >&2

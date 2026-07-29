@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/h3nryprod01/agent-office/security/advisories/new
+    about: Report privately instead of opening a public issue. See SECURITY.md.
+  - name: Idea or feature request
+    url: https://github.com/h3nryprod01/agent-office/issues/new
+    about: Open a normal issue and describe what you are trying to do — the goal matters more than the feature.

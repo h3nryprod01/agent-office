@@ -1,5 +1,9 @@
 # Agent Office
 
+[![CI](https://github.com/h3nryprod01/agent-office/actions/workflows/ci.yml/badge.svg)](https://github.com/h3nryprod01/agent-office/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-20%20%7C%2022-brightgreen.svg)](https://nodejs.org)
+
 Your coding-agent sessions, rendered as a live isometric office.
 
 Every character below is a **real agent session** running on this machine — walking to the bookshelf to read files, hammering the arcade machine to run commands, and raising a red ❗ when it needs you.
@@ -109,8 +113,14 @@ Next: a public protocol document so third parties can add harnesses without read
 - `packages/renderer/` — three.js isometric renderer and UI
 - `packages/protocol/` — event protocol (JSON schema)
 - `templates/` — "company in a box" agent rosters
-- `docs/` — specs, semantic mapping, and a status note per feature recording what was built and why
+- `docs/` — specs, semantic mapping, and a status note per feature recording what was built and why ([index](docs/README.md))
 - `assets/` — art, with sources and licenses in [assets/CREDITS.md](assets/CREDITS.md)
+
+## Contributing
+
+Issues welcome, including "this didn't work on my machine". Replies are
+best-effort — this is a spare-time project. Please open an issue before building
+anything substantial. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

@@ -1,0 +1,82 @@
+name: Bug report
+description: Something in the office does not match what your agents are doing
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Most failures here come from environment differences — a path that
+        exists on my machine and not yours, a service manager that behaves
+        differently, a CLI installed somewhere unexpected. The environment
+        fields below are usually what solves the issue.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect to see in the office, and what did you see instead?
+      placeholder: |
+        Started a Claude Code session in ~/code/my-app. No character appeared,
+        and the office stayed empty for several minutes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ./scripts/start.sh
+        2. Open http://localhost:8787
+        3. Start an agent session in another terminal
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS and version
+      placeholder: macOS 15.2 / Ubuntu 24.04 / Windows 11
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      description: Output of `node --version`
+      placeholder: v20.19.6
+    validations:
+      required: true
+
+  - type: dropdown
+    id: harness
+    attributes:
+      label: Which agent CLI
+      multiple: true
+      options:
+        - Claude Code
+        - Codex CLI
+        - Gemini CLI
+        - None — using ?mock=1
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Daemon log
+      description: |
+        macOS `~/Library/Logs/agent-office-daemon.log`, Linux
+        `journalctl --user -u agent-office-daemon`, Windows
+        `%LOCALAPPDATA%\agent-office\agent-office-daemon.log`.
+
+        Scan it before pasting — it contains repo paths and transcript excerpts.
+      render: shell
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Browser console errors
+      description: Optional, but decisive for anything about rendering or the UI.
+      render: shell
