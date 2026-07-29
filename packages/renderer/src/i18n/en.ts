@@ -338,4 +338,5 @@ export const en = {
   "chat.send": "Send",
   "wall.scrumBoard": "WORK BOARD",
   "chat.note": "\u24d8 this chat cannot approve permissions \u2014 do that in the agent's own app \u00b7 each message is one real Claude turn",
+  "org.counts": "{total} agents · {working} working · {blocked} blocked · {done} done",
 };

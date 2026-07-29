@@ -78,7 +78,7 @@ function repoHtml(tree: OrgRepoTree): string {
   return `
     <section class="org-repo">
       <h3>${esc(tree.repo)}
-        <span class="org-counts">${c.total} agent · ${c.working} làm · ${c.blocked} kẹt · ${c.done} xong</span>
+        <span class="org-counts">${t("org.counts", { total: c.total, working: c.working, blocked: c.blocked, done: c.done })}</span>
       </h3>
       <ul class="org-tree">${tree.roots.map(nodeHtml).join("")}</ul>
     </section>`;
