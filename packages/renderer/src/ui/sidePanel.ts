@@ -12,7 +12,7 @@ export interface TranscriptLine {
   tool?: string;
 }
 
-/** "Xem thêm" progression for GET /transcript?limit= (wi-office-life — read the full backlog without leaving the office). */
+/** The "Show more" progression for GET /transcript?limit= — read the full backlog without leaving the office. */
 const TRANSCRIPT_LIMIT_TIERS = [20, 100, 500];
 
 /**
@@ -26,7 +26,7 @@ export interface SidePanel {
   /**
    * Re-render from the latest sim state (call on a timer, ~2-4 Hz).
    * `now` defaults to wall clock; replay passes its virtual clock so the
-   * "đã bao lâu" readouts stay on the recording's time axis.
+   * "how long ago" readouts stay on the recording's time axis.
    */
   render(state: OfficeState, now?: number): void;
 }
@@ -48,7 +48,7 @@ export function mountSidePanel(
 ): SidePanel {
   let selectedId: string | null = null;
   // Transcript is fetched once per selection (and again when the limit grows
-  // via "Xem thêm"), async; null = not loaded yet.
+  // via "Show more"), async; null = not loaded yet.
   let transcript: TranscriptLine[] | null = null;
   let transcriptFor: string | null = null;
   let transcriptLimit = TRANSCRIPT_LIMIT_TIERS[0];
@@ -121,7 +121,7 @@ export function mountSidePanel(
       return;
     }
 
-    // Fetch transcript when the selection changes OR "Xem thêm" grew the
+    // Fetch the transcript when the selection changes OR "Show more" grew the
     // limit (mark first to avoid a refetch storm from the 4 Hz render timer).
     if (fetchTranscript && (transcriptFor !== agent.agentId || transcriptFetchedLimit !== transcriptLimit)) {
       transcriptFor = agent.agentId;
@@ -261,7 +261,7 @@ function panelHtml(
 }
 
 /**
- * "Hoạt động gần nhất": each entry clips to a couple of lines by default
+ * Recent activity: each entry clips to a couple of lines by default
  * (CSS .row-text) with a ▸/▾ toggle to show the full, untruncated text the
  * daemon sent (wi-office-life — never need to go back to the CLI to read the
  * rest). `expanded` holds the entry.ts values the user opened.
@@ -317,7 +317,7 @@ export function transcriptHtml(
     )
     .join("");
   // fewer lines than asked for = the daemon's buffer is exhausted, more
-  // "Xem thêm" clicks would return the exact same thing
+  // "Show more" clicks would return the exact same thing
   const nextTier = TRANSCRIPT_LIMIT_TIERS[TRANSCRIPT_LIMIT_TIERS.indexOf(limit) + 1];
   const moreBtn =
     nextTier && transcript.length >= limit

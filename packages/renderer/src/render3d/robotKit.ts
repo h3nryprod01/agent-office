@@ -79,7 +79,7 @@ function finish(g: THREE.Group, scale: number): THREE.Group {
   return g;
 }
 
-// ── 01. Khối vuông (blocky) — friendly voxel worker ──
+// ── 01. Boxy — friendly voxel worker ──
 const blocky: RobotBuilder = (s) => {
   const g = new THREE.Group();
   const n = neon(s.accent), b = matte(s.body);
@@ -92,7 +92,7 @@ const blocky: RobotBuilder = (s) => {
   return { inner: finish(g, 1.32), legs };
 };
 
-// ── 02. Viên nang (capsule) — soft rounded body, visor face ──
+// ── 02. Capsule — soft rounded body, visor face ──
 const capsule: RobotBuilder = (s) => {
   const g = new THREE.Group();
   const n = neon(s.accent), b = matte(s.body), m = metal();
@@ -105,7 +105,7 @@ const capsule: RobotBuilder = (s) => {
   return { inner: finish(g, 1.15), legs };
 };
 
-// ── 03. Bay lơ lửng (hover) — no legs; floats over a glowing ring ──
+// ── 03. Hover — no legs; floats over a glowing ring ──
 const hover: RobotBuilder = (s) => {
   const g = new THREE.Group();
   const n = neon(s.accent), b = matte(s.body);
@@ -117,7 +117,7 @@ const hover: RobotBuilder = (s) => {
   return { inner: finish(g, 1.25), legs: [] };
 };
 
-// ── 04. Máy móc nặng (mech) — chunky industrial, shoulder pads ──
+// ── 04. Mech — chunky industrial, shoulder pads ──
 const mech: RobotBuilder = (s) => {
   const g = new THREE.Group();
   const n = neon(s.accent), b = matte(s.body), m = metal();
@@ -133,7 +133,7 @@ const mech: RobotBuilder = (s) => {
   return { inner: finish(g, 1.12), legs };
 };
 
-// ── 05. Người máy thon (android) — tall, slim, elegant ──
+// ── 05. Android — tall, slim, elegant ──
 const android: RobotBuilder = (s) => {
   const g = new THREE.Group();
   const n = neon(s.accent), b = matte(s.body), m = metal();
@@ -147,7 +147,7 @@ const android: RobotBuilder = (s) => {
   return { inner: finish(g, 1.08), legs };
 };
 
-// ── 06. Cổ điển (retro) — 1950s tin robot: drum body, antenna, dial eyes ──
+// ── 06. Retro — 1950s tin robot: drum body, antenna, dial eyes ──
 const retro: RobotBuilder = (s) => {
   const g = new THREE.Group();
   const n = neon(s.accent), m = metal(), b = matte(s.body);
@@ -162,7 +162,7 @@ const retro: RobotBuilder = (s) => {
   return { inner: finish(g, 1.14), legs };
 };
 
-// ── 07. Mắt thần (orb) — a single floating lens; pure minimal presence ──
+// ── 07. Orb — a single floating lens; pure minimal presence ──
 const orb: RobotBuilder = (s) => {
   const g = new THREE.Group();
   const b = matte(s.body);
@@ -173,7 +173,7 @@ const orb: RobotBuilder = (s) => {
   return { inner: finish(g, 1.25), legs: [] };
 };
 
-// ── 08. Bốn chân (quad) — low, animal-like crawler ──
+// ── 08. Quad — low, animal-like crawler ──
 const quad: RobotBuilder = (s) => {
   const g = new THREE.Group();
   const n = neon(s.accent), b = matte(s.body), m = metal();
@@ -191,7 +191,7 @@ const quad: RobotBuilder = (s) => {
   return { inner: finish(g, 1.5), legs };
 };
 
-// ── 09. Đầu màn hình (screen) — CHOSEN: head is a live monitor ──
+// ── 09. Screen — CHOSEN: the head is a live monitor ──
 // The face plate is returned as `inner.userData.face` so the office can later
 // draw an expression / status onto it with a CanvasTexture.
 const screenHead: RobotBuilder = (s) => {
@@ -211,7 +211,7 @@ const screenHead: RobotBuilder = (s) => {
   return { inner, legs };
 };
 
-// ── 10. Lập phương (cube) — a floating cube with detached hands ──
+// ── 10. Cube — a floating cube with detached hands ──
 const cube: RobotBuilder = (s) => {
   const g = new THREE.Group();
   const n = neon(s.accent), b = matte(s.body);

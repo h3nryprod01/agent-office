@@ -14,7 +14,7 @@ export interface WorkItem {
   pr?: string | null;
   obsidianNote?: string | null;
   status?: string | null;
-  /** Work-item cha (task ancestry). null/undefined = gốc chuỗi. */
+  /** The parent work item. null/undefined means this is the root of the chain. */
   parentItemId?: string | null;
 }
 
@@ -67,9 +67,9 @@ export function matchWorkItem(agent: AgentIdentity, items: WorkItem[]): WorkItem
 }
 
 /**
- * Chuỗi work-item từ `start` lên tới root, theo parentItemId. Thứ tự
- * [start, cha, …, root]. Dừng khi cha không tồn tại (orphan) và khi gặp
- * cycle (trả phần đã đi, KHÔNG lặp vô hạn).
+ * The chain of work items from `start` up to the root, following parentItemId,
+ * ordered [start, parent, …, root]. Stops on a missing parent (an orphan) and on
+ * a cycle — returning what it walked rather than looping forever.
  */
 export function ancestryOf(start: WorkItem, items: readonly WorkItem[]): WorkItem[] {
   const byId = new Map(items.map((it) => [it.id, it]));
@@ -103,8 +103,9 @@ export function workItemLinksHtml(item: WorkItem): string {
 }
 
 /**
- * Khối "Vì sao": chuỗi work-item cha, đọc như "làm A vì B vì C". Rỗng khi
- * item không có cha (không có gì để giải thích). Escape mọi tiêu đề.
+ * The "why" block: the chain of parent work items, reading as "doing A because
+ * B because C". Empty when an item has no parent — there is nothing to explain.
+ * Every title is escaped.
  */
 export function whyChainHtml(item: WorkItem, items: readonly WorkItem[]): string {
   const chain = ancestryOf(item, items);

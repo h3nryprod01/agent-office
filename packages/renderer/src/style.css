@@ -471,7 +471,7 @@ body {
   font-size: 12px;
 }
 
-/* Task ancestry: "Vì sao" chain under the work item (child → parent → goal). */
+/* Task ancestry: the "why" chain under a work item (child → parent → goal). */
 .why-chain {
   margin-top: 8px;
   padding-top: 6px;
@@ -608,7 +608,7 @@ body {
   display: block;
 }
 
-/* ── org chart overlay ("Sơ đồ tổ chức", wi-orgchart) ─────────────────── */
+/* ── org chart overlay ───────────────────────────────────────────────── */
 
 .orgchart {
   position: fixed;
@@ -666,7 +666,7 @@ body {
 }
 
 /* the class's display:flex beats the UA's [hidden]{display:none} — without
-   this the dark backdrop covers the whole office on load (the "độ sáng thấp"
+   this the dark backdrop covers the whole office on load (the "screen looks dim"
    bug, surfaced once the missing-} CSS parse fix revived this rule) */
 .orgchart-overlay[hidden] {
   display: none;
@@ -764,7 +764,7 @@ body {
   float: right;
 }
 
-/* ── Building view ("Tòa nhà", R10-b) ──────────────────────── */
+/* ── Building view ──────────────────────────────────────────── */
 
 .building {
   position: fixed;
@@ -798,7 +798,7 @@ body {
 }
 
 /* [hidden] must beat display:flex or the backdrop covers the office on load
-   (same "độ sáng thấp" trap as the org chart overlay). */
+   (the same "screen looks dim" trap as the org chart overlay). */
 .building-overlay[hidden] {
   display: none;
 }
@@ -1024,8 +1024,9 @@ body {
   color: #e2e8f0;
 }
 
-/* display:flex đè thuộc tính hidden — phải chốt lại cho cả hai overlay
-   (orgchart dính y hệt, chỉ chưa lộ vì CSS của nó chết cho tới fix ở trên) */
+/* display:flex overrides the hidden attribute — has to be pinned back for both
+   overlays (the org chart had the identical bug; it just never showed, because
+   its CSS was dead until the fix above) */
 .outputs-overlay[hidden],
 .hiring-overlay[hidden],
 .tpl-overlay[hidden],
@@ -1242,7 +1243,7 @@ body {
   font-size: 12px;
 }
 
-/* ── "Công ty đóng hộp" — company templates panel (wi-templates-panel) ─── */
+/* ── company templates panel ──────────────────────────────────────────── */
 
 .templates {
   position: fixed;
@@ -1251,7 +1252,7 @@ body {
   z-index: 6;
   font-size: 13px;
 }
-/* the "Công ty đóng hộp" button sits top-right; the agent side panel opens there
+/* the templates button sits top-right; the agent side panel opens there
    too (right:12, width:320). sidePanel toggles body.side-panel-open → slide the
    button left of the panel so it never covers it. (body-class, not :has(): :has
    doesn't reliably invalidate an unrelated descendant like .templates when
@@ -1363,7 +1364,7 @@ body.side-panel-open .templates {
   font-size: 12px;
 }
 
-/* nút đã "lên nòng" — lần bấm tiếp theo GHI ĐÈ roster thật */
+/* the button is armed — the next click OVERWRITES the real roster */
 .tpl-card .tpl-confirm ~ .tpl-apply,
 .tpl-apply:hover {
   background: #334155;
@@ -1405,8 +1406,8 @@ body.side-panel-open .templates {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   R13-B — navbar rail + top-level views (Văn phòng / Bảng việc / Chi phí /
-   Cấu hình). App opens to Bảng việc (main.ts sets body[data-view="kanban"]);
+   navbar rail + top-level views (Office / Board / Spend / Settings).
+   main.ts decides which view the app opens to;
    each view shows one panel group, CSS hides the rest.
    ponytail: office-canvas panel offsets under the rail are partial — the
    panels are class-styled by their mount modules; nudging each left edge is
@@ -1523,7 +1524,7 @@ body[data-view="log"] #log {
 body[data-view="settings"] #settings {
   display: block;
 }
-/* Cấu hình view: daemon connection + harness status. Semantic chips
+/* Settings view: daemon connection + harness status. Semantic chips
    (ok/off/warn) read state at a glance; utilitarian, matches Mission Control. */
 .settings {
   height: 100vh;
@@ -1636,7 +1637,7 @@ body:not([data-view="office"]) #templates {
 body:not([data-view="costs"]) #costs {
   display: none;
 }
-/* the "Chi phí" nav view promotes the corner widget to a full-width panel so
+/* the Spend nav view promotes the corner widget to a full-width panel so
    the click lands on the dashboard, not a lone toggle pill. main.ts forces the
    panel open (costs.expand) when this view activates; the bottom padding clears
    the fixed PM chat dock. */
@@ -1707,7 +1708,7 @@ body[data-view="log"] .activity-log {
   max-width: 380px;
 }
 /* first-run: guidance + quick-add input as one centered column (the input sits
-   right under the "ô bên dưới" message instead of floating bottom-left) */
+   right under the hint text instead of floating bottom-left) */
 .kanban-firstrun {
   display: flex;
   flex-direction: column;
@@ -1832,7 +1833,7 @@ body[data-view="log"] .activity-log {
   border-color: #f59e0b;
 }
 
-/* activity log ("Nhật ký", R13-B-2) — de-jargoned transcript feed. Same
+/* activity log — a de-jargoned transcript feed. Same
    shell as the kanban; rows are time + content, tech mode shows the raw
    tool name as a chip + the command/text in mono. */
 .activity-log {
@@ -1915,7 +1916,7 @@ body[data-view="log"] .activity-log {
 }
 
 /* Shown instead of the office when WebGL is unavailable. The 3D view is the
-   nice-to-have; Bảng việc / Nhật ký / Chi phí / Cấu hình still work, so say so
+   nice-to-have; Board / Activity / Spend / Settings still work, so say so
    rather than leaving a blank canvas. */
 .office-fallback {
   position: absolute;
