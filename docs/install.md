@@ -1,93 +1,111 @@
-# Cài đặt & vận hành
+# Install and run
 
-Dành cho người nhận bàn giao Agent Office. Cần **Node 20+**. Không cần gì khác.
+Everything you need to run Agent Office on your own machine. Requires **Node 20+**
+and nothing else.
 
-## Chạy
+## Running it
 
-**macOS** — một lệnh, từ bản clone sạch hay vào sáng ngày demo:
+**macOS** — one command, from a fresh clone or on the morning of a demo:
 
 ```bash
 ./scripts/start.sh
 ```
 
-Nó cài dependency nếu thiếu, build lại renderer, dựng daemon nếu chưa chạy, rồi mở
-**http://localhost:8787**. Chạy lại lúc nào cũng được — nó dùng lại daemon đang có.
+It installs dependencies if they are missing, rebuilds the renderer, sets the
+daemon up if it isn't running, and opens **http://localhost:8787**. Run it again
+whenever you like — it reuses the daemon that's already up.
 
-> Mở bằng `localhost`, đừng gõ tay `127.0.0.1`. Trình duyệt coi hai địa chỉ này
-> là hai origin riêng và cấp quyền riêng — vào bằng IP thì phải cấp lại quyền
-> microphone, chưa cấp thì nút 🎤 không nhận giọng và không báo gì cả.
+> Open it at `localhost`; don't type `127.0.0.1` by hand. Browsers treat those as
+> two separate origins with separate permissions, so via the IP you'd have to
+> grant microphone access again — and until you do, the 🎤 button hears nothing
+> and says nothing about why.
 
-Muốn bấm đúp thay vì gõ lệnh:
+Prefer double-clicking an icon to typing a command:
 
 ```bash
-./scripts/make-app.sh     # tạo ~/Applications/Agent Office.app
+./scripts/make-app.sh     # creates ~/Applications/Agent Office.app
 ```
 
-**Windows** — trong PowerShell, từ thư mục repo:
+**Linux** — systemd `--user` service, starts at boot:
+
+```bash
+./scripts/install-ubuntu.sh
+```
+
+**Windows** — in PowerShell, from the repo directory:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\start.ps1
 ```
 
-> `start.ps1` đã **parse + dry-run sạch trên pwsh 7.6.3 (macOS)**: 0 lỗi cú pháp,
-> và với daemon đang chạy thì cả luồng non-Windows chạy trót lọt (kiểm deps →
-> `npm run build` → chờ cổng → exit 0). **Chưa chạy trên Windows thật** phần
-> Windows-only: `Start-ScheduledTask` đăng ký/khởi động daemon, `Start-Process` mở
-> trình duyệt, và perf x86. `install-daemon-service.ps1` (script này gọi tới) thì
-> đã verify trên Windows 11 thật ([windows-port.md](windows-port.md)). Trên Windows,
-> lần chạy đầu vẫn là bài test: đúng thì in `Agent Office -> ...` và mở trình duyệt.
+> `start.ps1` **parses and dry-runs clean on pwsh 7.6.3 (macOS)**: no syntax
+> errors, and with the daemon already running the whole non-Windows path
+> completes (check deps → `npm run build` → wait for the port → exit 0). The
+> Windows-only parts have **not been run on real Windows**: `Start-ScheduledTask`
+> registering and starting the daemon, `Start-Process` opening the browser, and
+> x86 performance. `install-daemon-service.ps1`, which it calls, *has* been
+> verified on real Windows 11 — see [windows-port.md](windows-port.md). On
+> Windows, treat the first run as the test: success prints `Agent Office -> ...`
+> and opens a browser.
 
-## Cái gì chạy ở đâu
+## What runs where
 
-| Thứ | macOS | Windows |
+| | macOS | Windows |
 |---|---|---|
-| Daemon | launchd `com.agentoffice.daemon`, chạy lúc đăng nhập, tự dựng lại khi chết | Scheduled Task `AgentOfficeDaemon` |
-| Log daemon | `~/Library/Logs/agent-office-daemon.log` | `%LOCALAPPDATA%\agent-office\agent-office-daemon.log` |
-| Log khi bấm đúp `.app` | `~/Library/Logs/agent-office-app.log` | — |
-| App | `http://localhost:8787` — **một tiến trình, một cổng**: daemon phục vụ luôn bản build | như macOS |
+| Daemon | launchd `com.agentoffice.daemon`, starts at login, restarts itself if it dies | Scheduled Task `AgentOfficeDaemon` |
+| Daemon log | `~/Library/Logs/agent-office-daemon.log` | `%LOCALAPPDATA%\agent-office\agent-office-daemon.log` |
+| Log when launched from the `.app` | `~/Library/Logs/agent-office-app.log` | — |
+| App | `http://localhost:8787` — **one process, one port**: the daemon also serves the build | same as macOS |
 
-Chỉ nghe ở `127.0.0.1`, không mở ra mạng ngoài.
+It listens on `127.0.0.1` only and is not exposed to the network. Before you
+change that, read [SECURITY.md](../SECURITY.md).
 
-## Hỏng thì xem đâu
+## When something breaks
 
-**Trang 404 hoặc trắng.** Chưa build `packages/renderer/dist`. Chạy `./scripts/start.sh` —
-nó luôn build. Đây là lý do file này tồn tại: `install-daemon-service.sh` chỉ cài
-service phục vụ `dist/`, nó không tự build.
+**A 404 or a blank page.** `packages/renderer/dist` hasn't been built. Run
+`./scripts/start.sh` — it always builds. This is the reason that script exists:
+`install-daemon-service.sh` only installs a service that serves `dist/`; it does
+not build anything itself.
 
-**Văn phòng vẫn là bản cũ sau khi sửa code.** Cũng vậy — daemon đọc file từ đĩa theo
-từng request, nên `start.sh` build xong là nó phục vụ bản mới ngay, không cần restart.
-Nhưng nếu bạn build bằng tay và quên, daemon vẫn trả **200 kèm bản cũ** và trông y như
-đang khoẻ. Nó không có cách nào báo cho bạn biết.
+**The office still shows old code after you changed something.** Same cause. The
+daemon reads files from disk per request, so once `start.sh` finishes building it
+serves the new bundle immediately, with no restart. But if you build by hand and
+forget, the daemon happily returns **200 with the old build** and looks perfectly
+healthy. It has no way to tell you.
 
-**Cấu hình báo "Mất kết nối" (chế độ live).** Daemon chết thật. Xem log ở bảng trên.
-Dựng lại: chạy lại `./scripts/start.sh`.
+**Settings says "Disconnected" in live mode.** The daemon really is down. Check
+the log in the table above, then bring it back with `./scripts/start.sh`.
 
-**Bóng đổ tự nhiên biến mất.** Cố ý: máy tụt dưới 20 fps quá 3 giây thì office bỏ bóng
-đổ để giữ mượt, và không bật lại cho tới khi tải lại trang. Đo được 3 fps trên VM
-Windows ARM không có tăng tốc GPU. Tải lại trang là bóng trở về.
+**Shadows disappeared on their own.** Deliberate: if the machine drops below
+20 fps for more than three seconds, the office sheds shadows to stay smooth and
+does not turn them back on until you reload. Measured at 3 fps on a Windows ARM
+VM with no GPU acceleration. Reloading the page brings them back.
 
-**Máy không có WebGL.** App vẫn chạy: Bảng việc, Nhật ký, Chi phí, Cấu hình đều bình
-thường, chỉ khung Văn phòng 3D được thay bằng lời giải thích.
+**The machine has no WebGL.** The app still works — Board, Activity, Spend and
+Settings are all normal; only the 3D office is replaced by an explanation.
 
-## Demo không cần daemon
+## A demo with no daemon
 
-Thêm `?mock=1` → kịch bản dựng sẵn, mở thẳng vào Văn phòng, không cần daemon hay
-session thật. Dùng để cho người ta thấy sản phẩm trước khi họ kết nối gì cả.
-Ở chế độ này Bảng việc / Nhật ký / Chi phí **không có dữ liệu** — đúng thiết kế, vì
-không có daemon để hỏi.
+Add `?mock=1` for a scripted scenario that opens straight into the office, with
+no daemon and no real sessions. Useful for showing someone the product before
+they connect anything.
 
-Bản thật thì ngược lại: chạy `http://127.0.0.1:8787` không kèm tham số, các phiên
-Claude Code đang chạy sẽ hiện thành nhân vật trong vài giây.
+In this mode Board / Activity / Spend have **no data** — by design, since there
+is no daemon to ask.
 
-## Gỡ cài đặt
+The real thing is the opposite: open `http://localhost:8787` with no query
+parameters and your running agent sessions appear as characters within seconds.
+
+## Uninstalling
 
 ```bash
 ./scripts/install-daemon-service.sh uninstall     # macOS
-rm -rf ~/Applications/Agent\ Office.app           # nếu đã tạo .app
+rm -rf ~/Applications/Agent\ Office.app           # if you created the .app
 ```
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\install-daemon-service.ps1 uninstall
 ```
 
-Xoá repo là hết — không có gì nằm ngoài repo, service, và mấy file log kể trên.
+Then delete the repo. Nothing lives outside the repo, the service, and the log
+files listed above.

@@ -1,31 +1,46 @@
-# Company Protocol v1 — hợp đồng giữa coordinator, agents, và Agent Office
+# Company Protocol v1 — the contract between coordinator, agents, and the office
 
-Giao thức chung cho mô hình "công ty đa agent phục vụ 1 solo dev". Mọi skill (`/company:pm`, `company:report`, `/company:board`) và UI (Agent Office side panel) đều đọc/ghi theo hợp đồng này. Nguyên tắc gốc không đổi: **data thật + real-time; mọi thứ phải trả lời nhanh hơn terminal câu hỏi "tôi cần can thiệp ở đâu?"**
+The shared protocol for running "a multi-agent company serving one solo dev".
+Every skill (`/company:pm`, `company:report`, `/company:board`) and the office's
+own UI read and write against this contract.
 
-## 1. Work item — nguồn chân lý
+The founding principle doesn't move: **real data, in real time; everything must
+answer "where do I need to intervene?" faster than the terminal would.**
 
-- **Plane** (self-host, `localhost:8080`, workspace `mission-control`) là nguồn chân lý trạng thái task. Mỗi việc giao cho một agent = **1 Plane issue**: title = việc, description = bối cảnh + vùng file được đụng + tiêu chí xong, state chuẩn `Backlog → In Progress → Done / Blocked`.
-- **Ngưỡng "vào công ty"**: việc ước < 30 phút, 1 session tự làm xong → KHÔNG tạo issue, không nghi thức. Chỉ việc giao đi (chip/session khác) hoặc nhiều bước mới tạo issue.
-- **Fallback khi Plane tắt**: ghi vào registry file (mục 2) với `planeIssueId: null` + thêm dòng vào `.claude/memory/plane-outbox.jsonl` (mỗi dòng = 1 thao tác Plane chưa sync: create/update/comment). Session nào thấy Plane sống thì replay outbox rồi xóa dòng đã sync.
+## 1. Work items — the source of truth
 
-## 2. Work registry — cầu nối sang Agent Office
+- A tracker holds task state. One piece of work handed to one agent is **one
+  issue**: the title is the work, the description carries the context, the file
+  areas it may touch, and what "done" means. States are
+  `Backlog → In Progress → Done / Blocked`.
+- **The threshold for ceremony**: work under ~30 minutes that a single session
+  finishes itself gets **no issue and no ritual**. Only work handed to another
+  agent, or work with several steps, earns one.
+- **When the tracker is offline**, write to the registry (§2) with a null issue
+  id and append a line to an outbox file — one line per unsynced tracker
+  operation (create / update / comment). Whichever session next finds the
+  tracker alive replays the outbox and drops the synced lines. Replay is
+  idempotent by design.
 
-File `.claude/memory/work-items.json` trong repo của dự án, coordinator ghi khi giao việc, agent cập nhật khi có link mới:
+## 2. The work registry — the bridge into the office
+
+A JSON file in the project's repo. The coordinator writes it when handing work
+out; the agent updates it as links appear:
 
 ```json
 {
   "version": 1,
   "items": [
     {
-      "id": "wi-<ngắn, duy nhất>",
-      "title": "Dựng Mission Control MVP",
-      "assignee": "mission-control",        // tên agent/chip
-      "sessionId": "<claude session id nếu biết>",
+      "id": "wi-<short, unique>",
+      "title": "Build the Mission Control MVP",
+      "assignee": "mission-control",
+      "sessionId": "<agent session id, if known>",
       "branch": "feat/mission-control",
-      "planeIssueId": "AGOF-12 | null",
-      "planeUrl": "http://localhost:8080/... | null",
+      "issueId": "PROJ-12 | null",
+      "issueUrl": "https://... | null",
       "pr": "https://github.com/... | null",
-      "obsidianNote": "ai-memory/... | null",
+      "note": "<external note ref> | null",
       "status": "in_progress | done | blocked",
       "updatedAt": "<ISO>"
     }
@@ -33,35 +48,63 @@ File `.claude/memory/work-items.json` trong repo của dự án, coordinator ghi
 }
 ```
 
-Daemon serve file này qua `GET /work-items` (đọc mỗi request, không cache); side panel render mục "Work item" với deep link: Plane URL, `obsidian://` , PR. Click nhân vật là mở được vùng dữ liệu của nó — đó là toàn bộ mục đích của registry.
+The daemon serves this over `GET /work-items`, re-read per request and never
+cached. The side panel renders a "Work item" section with deep links out to the
+issue, the note, and the PR.
 
-## 3. Giao thức báo cáo (bắt buộc trong prompt mọi agent được spawn)
+Clicking a character opens everything about the work it is doing — that is the
+registry's entire purpose.
 
-Agent xong việc (hoặc bị kẹt) phải làm theo thứ tự:
+## 3. The reporting protocol
 
-1. **Cập nhật work item**: Plane issue → Done/Blocked + comment đúng 5 mục (mỗi mục ≤ 2 dòng):
-   - `Did:` làm gì
-   - `Verified:` verify bằng cách nào (test số liệu, chạy thật, screenshot)
-   - `Links:` PR / commit / file
-   - `Blockers:` gì đang chặn (hoặc "none")
-   - `Next:` đề xuất bước sau (hoặc "none")
-   Plane tắt → ghi comment này vào outbox + cập nhật `work-items.json`.
-2. **Nhắn coordinator**: `send_message` tới session điều phối (nếu còn sống) với đúng 5 mục trên. Coordinator chết → bỏ qua, registry + Plane đã đủ (PM stateless sẽ đọc lại).
-3. **Tri thức tái dùng** (chỉ khi có): insight dùng lại được ngoài repo này → 1 note Obsidian qua basic-memory, link vào `obsidianNote` của work item. Không ghi trùng những gì đã nằm trong repo docs.
+Required in the prompt of every agent that gets spawned. When an agent finishes
+or gets stuck, in this order:
 
-Coordinator **không tin lời báo cáo** — đối chiếu PR/commit/test thật trước khi đóng issue.
+1. **Update the work item.** Move the issue to Done or Blocked with a comment in
+   exactly five parts, each at most two lines:
+   - `Did:` what you did
+   - `Verified:` how you verified it — test numbers, a real run, a screenshot
+   - `Links:` PR / commit / files
+   - `Blockers:` what is in the way, or "none"
+   - `Next:` the suggested next step, or "none"
 
-## 4. PM stateless (quyết định đã chốt 2026-07-07)
+   Tracker offline → the same comment goes to the outbox and the registry.
+2. **Message the coordinator** with those same five parts, if that session is
+   still alive. If it isn't, skip it: the registry and the tracker are enough,
+   because the PM is stateless and will read them back.
+3. **Reusable knowledge, only when there is some.** An insight that applies
+   beyond this repo becomes one external note, linked from the work item. Don't
+   duplicate anything the repo's own docs already say.
 
-Không có "PM session sống lâu". Bất kỳ session nào chạy `/company:pm` sẽ:
-1. Đọc state: Plane issues (hoặc registry khi Plane tắt) + `work-items.json` + `.claude/memory/activeContext.md` + `git log`/PR + sessions đang chạy.
-2. Đối chiếu — issue Done mà chưa merge? PR mở chưa review? Agent im quá lâu?
-3. Hành động: review/merge, giao việc mới (tạo issue + registry entry + spawn chip/sub-agent với prompt tiêm mục 3 + kỷ luật mục 5), cập nhật activeContext.
-4. Kết thúc turn hoặc set loop — chết không mất gì vì toàn bộ não nằm trong Plane + registry + repo memory.
+The coordinator **does not take the report at face value** — it checks the PR,
+the commits and the tests before closing anything.
 
-## 5. Kỷ luật thi công (bài học đã trả giá 3 lần)
+## 4. A stateless PM
 
-- Mỗi agent làm trong **git worktree riêng** (`.claude/worktrees/<tên>`), không bao giờ checkout trong thư mục gốc chung; luôn `git branch --show-current` trước khi commit.
-- Coordinator phân **vùng file** khi giao việc (ghi trong issue); ai cần sửa ngoài vùng → nói trong PR, không tự ý.
-- Merge: squash qua PR; docs/demo merge cuối; xóa branch + worktree sau merge (worktree phải clean và session đã tắt).
-- Quyết định mới → append `.claude/memory/decisions.md` (`| date | quyết định | lý do |`).
+There is no long-lived PM session. Any session running `/company:pm` will:
+
+1. **Read the state**: issues (or the registry when the tracker is down), the
+   work registry, the repo's active-context note, `git log` and open PRs, and
+   which sessions are currently running.
+2. **Reconcile**: an issue marked Done but never merged? A PR open and
+   unreviewed? An agent silent for too long?
+3. **Act**: review and merge, or hand out new work — create the issue, add the
+   registry entry, and spawn the agent with §3 and §5 injected into its prompt —
+   then update the active-context note.
+4. **End the turn**, or loop. Dying costs nothing, because the whole brain lives
+   in the tracker, the registry and the repo's memory.
+
+## 5. Working discipline
+
+Each of these was learned by getting it wrong first.
+
+- Every agent works in **its own git worktree**, never checked out in the shared
+  root. Always confirm `git branch --show-current` before committing.
+- The coordinator **partitions file ownership** when handing work out and writes
+  it in the issue. Needing to touch something outside your area is a thing you
+  raise in the PR, not something you just do.
+- Merge by squash through a PR. Docs and demo changes merge last. Delete the
+  branch and the worktree afterwards — the worktree must be clean and its
+  session stopped.
+- A new decision gets appended to the repo's decision log with its date and,
+  more importantly, its reason.

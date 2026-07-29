@@ -11,7 +11,9 @@ the day they describe and may lag the code. They are kept because the reasoning
 is often more useful than the outcome — several of them exist mainly to record
 a trap worth not falling into twice.
 
-Most documents are in Vietnamese.
+The reference documents are in English. **The status notes are in Vietnamese**,
+in the language they were written in as the work happened. Translating them
+after the fact would have meant rewriting a record, so they were left alone.
 
 ## Start here
 
