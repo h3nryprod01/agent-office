@@ -98,24 +98,24 @@ async function main() {
   // event type "roster_updated" (renderer diffs members → walk-in greeting).
   const rosterPath = process.env.COMPANY_ROSTER_PATH ?? DEFAULT_ROSTER_PATH;
   const rosterHttp = createRosterHttpHandler({ rosterPath });
-  // "Công ty đóng hộp" (wi-templates-panel): browse templates/ and apply one
+  // Company in a box: browse templates/ and apply one
   // onto ~/.claude/company/roster.yaml (timestamped backup first).
   const templatesHttp = createTemplatesHttpHandler();
-  // R13-A: ~/.agent-office/projects/<slug>/ — daemon là cổng ghi duy nhất của item.
+  // ~/.agent-office/projects/<slug>/ — the daemon is the only writer of an item.
   const projectsHttp = createProjectsHttpHandler();
   // R13-INFRA: harness install/login probe for the onboarding wizard, and a
   // static handler serving the renderer build (1 process, 1 port).
   const harnessHttp = createHarnessHttpHandler();
   const staticHttp = createStaticHttpHandler();
-  // Voice VN (wi-voice-vieneu): POST /tts → VieNeu WAV; renderer fallback về
-  // speechSynthesis khi 503 nên thiếu venv không chặn gì.
+  // Voice: POST /tts → a WAV from the local model. A missing venv returns 503
+  // and blocks nothing — the renderer simply doesn't speak.
   const vieneuTts = new VieNeuTts();
   const ttsHttp = createTtsHttpHandler(vieneuTts);
 
   const server = new EventBroadcastServer({
     port: WS_PORT,
     host: WS_HOST,
-    // wi-office-life: the side panel's transcript "Xem thêm" grows its
+    // the side panel's transcript "Show more" grows its
     // request up to limit=500 — bump the ring buffer to match, or higher
     // tiers would just re-return the same 100 events.
     perSessionLimit: 500,
@@ -160,7 +160,7 @@ async function main() {
   });
   rosterWatcher.start();
   attachNotifier(server); // macOS notification khi agent kẹt >30s (AGENT_OFFICE_NOTIFY=0 để tắt)
-  // Telegram 2 chiều (B11/B12): no-op silently unless TELEGRAM_BOT_TOKEN +
+  // Two-way Telegram: a silent no-op unless TELEGRAM_BOT_TOKEN +
   // TELEGRAM_CHAT_ID are both set — see telegram.js's own config gate.
   const telegramPoll = pollUpdates(chatManager);
   console.log(`[daemon] approve gateway: POST http://${WS_HOST}:${WS_PORT}/approval-request|/approval-response`);

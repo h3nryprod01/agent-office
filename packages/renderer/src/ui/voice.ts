@@ -1,24 +1,27 @@
-import { t } from "../i18n";
 /**
- * Voice for the PM chatbox (Round 6, wi-voice) — zero dependencies.
+ * Voice for the PM chat box — no dependencies.
  *
- * Input: Web Speech API (webkitSpeechRecognition, lang vi-VN). Hold the 🎤
- * button or the Space key (when not typing) to talk; the live transcript
- * lands in the chat input; releasing gives a 1.5s grace window to edit
- * (typing restarts it) or cancel with Esc before the message auto-sends.
+ * Input: the Web Speech API. Hold the 🎤 button, or Space when you aren't
+ * typing, to talk. The live transcript lands in the chat input; releasing gives
+ * a short grace window to edit (typing restarts it) or cancel with Esc before
+ * the message sends itself.
  *
- * Output: PM replies are read aloud — 🔊 toggle, off by default, remembered
- * in localStorage. Markdown is stripped first (stripForSpeech), then the
- * reply routes by language (detectLang): English → speechSynthesis (system
- * voices are good); Vietnamese → VieNeu qua daemon POST /tts (wi-voice-vieneu:
- * giọng vi hệ thống duy nhất là Linh compact, đọc "như đánh vần" — user bác
- * 2 lần). Reply Việt được cắt theo câu (splitSentences), phát nối tiếp qua
- * <audio> với prefetch câu kế; daemon tắt/503 → tự fallback speechSynthesis
- * (Linh) kèm 1 dòng hint. Xem docs/voice-vi-status.md.
+ * Output: replies are read aloud behind a toggle that is off by default and
+ * remembered. Markdown is stripped first (stripForSpeech), then the reply is
+ * split into sentences and played back to back through <audio>, prefetching the
+ * next clip while the current one plays.
  *
- * createVoiceMachine() is the testable core: the recognition object is
- * injected so unit tests drive it with a mock. wireVoice() is DOM glue.
+ * There is exactly one voice, served by the daemon at POST /tts. The browser's
+ * own speechSynthesis is deliberately not a fallback: the only system
+ * Vietnamese voice reads word by word, and it doubled up across tabs. Without
+ * the daemon the speaker stays silent and says so once. See
+ * docs/voice-vi-status.md.
+ *
+ * createVoiceMachine() is the testable core — the recognition object is
+ * injected so unit tests drive it with a mock. wireVoice() is the DOM glue.
  */
+
+import { t } from "../i18n";
 
 export interface RecognitionEventLike {
   resultIndex: number;
@@ -194,7 +197,7 @@ export function detectLang(text: string): "vi-VN" | "en-US" {
 
 /**
  * wi-pm-ux: PM replies are markdown — reading `**`, `#`, `|`, URLs aloud is
- * noise. Strip to plain text; a markdown table collapses to "bảng N dòng".
+ * noise. Strip to plain text; a markdown table collapses to "table, N rows".
  */
 export function stripForSpeech(text: string): string {
   let out = text.replace(/```[\s\S]*?```/g, " ");
@@ -218,9 +221,10 @@ export function stripForSpeech(text: string): string {
 }
 
 /**
- * wi-voice-vieneu: reply Việt cắt theo câu để câu đầu vang lên sau ~2s thay vì
- * chờ VieNeu render cả reply (infer ~0.6× realtime, đo 2026-07-08). Câu quá
- * dài (bullet gộp) cắt thêm ở dấu phẩy/chấm phẩy cho từng clip ngắn lại.
+ * Split a reply into sentences so the first one is audible after ~2s instead of
+ * waiting for the whole reply to render (inference measured at ~0.6× realtime).
+ * An over-long sentence — a run of merged bullets — splits again at commas and
+ * semicolons so no single clip is long.
  */
 export function splitSentences(text: string): string[] {
   const MAX = 180;
@@ -248,16 +252,16 @@ export interface AudioLike {
 
 export interface SpeakerDeps {
   /**
-   * POST /tts cho MỘT câu → object URL của WAV, null khi daemon/VieNeu không
-   * sẵn sàng (renderer sẽ fallback speechSynthesis). Không có dep này thì
-   * tiếng Việt cũng đi đường speechSynthesis như trước.
+   * POST /tts for ONE sentence → an object URL for the WAV, or null when the
+   * daemon's voice is unavailable. Without this dependency the speaker stays
+   * silent rather than falling back to a system voice.
    */
   fetchTtsUrl?(text: string): Promise<string | null>;
   createAudio?(url: string): AudioLike;
   revokeUrl?(url: string): void;
-  /** Gọi đúng 1 lần khi VieNeu thiếu và phải dùng giọng hệ thống cho tiếng Việt. */
+  /** Called exactly once when the voice backend is missing. */
   onFallbackHint?(): void;
-  /** Tab đang ẩn? Mặc định đọc document.hidden. */
+  /** Is the tab hidden? Reads document.hidden by default. */
   isHidden?(): boolean;
 }
 
@@ -281,8 +285,9 @@ export function createSpeaker(
   let enabled = supported && localStorage.getItem(TTS_KEY) === "1";
   let active = 0; // reply lines queued + đang đọc
 
-  // HTMLAudioElement khớp AudioLike lúc runtime; khác nhau mỗi chữ ký handler
-  // (DOM truyền Event, mình không dùng) — cast thay vì nới interface cho mock.
+  // HTMLAudioElement satisfies AudioLike at runtime; only the handler signatures
+  // differ (the DOM passes an Event we don't use), so cast rather than widening
+  // the interface just to fit a mock.
   const createAudio =
     deps.createAudio ?? ((url: string): AudioLike => new Audio(url) as unknown as AudioLike);
   const revokeUrl = deps.revokeUrl ?? ((url: string) => URL.revokeObjectURL(url));
@@ -294,7 +299,7 @@ export function createSpeaker(
     if (was !== active > 0) onSpeaking?.(active > 0);
   };
 
-  // ── đường VieNeu qua daemon /tts (giọng Đoan, giọng đọc duy nhất) ─────────
+  // ── the daemon /tts path — the only voice the office speaks with ─────────
   let gen = 0; // cancel() bumps — vòng pump cũ tự thoát
   let queue: string[] = [];
   let pumping = false;
@@ -314,7 +319,7 @@ export function createSpeaker(
       };
       a.onended = () => done(true);
       a.onerror = () => done(false);
-      // play() reject (autoplay policy…) → coi như câu này phát hỏng
+      // play() rejecting (autoplay policy, …) counts as this clip failing
       Promise.resolve(a.play()).catch(() => done(false));
     });
 
@@ -326,7 +331,7 @@ export function createSpeaker(
         const myGen = gen;
         const text = queue.shift()!;
         const sentences = splitSentences(text);
-        // prefetch câu kế trong lúc câu hiện tại đang phát — lấp độ trễ infer
+        // prefetch the next sentence while this one plays, hiding inference latency
         let next: Promise<string | null> | null = sentences.length
           ? deps.fetchTtsUrl!(sentences[0]!).catch(() => null)
           : null;
@@ -341,7 +346,7 @@ export function createSpeaker(
             break;
           }
           if (!url) {
-            // VieNeu không sẵn sàng → bỏ phần còn lại, chỉ hiện hint (không đè giọng hệ thống)
+            // voice backend unavailable → drop the rest and show the hint once
             if (!hinted) {
               hinted = true;
               deps.onFallbackHint?.();
@@ -352,7 +357,7 @@ export function createSpeaker(
           revokeUrl(url);
           if (myGen !== gen) break;
           if (!ok) {
-            // clip hỏng → bỏ qua phần còn lại, không đè giọng hệ thống lên VieNeu
+            // a broken clip ends the reply rather than switching voices mid-sentence
             break;
           }
         }
@@ -385,13 +390,13 @@ export function createSpeaker(
       if (!enabled || !text) return;
       const spoken = stripForSpeech(text);
       if (!spoken) return;
-      // Giọng Đoan (VieNeu) là giọng đọc DUY NHẤT. Mọi câu — kể cả dòng tiếng
-      // Anh (hash commit, path) — đều đi VieNeu; KHÔNG dùng speechSynthesis nữa
-      // (giọng hệ thống Linh đọc "đánh vần", lại chồng giọng khi mở nhiều tab).
+      // One voice, always. Every line — including the English ones (commit
+      // hashes, paths) — goes through the daemon. speechSynthesis is gone: the
+      // system Vietnamese voice spells words out, and it doubled up across tabs.
       if (!deps.fetchTtsUrl) return; // không có daemon VieNeu → im lặng, không rơi sang giọng hệ thống
-      // Mỗi tab office mở là một client WS riêng, nên cùng một reply được N tab
-      // đọc cùng lúc, lệch nhau vài trăm ms → nghe như mấy người nói chồng nhau.
-      // Chỉ tab đang nhìn thấy mới đọc; tab nền im.
+      // Every open office tab is its own WS client, so one reply gets read by N
+      // tabs a few hundred ms apart — it sounds like several people talking over
+      // each other. Only the visible tab speaks; background tabs stay quiet.
       if (isHidden()) return;
       setActive(active + 1);
       queue.push(spoken);
@@ -399,7 +404,7 @@ export function createSpeaker(
     },
     cancel,
     resetTurn() {
-      // no-op: giọng đọc không còn phân nhánh theo ngôn ngữ (chỉ VieNeu/Đoan).
+      // no-op: the speaker no longer branches by language.
     },
   };
 }
@@ -415,7 +420,7 @@ export interface WireVoiceOpts {
   appendSystemLine(text: string): void;
   /** speechSynthesis started/stopped reading (for the PM bubble glow). */
   onSpeaking?(speaking: boolean): void;
-  /** Endpoint VieNeu của daemon (mặc định /tts). */
+  /** The daemon's voice endpoint (defaults to /tts). */
   ttsUrl?: string;
 }
 
@@ -433,8 +438,8 @@ export function wireVoice(o: WireVoiceOpts): VoiceHandle {
   const w = window as unknown as Record<string, unknown>;
   const Ctor = (w.SpeechRecognition ?? w.webkitSpeechRecognition) as RecognitionCtor | undefined;
 
-  // Reply Việt đi qua VieNeu của daemon; mọi lỗi (daemon tắt, 503, mạng) trả
-  // null để speaker fallback speechSynthesis — voice không bao giờ chết hẳn.
+  // Replies go through the daemon's voice; any failure — daemon down, 503,
+  // network — returns null, and the speaker stays silent rather than crashing.
   const ttsUrl = o.ttsUrl ?? "/tts";
   const fetchTtsUrl = async (text: string): Promise<string | null> => {
     try {
@@ -469,10 +474,11 @@ export function wireVoice(o: WireVoiceOpts): VoiceHandle {
         o.appendSystemLine(t("voice.micBlocked"));
         return;
       }
-      // "aborted" = user tự huỷ, "no-speech" = không nói gì: im lặng là đúng.
-      // Còn lại phải hiện ra. Nuốt hết như trước thì lỗi "network" (Web Speech
-      // của Chrome gọi server Google — VPN/tường lửa chặn là hỏng) trông y hệt
-      // "mic không chạy" mà không có lấy một dòng nào để lần ra.
+      // "aborted" is the user cancelling and "no-speech" is silence — staying
+      // quiet is right for both. Everything else must surface. Swallowing them
+      // all, as this used to, made a "network" failure (Chrome's Web Speech
+      // calls Google's servers, so a VPN or firewall breaks it) look exactly
+      // like a dead microphone, with nothing to trace it by.
       if (code === "aborted" || code === "no-speech") return;
       o.appendSystemLine(
         code === "network"
@@ -514,10 +520,10 @@ export function wireVoice(o: WireVoiceOpts): VoiceHandle {
 
   const typingSomewhere = (): boolean => {
     const el = document.activeElement;
-    // Ô chat giữ focus sau MỌI lần gửi (send() không blur), nên nếu chặn vô điều
-    // kiện thì Space-PTT chết hẳn từ tin nhắn thứ hai trở đi — bấm giữ Space chỉ
-    // gõ dấu cách. Ô chat rỗng = không ai đang gõ dở → cho PTT chạy; có chữ rồi
-    // thì Space vẫn là dấu cách như bình thường.
+    // The chat input keeps focus after EVERY send (send() doesn't blur), so
+    // blocking unconditionally kills push-to-talk from the second message on —
+    // holding Space would only type a space. An empty input means nobody is
+    // mid-sentence, so Space belongs to PTT; with text in it, Space is a space.
     if (el === o.input) return o.input.value !== "";
     return (
       el instanceof HTMLInputElement ||
@@ -543,7 +549,7 @@ export function wireVoice(o: WireVoiceOpts): VoiceHandle {
   // typing during the grace window restarts the 1.5s countdown
   o.input.addEventListener("input", () => machine.touch());
 
-  // Prime autoplay. The reply's Đoan clip is fetched and played ~10s after the
+  // Prime autoplay. The reply's audio clip is fetched and played ~10s after the
   // send click, in an async callback OFF the gesture call stack — Chrome then
   // silently blocks <audio>.play() and there is no voice at all. (The old
   // speechSynthesis path masked this; VieNeu-only exposes it.) Playing a tiny

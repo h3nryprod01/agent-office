@@ -51,7 +51,7 @@ export interface ChatBoxHandle {
   /** Active office tab changed; null = tab "All" → the daemon's default repo. */
   setRepo(repo: string | null): void;
   /** Pre-fill the input with a draft (e.g. "Giao cho PM" from a kanban idea) and
-   *  focus it — does NOT send; the user reviews then hits Enter/Gửi. */
+   *  focus it — does NOT send; the user reviews then hits Enter or Send. */
   prefill(text: string): void;
 }
 
@@ -73,7 +73,7 @@ const STYLE = `
 #chat-box .chat-log:empty, #chat-box .chat-log[hidden] { display: none; }
 #chat-box .chat-line { white-space: pre-wrap; word-break: break-word; }
 #chat-box .chat-line.user { color: #93c5fd; }
-#chat-box .chat-line.user::before { content: t("chat.youPrefix"); color: #475569; }
+#chat-box .chat-line.user::before { content: "${t("chat.youPrefix")}"; color: #475569; }
 #chat-box .chat-line.assistant::before { content: "PM › "; color: #f59e0b; }
 #chat-box .chat-line.system { color: #f87171; font-style: italic; }
 #chat-box .chat-line.info { color: #94a3b8; font-style: italic; }
@@ -167,11 +167,12 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
   });
 
   const seenFrameIds = new Set<string>();
-  // Daemon phát lại TOÀN BỘ lịch sử chat cho mỗi client vừa nối, mà seenFrameIds
-  // trống sau mỗi lần nạp trang → không chặn thì mỗi lần F5 là đọc to lại mọi
-  // reply cũ (đo được 5 câu; nhân số tab đang mở = một tràng giọng chồng nhau).
-  // Backlog về ngay trong vài ms sau khi nối, nên chờ nó chảy hết rồi mới đọc.
-  // Dùng độ trễ thay vì so frame.ts: qua tunnel thì đồng hồ hai bên lệch nhau.
+  // The daemon replays the ENTIRE chat history to every client that connects,
+  // and seenFrameIds starts empty on each page load — so without a gate, every
+  // refresh reads all the old replies out loud (measured at 5, times the number
+  // of open tabs). The backlog arrives within milliseconds of connecting, so
+  // wait for it to drain before speaking. A delay rather than comparing
+  // frame.ts, because through a tunnel the two clocks disagree.
   let speakLive = false;
   setTimeout(() => {
     speakLive = true;
@@ -273,7 +274,7 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
 
   // ⏹ (wi-pm-ux): stop the in-flight PM turn. Only THIS chat's turn — the
   // daemon SIGTERMs its own `claude -p` child; other Claude sessions are the
-  // origin app's business. The daemon's final "(đã dừng…)" frame clears the
+  // origin app's business. The daemon's final "(stopped…)" frame clears the
   // typing state, so no local state change here.
   const stopBtn = root.querySelector<HTMLButtonElement>("button.stop")!;
   stopBtn.addEventListener("click", async () => {

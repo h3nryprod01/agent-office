@@ -43,8 +43,8 @@ async function boot(): Promise<void> {
   // It is allowed to fail. WebGL can be missing or blocked (old GPU, driver,
   // remote desktop, a VM without acceleration) and THREE.WebGLRenderer throws on
   // construction. This is the first thing boot() does, so an unguarded throw
-  // would take the WHOLE app down — navbar, Bảng việc, Nhật ký, Chi phí, Cấu
-  // hình — leaving a blank page. The office is the nice-to-have; those panels
+  // would take the WHOLE app down — navbar, Board, Activity, Spend, Settings —
+  // leaving a blank page. The office is the nice-to-have; those panels
   // are the job. So: degrade to a message and keep going.
   let office3d: Office3DHandle | null = null;
   try {
@@ -152,7 +152,7 @@ async function boot(): Promise<void> {
           body: JSON.stringify(body),
         }).then((r) => r.json())
     : undefined;
-  // R13-B-2: Nhật ký reads the daemon's merged /transcript (no sessionId —
+  // The activity log reads the daemon's merged /transcript (no sessionId —
   // last N events across every session). Live mode only, like fetchItems;
   // mock leaves it undefined → mountActivityLog shows a placeholder.
   const fetchRecentTranscript = useWs
@@ -163,7 +163,7 @@ async function boot(): Promise<void> {
     document.querySelector<HTMLElement>("#side-panel")!,
     fetchTranscript,
     fetchWorkItems,
-    // wi-pm-ux: PM characters get a "Tiếp tục trong Claude" row — the PM is a
+    // PM characters get a "Resume in Claude" row — the PM is a
     // real Claude Code session, resumable in a terminal via `claude --resume`.
     (a) => {
       for (const id of pmPins.values()) {
@@ -179,8 +179,8 @@ async function boot(): Promise<void> {
   // R13-B: navbar rail + kanban view. The navbar emits a key; setView maps it
   // to body[data-view] (CSS shows/hides the matching panel).
   //
-  // Always opens to the Văn phòng (office) — user decision 2026-07-22, overriding
-  // the 2026-07-10 "open to Bảng việc" call. A refresh must always land on the
+  // Always opens to the office — a later decision overriding an earlier "open to
+  // the board" call. A refresh must always land on the
   // office, live or mock.
   const navbarItems: NavItem[] = [
     { key: "office", icon: "🏢", label: t("nav.office") },
@@ -217,14 +217,14 @@ async function boot(): Promise<void> {
     if (key === "settings") settings.refresh();
   }
 
-  // Cost dashboard (wi-cost-dashboard): "bảng lương" của công ty agent.
+  // Spend dashboard — the agent company's payroll, in effect.
   const fetchCosts = useWs
     ? (w: CostWindow): Promise<CostsPayload> =>
         fetch(`/costs?window=${w}`).then((r) => r.json())
     : undefined;
   const costs = mountCosts(document.querySelector<HTMLElement>("#costs")!, fetchCosts, fetchWorkItems);
 
-  // Cấu hình (R13-B): a real status screen — daemon connection + which agent CLIs
+  // Settings: a real status screen — daemon connection + which agent CLIs
   // the app sees. Harness list is live-only; the WS reports connection changes.
   const settings = mountSettings(document.querySelector<HTMLElement>("#settings")!, {
     daemonUrl: "127.0.0.1:8787",
@@ -247,7 +247,7 @@ async function boot(): Promise<void> {
   // TDZ ReferenceError with nothing on screen to explain why.
   setView(homeView);
 
-  // Filing cabinet ("tủ hồ sơ", wi-office-life): click the sprite in the
+  // Filing cabinet: click the sprite in the
   // office (a tagged prop the 3D raycast resolves) → daemon's GET /outputs / POST /open.
   const fetchOutputs = useWs
     ? (): Promise<{ files: OutputFile[] }> =>
@@ -267,7 +267,7 @@ async function boot(): Promise<void> {
             // outputs.ts's click handler fires-and-forgets openPath() with no
             // .catch of its own, so a daemon-side failure has to surface itself
             // here — reuse the outputs panel's own error style (same .empty
-            // class it already uses for "Không kết nối được daemon.").
+            // class it already uses for the daemon-unreachable message).
             document
               .querySelector("#outputs .outputs-panel h2")
               ?.insertAdjacentHTML(
@@ -304,8 +304,8 @@ async function boot(): Promise<void> {
   });
 
   // Hiring Hall (wi-hiring-hall): click the reception desk → recruitment
-  // panel (roster từ ~/.claude/company/roster.yaml qua daemon; form giao PM
-  // tuyển qua POST /chat + skill company-hire). New roster members walk in
+  // panel (the roster comes from the daemon; the form asks the PM to hire via
+  // POST /chat and the company-hire skill). New roster members walk in
   // through the door of whatever office is on screen.
   const fetchRoster = useWs
     ? (): Promise<RosterPayload> => fetch("/roster").then((r) => r.json())
@@ -315,8 +315,8 @@ async function boot(): Promise<void> {
     walkIn: (name) => office3d?.walkInGreeter(name),
   });
 
-  // "Công ty đóng hộp" (wi-templates-panel): xem template trong templates/ và
-  // áp lên roster thật (daemon backup trước). Live mode only — apply cần daemon.
+  // Company in a box: browse templates/ and apply one onto the real roster (the
+  // daemon backs it up first). Live mode only — applying needs the daemon.
   const fetchTemplates = useWs
     ? (): Promise<TemplateSummary[]> => fetch("/templates").then((r) => r.json())
     : undefined;
@@ -362,7 +362,7 @@ async function boot(): Promise<void> {
   // the customer's Windows + taskbar badge). Same alert signal as the queue.
   const notifier = mountNotifier(focusAgent);
 
-  // Org chart overlay ("Sơ đồ tổ chức", next to Board): who spawned whom,
+  // Org chart overlay, next to the Board: who spawned whom,
   // per repo. Defaults to the active tab's repo; All groups by repo.
   mountOrgChart(
     document.querySelector<HTMLElement>("#orgchart")!,
@@ -371,7 +371,7 @@ async function boot(): Promise<void> {
     focusAgent,
   );
 
-  // Building view ("Tòa nhà", R10-b): every repo as a floor — click one to
+  // Building view: every repo as a floor — click one to
   // jump to its tab. Reads the same repoTabs selector the tab bar uses.
   mountBuildingView(
     document.querySelector<HTMLElement>("#building")!,
@@ -389,7 +389,7 @@ async function boot(): Promise<void> {
   }, () => office3d?.canvas ?? document.createElement("canvas")); // 🎬 records the office canvas
 
   // PM chatbox (live mode only): talk to the active tab's PM via the daemon's
-  // POST /chat. Each repo's PM is pinned to the CEO desk of ITS office ("bàn
+  // POST /chat. Each repo's PM is pinned to the CEO desk of ITS office (the
   // CEO" — art round 2 draws the real furniture); the default repo's PM also
   // takes the All office's desk. Streaming reply text is injected as
   // agent_message so the speech bubble shows the answer while the PM types.

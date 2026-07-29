@@ -1,21 +1,21 @@
-// VieNeu TTS bridge (wi-voice-vieneu). Giọng vi hệ thống duy nhất Chrome thấy
-// là Linh (compact) — đọc tiếng Việt rời rạc "như đánh vần", user đã bác 2 lần.
-// Daemon expose POST /tts {text} → WAV; renderer phát qua <audio> cho reply
-// tiếng Việt và tự fallback về speechSynthesis khi route này 503/tắt.
+// The TTS bridge. The only system Vietnamese voice Chrome exposes reads word by
+// word, which was rejected twice — hence a local model instead. The daemon
+// serves POST /tts {text} → WAV and the renderer plays it through <audio>.
 //
-// Worker = tts_worker.py chạy bằng python của một venv có sẵn package `vieneu`.
-// Spawn lười ở request đầu (load model ~5.5s), giữ ấm giữa các request, tự tắt
-// sau idleMs để trả RAM. Tính năng này là tuỳ chọn: không có venv thì
-// available() = false và route /tts trả 503, phần còn lại của app chạy bình thường.
+// The worker is tts_worker.py, run by the python of a venv that has the model
+// package. Spawned lazily on the first request (~5.5s to load the model), kept
+// warm between requests, and killed after idleMs to give the RAM back.
+// The whole feature is optional: with no venv, available() is false, /tts
+// returns 503, and the rest of the app is unaffected.
 
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile, unlink } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-// Đặt VIENEU_PYTHON trỏ tới python của venv có package `vieneu`. Không đặt thì
-// thử vị trí quy ước `.venv-tts/` ở gốc repo; không có venv → available()=false
-// → /tts trả 503 và renderer im lặng bỏ qua giọng đọc.
+// Point VIENEU_PYTHON at the python of a venv that has the model package.
+// Unset, it tries the conventional `.venv-tts/` at the repo root; with neither,
+// available() is false, /tts returns 503, and the renderer quietly skips speech.
 const DEFAULT_PYTHON = fileURLToPath(
   new URL("../../../.venv-tts/bin/python", import.meta.url)
 );
@@ -24,10 +24,10 @@ const DEFAULT_WORKER = fileURLToPath(new URL("./tts_worker.py", import.meta.url)
 export class VieNeuTts {
   /**
    * @param {Object} [opts]
-   * @param {string} [opts.pythonBin] python có package vieneu (VIENEU_PYTHON)
+   * @param {string} [opts.pythonBin] python that has the model package (VIENEU_PYTHON)
    * @param {string} [opts.workerScript]
-   * @param {number} [opts.requestTimeoutMs] trần cho 1 câu (gồm cả model load lần đầu)
-   * @param {number} [opts.idleMs] không có request trong khoảng này → kill worker
+   * @param {number} [opts.requestTimeoutMs] ceiling for one sentence, including the first model load
+   * @param {number} [opts.idleMs] no request for this long → kill the worker
    * @param {typeof spawn} [opts.spawnFn] test injection
    */
   constructor({
@@ -55,21 +55,21 @@ export class VieNeuTts {
     return !this.disposed && existsSync(this.pythonBin);
   }
 
-  /** Text 1 câu → Buffer WAV. Reject khi worker chết/timeout/VieNeu báo lỗi. */
+  /** One sentence of text → a WAV Buffer. Rejects if the worker dies, times out, or errors. */
   async synth(text) {
     if (!this.available()) throw new Error("vieneu_unavailable");
     this.#ensureWorker();
     await this.ready;
     const id = ++this.seq;
     const wav = await new Promise((resolve, reject) => {
-      // worker có thể chết ngay giữa await ready và lúc này (race exit event)
+      // the worker can die between `await ready` and here (exit-event race)
       if (!this.worker) {
         reject(new Error("vieneu_worker_exited"));
         return;
       }
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        // 1 câu kẹt là cả queue phía sau kẹt — kill để request kế spawn lại sạch
+        // one stuck sentence stalls everything behind it — kill so the next request respawns clean
         this.#kill(new Error("vieneu_timeout"));
         reject(new Error("vieneu_timeout"));
       }, this.requestTimeoutMs);
@@ -88,7 +88,7 @@ export class VieNeuTts {
   #ensureWorker() {
     if (this.worker) return;
     const child = this.spawnFn(this.pythonBin, [this.workerScript], {
-      // stderr thẳng ra log daemon — warning của torch/transformers hữu ích khi debug
+      // stderr goes straight to the daemon log — the model library's warnings are useful when debugging
       stdio: ["pipe", "pipe", "inherit"],
     });
     this.worker = child;
@@ -97,7 +97,7 @@ export class VieNeuTts {
       readyResolve = res;
       readyReject = rej;
     });
-    // node --test coi unhandled rejection là fail kể cả khi synth() sẽ await sau
+    // node --test counts an unhandled rejection as a failure even when synth() awaits it later
     this.ready.catch(() => {});
     this.readyReject = readyReject;
 
@@ -176,8 +176,8 @@ const CORS_HEADERS = {
 
 /**
  * HTTP route cho extraHttp: POST /tts {text} → 200 audio/wav.
- * 503 = VieNeu không sẵn sàng (venv thiếu / worker lỗi / timeout) — renderer
- * hiểu là "dùng speechSynthesis đi", nên route này chết không làm mất voice.
+ * 503 means the voice backend is unavailable — a missing venv, a worker error,
+ * or a timeout. The renderer treats it as "no speech this time" and carries on.
  * @param {VieNeuTts} tts
  */
 export function createTtsHttpHandler(tts) {
