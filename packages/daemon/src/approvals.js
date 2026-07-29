@@ -89,10 +89,10 @@ export class ApprovalBroker {
    */
   respond(id, decision) {
     if (decision !== "allow" && decision !== "deny") {
-      return { ok: false, error: "decision phải là allow hoặc deny" };
+      return { ok: false, error: "decision must be allow or deny" };
     }
     if (!this.pending.has(id)) {
-      return { ok: false, error: "không có approval này (đã hết hạn hoặc đã trả lời)" };
+      return { ok: false, error: "no such approval — it expired or was already answered" };
     }
     this.#settle(id, decision, "office");
     return { ok: true };
@@ -125,8 +125,8 @@ export class ApprovalBroker {
           status: type === "approval_pending" ? "start" : "ok",
           detail:
             type === "approval_pending"
-              ? `cần duyệt: ${item.tool}`
-              : `duyệt xong: ${extraMeta.decision ?? "none"}`,
+              ? `needs approval: ${item.tool}`
+              : `answered: ${extraMeta.decision ?? "none"}`,
           meta: {
             approvalId: item.id,
             preview: item.preview,
@@ -205,7 +205,7 @@ export function createApprovalHttpHandler(broker) {
 
       if (path === "/approval-request") {
         if (!parsed || typeof parsed !== "object") {
-          respond(400, { id: null, decision: "none", error: "body JSON không hợp lệ" });
+          respond(400, { id: null, decision: "none", error: "invalid JSON body" });
           return;
         }
         const payload = {

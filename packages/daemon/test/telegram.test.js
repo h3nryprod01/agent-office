@@ -260,7 +260,7 @@ test("pollUpdates: manager.send() reports busy (PM already mid-turn) → the bus
   };
   const manager = {
     broadcast: () => {},
-    send: () => ({ accepted: false, message: "PM đang trả lời tin nhắn trước — chờ chút rồi gửi lại." }),
+    send: () => ({ accepted: false, message: "The PM is still answering your previous message — chờ chút rồi gửi lại." }),
   };
   const env = { TELEGRAM_BOT_TOKEN: "T:abc", TELEGRAM_CHAT_ID: "1" };
   const { dir, offsetFile } = tmpOffsetFile();
@@ -270,7 +270,7 @@ test("pollUpdates: manager.send() reports busy (PM already mid-turn) → the bus
   handle.stop();
 
   assert.equal(sentMessages.length, 1);
-  assert.equal(sentMessages[0].text, "PM đang trả lời tin nhắn trước — chờ chút rồi gửi lại.");
+  assert.equal(sentMessages[0].text, "The PM is still answering your previous message — chờ chút rồi gửi lại.");
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -303,7 +303,7 @@ test("pollUpdates: manager.send() throwing synchronously is caught — the error
   await new Promise((r) => setTimeout(r, 20));
   handle.stop();
   assert.equal(sentMessages.length, 1);
-  assert.equal(sentMessages[0].text, "PM lỗi: spawn ENOENT");
+  assert.equal(sentMessages[0].text, "PM error: spawn ENOENT");
   rmSync(dir, { recursive: true, force: true });
 });
 

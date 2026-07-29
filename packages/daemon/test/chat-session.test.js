@@ -244,7 +244,7 @@ test("timeout: kills the child, emits friendly error event, releases the turn", 
   assert.equal(chatMeta(last).role, "system");
   assert.equal(chatMeta(last).error, true);
   assert.equal(chatMeta(last).done, true);
-  assert.match(chatMeta(last).text, /không phản hồi/);
+  assert.match(chatMeta(last).text, /did not answer/);
   assert.equal(manager.busy, false, "next message can be sent after a timeout");
 });
 
@@ -269,7 +269,7 @@ test("child exit with non-zero code before result → error event, turn released
 
 // ── wi-pm-ux: ⏹ stop the in-flight PM turn ────────────────────────────────
 
-test("stop while a turn runs: SIGTERM, exit → '(đã dừng theo yêu cầu)' done event, turn released", () => {
+test("stop while a turn runs: SIGTERM, exit → '(stopped on request)' done event, turn released", () => {
   const { manager, events, child } = setup();
   manager.send("câu dài");
   const result = manager.stop();
@@ -279,7 +279,7 @@ test("stop while a turn runs: SIGTERM, exit → '(đã dừng theo yêu cầu)' 
   child.emit("exit", null); // SIGTERM exit has no code
   const last = events.at(-1);
   assert.equal(chatMeta(last).role, "system");
-  assert.equal(chatMeta(last).text, "(đã dừng theo yêu cầu)");
+  assert.equal(chatMeta(last).text, "(stopped on request)");
   assert.equal(chatMeta(last).done, true);
   assert.equal(chatMeta(last).error, false);
   assert.equal(manager.busy, false, "next message can be sent after a stop");

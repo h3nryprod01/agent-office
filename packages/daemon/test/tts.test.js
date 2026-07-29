@@ -125,7 +125,7 @@ test("timeout 1 câu → reject + kill worker để respawn sạch", async () =>
   assert.equal((await p2).toString(), "hồi phục");
 });
 
-test("idle quá hạn → worker bị tắt để trả RAM", async () => {
+test("idle timed out → worker bị tắt để trả RAM", async () => {
   const { tts, worker } = setup({ idleMs: 25 });
   const p = tts.synth("câu duy nhất");
   worker().line({ ready: true });

@@ -24,7 +24,7 @@ export const COMMON_BIN_DIRS = commonBinDirs();
 
 // probeArgs: a FAST, token-free auth check per CLI. claude/codex have a
 // purpose-built one; gemini has none, so it falls back to a tiny prompt. Beats
-// the old `-p "ok"` full turn that was slow (hit the 8s timeout → "quá hạn") and
+// the old `-p "ok"` full turn that was slow (hit the 8s timeout → "timed out") and
 // spent a token every check.
 export const HARNESSES = [
   { key: "claude", bin: "claude", label: "Claude Code", probeArgs: ["auth", "status"] },
@@ -82,15 +82,15 @@ export function checkInstalled(
 export function classifyProbe({ code, stdout = "", stderr = "" }) {
   if (code === 0) return { loggedIn: true };
   if (NEEDS_LOGIN_RE.test(`${stderr}\n${stdout}`)) {
-    return { loggedIn: false, reason: "cần đăng nhập" };
+    return { loggedIn: false, reason: "sign-in required" };
   }
-  return { loggedIn: false, reason: "lỗi không rõ" };
+  return { loggedIn: false, reason: "unknown error" };
 }
 
 /**
  * Spawn `bin -p "ok" --output-format json` once and classify the result.
  * `spawnFn` is injectable so tests never run a real CLI. A hang past timeoutMs
- * kills the child and reports "quá hạn" rather than waiting forever.
+ * kills the child and reports "timed out" rather than waiting forever.
  * @returns {Promise<{loggedIn:boolean, reason?:string}>}
  */
 export function probeLoggedIn({
@@ -115,7 +115,7 @@ export function probeLoggedIn({
     try {
       child = spawnFn(bin, args, cliSpawnOptions(platform));
     } catch {
-      return done({ loggedIn: false, reason: "lỗi không rõ" });
+      return done({ loggedIn: false, reason: "unknown error" });
     }
     timer = setTimeout(() => {
       try {
@@ -123,7 +123,7 @@ export function probeLoggedIn({
       } catch {
         // already dead — nothing to kill
       }
-      done({ loggedIn: false, reason: "quá hạn" });
+      done({ loggedIn: false, reason: "timed out" });
     }, timeoutMs);
     child.stdout?.on("data", (d) => {
       stdout += d;
@@ -131,7 +131,7 @@ export function probeLoggedIn({
     child.stderr?.on("data", (d) => {
       stderr += d;
     });
-    child.on("error", () => done({ loggedIn: false, reason: "lỗi không rõ" }));
+    child.on("error", () => done({ loggedIn: false, reason: "unknown error" }));
     child.on("close", (code) => done(classifyProbe({ code, stdout, stderr })));
   });
 }
@@ -212,7 +212,7 @@ export function createHarnessHttpHandler({
     }
     // probe (async) → cache → respond. Spawn the RESOLVED path, not the bare
     // name: the launchd daemon's PATH is sparse, so `claude`/`codex`/`gemini`
-    // won't resolve by name even though checkInstalled found them → "lỗi không rõ".
+    // won't resolve by name even though checkInstalled found them → "unknown error".
     probeFn({ bin: path ?? harness.bin, args: harness.probeArgs }).then((result) => {
       cache.set(harness.key, { ...result, at: Date.now() });
       respond(res, 200, buildList());

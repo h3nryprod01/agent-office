@@ -16,15 +16,15 @@ test("classifyProbe: code 0 → logged in; 401 → needs login; other → unknow
   assert.deepEqual(classifyProbe({ code: 0 }), { loggedIn: true });
   assert.deepEqual(classifyProbe({ code: 1, stderr: "Error: 401 unauthorized" }), {
     loggedIn: false,
-    reason: "cần đăng nhập",
+    reason: "sign-in required",
   });
   assert.deepEqual(classifyProbe({ code: 1, stdout: "invalid api key" }), {
     loggedIn: false,
-    reason: "cần đăng nhập",
+    reason: "sign-in required",
   });
   assert.deepEqual(classifyProbe({ code: 1, stderr: "some random junk" }), {
     loggedIn: false,
-    reason: "lỗi không rõ",
+    reason: "unknown error",
   });
 });
 
@@ -66,7 +66,7 @@ test("checkInstalled: a binary in extraDirs (not on PATH) is still found — the
   rmSync(dir, { recursive: true, force: true });
 });
 
-test("probeLoggedIn: spawnFn exit 0 → logged in; hang → timeout 'quá hạn'", async () => {
+test("probeLoggedIn: spawnFn exit 0 → logged in; hang → timeout 'timed out'", async () => {
   const spawnOk = () => {
     const child = new EventEmitter();
     child.stdout = new EventEmitter();
@@ -87,7 +87,7 @@ test("probeLoggedIn: spawnFn exit 0 → logged in; hang → timeout 'quá hạn'
   };
   const hung = await probeLoggedIn({ bin: "claude", spawnFn: spawnHang, timeoutMs: 30 });
   assert.equal(hung.loggedIn, false);
-  assert.equal(hung.reason, "quá hạn");
+  assert.equal(hung.reason, "timed out");
 });
 
 /**

@@ -101,11 +101,11 @@ function askPm(manager, text) {
     try {
       result = manager.send(text);
     } catch (error) {
-      resolve(`PM lỗi: ${error.message}`);
+      resolve(`PM error: ${error.message}`);
       return;
     }
     if (!result.accepted) {
-      resolve(result.message ?? "PM đang bận, thử lại sau.");
+      resolve(result.message ?? "The PM is busy — try again shortly.");
       return;
     }
     let reply = "";
@@ -116,7 +116,7 @@ function askPm(manager, text) {
       if (event.meta?.text) reply += (reply ? "\n" : "") + event.meta.text;
       if (event.meta?.done) {
         manager.broadcast = original;
-        resolve(reply || "(PM không trả lời gì)");
+        resolve(reply || "(the PM said nothing)");
       }
     };
   });

@@ -211,7 +211,7 @@ export function createTtsHttpHandler(tts) {
       }
       const text = typeof parsed?.text === "string" ? parsed.text.trim() : "";
       if (!text) {
-        respond(400, { ok: false, error: "text (chuỗi không rỗng) là bắt buộc" });
+        respond(400, { ok: false, error: "text is required and must be a non-empty string" });
         return;
       }
       if (!tts.available()) {

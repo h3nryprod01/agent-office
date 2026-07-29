@@ -31,23 +31,25 @@ import { cliSpawnOptions } from "./platform.js";
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // PM reads registry/git before answering
 
 export const PM_SYSTEM_PROMPT =
-  "Bạn là PM của Agent Office, đang trả lời qua chatbox trong văn phòng. " +
-  "Hành xử như PM stateless theo docs/company-protocol.md và skill company-pm " +
-  "(~/.claude/skills/company-pm/SKILL.md): trước khi trả lời về trạng thái công việc, " +
-  "đọc .claude/memory/work-items.json + .claude/memory/activeContext.md + git log. " +
-  "LUÔN trả lời bằng đúng ngôn ngữ user dùng trong tin nhắn: user viết tiếng Việt thì " +
-  "trả lời tiếng Việt, user viết tiếng Anh thì trả lời tiếng Anh. Ngắn gọn như tin nhắn chat. " +
-  "Bạn KHÔNG thể duyệt permission cho session khác — nếu được nhờ, nói rõ phải duyệt ở app gốc.";
+  "You are the PM for Agent Office, answering through the chat box in the office. " +
+  "Act as the stateless PM described in docs/company-protocol.md and the company-pm " +
+  "skill: before you answer anything about the state of the work, read the work " +
+  "registry, the repo's active-context note, and git log. " +
+  "ALWAYS reply in the language the user wrote in — Vietnamese in, Vietnamese out; " +
+  "English in, English out. Keep it short, like a chat message. " +
+  "You CANNOT approve permissions for another session — if asked, say plainly that " +
+  "it has to be approved in that session's own app.";
 
-// PMs of other repos: those repos have no work-items.json / company-protocol —
+// PMs of other repos: those repos have no work registry and no company protocol —
 // keep the prompt generic instead of forcing the registry ritual on them.
 export const GENERIC_PM_SYSTEM_PROMPT =
-  "Bạn là PM điều phối repo này, đang trả lời qua chatbox của Agent Office. " +
-  "Trước khi trả lời về trạng thái công việc, đọc git log / git status và " +
-  "trạng thái các session đang chạy trong repo. " +
-  "LUÔN trả lời bằng đúng ngôn ngữ user dùng trong tin nhắn: user viết tiếng Việt thì " +
-  "trả lời tiếng Việt, user viết tiếng Anh thì trả lời tiếng Anh. Ngắn gọn như tin nhắn chat. " +
-  "Bạn KHÔNG thể duyệt permission cho session khác — nếu được nhờ, nói rõ phải duyệt ở app gốc.";
+  "You are the PM coordinating this repo, answering through the Agent Office chat box. " +
+  "Before you answer anything about the state of the work, read git log / git status " +
+  "and which sessions are currently running in the repo. " +
+  "ALWAYS reply in the language the user wrote in — Vietnamese in, Vietnamese out; " +
+  "English in, English out. Keep it short, like a chat message. " +
+  "You CANNOT approve permissions for another session — if asked, say plainly that " +
+  "it has to be approved in that session's own app.";
 
 export class ChatSessionManager {
   /**
@@ -230,8 +232,8 @@ export class ChatSessionManager {
         accepted: false,
         reason: "unknown_repo",
         message:
-          `Chưa biết repo "${repoName}" nằm ở đâu — daemon chưa thấy session nào chạy trong repo đó. ` +
-          "Mở một session Claude trong repo trước, hoặc chat từ tab Acme Web.",
+          `Don't know where the repo "${repoName}" lives — the daemon has not seen a session running there. ` +
+          "Open an agent session in that repo first, or chat from the default tab.",
       };
     }
 
@@ -291,7 +293,7 @@ export class ChatSessionManager {
       });
     } catch (error) {
       this.busy = false;
-      emit({ role: "system", text: `Không chạy được claude CLI: ${error.message}`, targetSessionId: resumeId, done: true, error: true });
+      emit({ role: "system", text: `Could not run the claude CLI: ${error.message}`, targetSessionId: resumeId, done: true, error: true });
       return { accepted: false, reason: error.message };
     }
 
@@ -314,7 +316,7 @@ export class ChatSessionManager {
     const timer = setTimeout(() => {
       finish(() => {
         child.kill("SIGKILL");
-        emit({ role: "system", text: `PM không phản hồi sau ${Math.round(this.timeoutMs / 1000)}s — turn đã bị hủy, thử lại sau.`, targetSessionId: liveSessionId, done: true, error: true });
+        emit({ role: "system", text: `The PM did not answer within ${Math.round(this.timeoutMs / 1000)}s — the turn was cancelled, try again.`, targetSessionId: liveSessionId, done: true, error: true });
       });
     }, this.timeoutMs);
 
@@ -336,14 +338,14 @@ export class ChatSessionManager {
         } else if (msg.type === "result") {
           finish(() => {
             const isErr = msg.is_error === true;
-            emit({ role: isErr ? "system" : "assistant", text: isErr ? `PM gặp lỗi: ${typeof msg.result === "string" ? msg.result.slice(0, 300) : "unknown"}` : "", targetSessionId: liveSessionId, done: true, error: isErr });
+            emit({ role: isErr ? "system" : "assistant", text: isErr ? `PM error: ${typeof msg.result === "string" ? msg.result.slice(0, 300) : "unknown"}` : "", targetSessionId: liveSessionId, done: true, error: isErr });
           });
         }
       }
     });
     child.stderr.on("data", (chunk) => { stderrTail = (stderrTail + chunk).slice(-500); });
     child.on("error", (error) => {
-      finish(() => emit({ role: "system", text: `Không chạy được claude CLI: ${error.message}`, targetSessionId: liveSessionId, done: true, error: true }));
+      finish(() => emit({ role: "system", text: `Could not run the claude CLI: ${error.message}`, targetSessionId: liveSessionId, done: true, error: true }));
     });
     child.on("exit", (code) => {
       if (finished) return;
@@ -351,7 +353,7 @@ export class ChatSessionManager {
       finish(() => {
         emit({
           role: "system",
-          text: stopped ? "(đã dừng theo yêu cầu)" : code === 0 ? "" : `PM turn kết thúc bất thường (exit ${code}). ${stderrTail.trim().slice(0, 200)}`.trim(),
+          text: stopped ? "(stopped on request)" : code === 0 ? "" : `The PM turn ended unexpectedly (exit ${code}). ${stderrTail.trim().slice(0, 200)}`.trim(),
           targetSessionId: liveSessionId,
           done: true,
           error: !stopped && code !== 0,
@@ -435,10 +437,10 @@ export class ChatSessionManager {
       // process so the next message spawns a fresh one.
       this.#clearRepoSession(proc.repo);
       this.#killWarm(proc);
-      cur.emit({ role: "system", text: "Phiên PM cũ không còn — đã reset. Gửi lại tin để PM bắt đầu phiên mới.", targetSessionId: null, done: true, error: true });
+      cur.emit({ role: "system", text: "That PM session is gone — it has been reset. Send your message again to start a new one.", targetSessionId: null, done: true, error: true });
       return;
     }
-    cur.emit({ role: isErr ? "system" : "assistant", text: isErr ? `PM gặp lỗi: ${typeof msg.result === "string" ? msg.result.slice(0, 300) : "unknown"}` : "", targetSessionId: proc.sessionId, done: true, error: isErr });
+    cur.emit({ role: isErr ? "system" : "assistant", text: isErr ? `PM error: ${typeof msg.result === "string" ? msg.result.slice(0, 300) : "unknown"}` : "", targetSessionId: proc.sessionId, done: true, error: isErr });
     this.#armWarmIdle(proc);
   }
 
@@ -454,10 +456,10 @@ export class ChatSessionManager {
     cur.emit({
       role: "system",
       text: cur.stopRequested
-        ? "(đã dừng theo yêu cầu)"
+        ? "(stopped on request)"
         : cur.timedOut
-          ? `PM không phản hồi sau ${Math.round(this.timeoutMs / 1000)}s — turn đã bị hủy, thử lại sau.`
-          : `PM turn kết thúc bất thường (exit ${code}). ${proc.stderrTail.trim().slice(0, 200)}`.trim(),
+          ? `The PM did not answer within ${Math.round(this.timeoutMs / 1000)}s — the turn was cancelled, try again.`
+          : `The PM turn ended unexpectedly (exit ${code}). ${proc.stderrTail.trim().slice(0, 200)}`.trim(),
       targetSessionId: proc.sessionId,
       done: true,
       error: !cur.stopRequested,
@@ -484,7 +486,7 @@ export class ChatSessionManager {
     if (!proc) proc = this.#spawnWarm(repoName, cwd);
     if (!proc) {
       this.busy = false;
-      emit({ role: "system", text: "Không chạy được claude CLI.", targetSessionId: null, done: true, error: true });
+      emit({ role: "system", text: "Could not run the claude CLI.", targetSessionId: null, done: true, error: true });
       return { accepted: false, reason: "spawn_failed" };
     }
     clearTimeout(proc.idleTimer);
@@ -503,7 +505,7 @@ export class ChatSessionManager {
       this.current = null;
       this.busy = false;
       this.#killWarm(proc);
-      emit({ role: "system", text: "PM chat lỗi ghi stdin — thử lại.", targetSessionId: null, done: true, error: true });
+      emit({ role: "system", text: "PM chat could not write to stdin — try again.", targetSessionId: null, done: true, error: true });
       return { accepted: false, reason: "stdin_error" };
     }
     return { accepted: true, repo: repoName, targetSessionId: proc.sessionId };
@@ -598,7 +600,7 @@ export function createChatHttpHandler(manager) {
           ? parsed.targetSessionId
           : null;
       if (!text) {
-        respond(400, { ok: false, error: "text (chuỗi không rỗng) là bắt buộc" });
+        respond(400, { ok: false, error: "text is required and must be a non-empty string" });
         return;
       }
 
@@ -612,7 +614,7 @@ export function createChatHttpHandler(manager) {
           ok: false,
           error:
             result.reason === "busy"
-              ? "PM đang trả lời tin nhắn trước — chờ chút rồi gửi lại."
+              ? "The PM is still answering your previous message — wait a moment and send again."
               : result.reason,
         });
         return;

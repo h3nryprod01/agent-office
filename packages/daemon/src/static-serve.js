@@ -56,7 +56,7 @@ export function createStaticHttpHandler({
 } = {}) {
   const root = path.resolve(distDir);
   if (devMode) {
-    console.log("[static-serve] OFF (AGENT_OFFICE_DEV=1) — dùng Vite:5199");
+    console.log("[static-serve] OFF (AGENT_OFFICE_DEV=1) — use Vite on :5199");
     return () => false;
   }
 

@@ -25,7 +25,7 @@ const URL_BASE = `http://127.0.0.1:${PORT}`;
 const TOOL = {
   name: "approval_prompt",
   description:
-    "Xin duyệt một tool call qua Agent Office. Claude Code gọi tool này thay cho hộp thoại permission (chế độ -p).",
+    "Ask for approval of a tool call through Agent Office. Claude Code calls this instead of showing a permission dialog when running with -p.",
   inputSchema: {
     type: "object",
     properties: {
@@ -86,7 +86,7 @@ export async function handleMessage(msg, approve = askOffice) {
     const payload =
       decision === "allow"
         ? { behavior: "allow", updatedInput: args?.input ?? {} }
-        : { behavior: "deny", message: "Bị từ chối hoặc không có office đang mở để duyệt (Agent Office)." };
+        : { behavior: "deny", message: "Denied, or no office was open to approve it (Agent Office)." };
     return { jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(payload) }] } };
   }
   if (id == null) return null; // notification — no response

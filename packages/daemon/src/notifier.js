@@ -114,10 +114,10 @@ export function buildOfficeUrl(officeUrl, agentId) {
 export function composeNotification(event, url) {
   const label =
     event.meta?.state === "waiting_permission"
-      ? "Chờ phê duyệt"
+      ? "Waiting for approval"
       : /denied/i.test(event.detail ?? "")
-        ? "Bị chặn"
-        : "Lỗi";
+        ? "Blocked"
+        : "Error";
   const reason = event.detail || event.tool || "";
   return {
     title: "Agent Office",

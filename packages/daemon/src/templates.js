@@ -64,7 +64,7 @@ export function listTemplates({ templatesDir = DEFAULT_TEMPLATES_DIR, homeDir = 
         missingSkills: templateMissingSkills(rosterText, homeDir),
       });
     } catch (error) {
-      console.warn(`[templates] bỏ qua "${name}" (${error.message})`);
+      console.warn(`[templates] skipping "${name}" (${error.message})`);
     }
   }
   return out;
@@ -136,7 +136,7 @@ export function createTemplatesHttpHandler({
           return;
         }
         console.error("[templates] apply failed:", error);
-        respond(500, { error: "apply template thất bại" });
+        respond(500, { error: "applying the template failed" });
       }
     });
     return true;

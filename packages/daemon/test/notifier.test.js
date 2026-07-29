@@ -50,7 +50,7 @@ test("agent stuck past the threshold fires exactly one notification", async () =
   assert.equal(sent.length, 1);
   assert.equal(sent[0].title, "Agent Office");
   assert.equal(sent[0].subtitle, "repo · repo");
-  assert.match(sent[0].message, /Chờ phê duyệt/);
+  assert.match(sent[0].message, /Waiting for approval/);
   assert.equal(sent[0].url, "http://localhost:5173/?focus=sess-1");
 });
 
@@ -86,7 +86,7 @@ test("error event held past the threshold notifies with the error label", async 
   notifier.onEvent(evt({ type: "tool_call", status: "error", detail: "exit code 1", meta: null }));
   await sleep(THRESHOLD_MS * 2);
   assert.equal(sent.length, 1);
-  assert.match(sent[0].message, /Lỗi/);
+  assert.match(sent[0].message, /Error/);
 });
 
 test("any later transcript activity clears an error before the threshold", async () => {
@@ -156,7 +156,7 @@ test("denied errors get the blocked label", () => {
     evt({ status: "error", detail: "Bash has been denied", meta: null }),
     "http://x"
   );
-  assert.match(n.message, /Bị chặn/);
+  assert.match(n.message, /Blocked/);
 });
 
 test("attachNotifier observes broadcasts without breaking delivery", async () => {

@@ -145,7 +145,7 @@ export function pollUpdates(
     if (!waiting || event?.type !== "chat_message" || event.meta?.role === "user") return;
     if (event.meta?.text) waiting.reply += (waiting.reply ? "\n" : "") + event.meta.text;
     if (event.meta?.done) {
-      waiting.resolve(waiting.reply || "(PM không trả lời gì)");
+      waiting.resolve(waiting.reply || "(the PM said nothing)");
       waiting = null;
     }
   };
@@ -158,11 +158,11 @@ export function pollUpdates(
       } catch (error) {
         // defensive — chat-session.js already guards its own risky calls, but
         // this loop must never die because the PM turn failed to start.
-        resolve(`PM lỗi: ${error.message}`);
+        resolve(`PM error: ${error.message}`);
         return;
       }
       if (!result.accepted) {
-        resolve(result.message ?? "PM đang bận, thử lại sau.");
+        resolve(result.message ?? "The PM is busy — try again shortly.");
         return;
       }
       waiting = { resolve, reply: "" };

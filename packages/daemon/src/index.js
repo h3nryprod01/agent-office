@@ -151,7 +151,7 @@ async function main() {
           sessionId: "company-roster",
           agentId: "company-roster",
           status: "ok",
-          detail: "roster.yaml đã thay đổi",
+          detail: "roster.yaml changed",
           meta: { roster },
         })
       );
@@ -238,8 +238,8 @@ async function main() {
         status: signal.state === "waiting_permission" ? "start" : "ok",
         detail:
           signal.state === "waiting_permission"
-            ? `chờ phê duyệt: ${signal.tool}`
-            : `${signal.tool} đã chạy tiếp`,
+            ? `waiting for approval: ${signal.tool}`
+            : `${signal.tool} resumed`,
         meta: { state: signal.state, toolUseId: signal.toolUseId, source: "hook" },
       });
       server.broadcast(event);

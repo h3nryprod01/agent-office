@@ -45,15 +45,15 @@ const invalid = (m) => fail("INVALID", m);
  * the traversal attempt would look like a normal create.
  */
 export function slugify(name) {
-  if (typeof name !== "string" || name.trim() === "") throw invalid("thiếu tên dự án");
-  if (/[/\\]|\.\./.test(name)) throw invalid(`tên dự án không hợp lệ: ${JSON.stringify(name)}`);
+  if (typeof name !== "string" || name.trim() === "") throw invalid("project name is required");
+  if (/[/\\]|\.\./.test(name)) throw invalid(`invalid project name: ${JSON.stringify(name)}`);
   const slug = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 40)
     .replace(/-+$/, "");
-  if (!PROJECT_SLUG_RE.test(slug)) throw invalid(`tên dự án không hợp lệ: ${JSON.stringify(name)}`);
+  if (!PROJECT_SLUG_RE.test(slug)) throw invalid(`invalid project name: ${JSON.stringify(name)}`);
   return slug;
 }
 
@@ -65,7 +65,7 @@ function writeJsonAtomic(file, value) {
 }
 
 function projectDir(projectsDir, slug) {
-  if (!PROJECT_SLUG_RE.test(slug)) throw invalid(`slug không hợp lệ: ${JSON.stringify(slug)}`);
+  if (!PROJECT_SLUG_RE.test(slug)) throw invalid(`invalid slug: ${JSON.stringify(slug)}`);
   return path.join(projectsDir, slug);
 }
 
@@ -75,27 +75,27 @@ function readJson(file) {
 
 /** Throws INVALID unless `cwd` is an absolute path realpath-ing to a directory inside `homeDir`. */
 function assertCwdInHome(cwd, homeDir) {
-  if (typeof cwd !== "string" || !path.isAbsolute(cwd)) throw invalid(`cwd phải là đường dẫn tuyệt đối`);
+  if (typeof cwd !== "string" || !path.isAbsolute(cwd)) throw invalid(`cwd must be an absolute path`);
   let real;
   let realHome;
   try {
     real = fs.realpathSync(cwd);
     realHome = fs.realpathSync(homeDir);
   } catch {
-    throw invalid(`cwd không tồn tại: ${cwd}`);
+    throw invalid(`cwd does not exist: ${cwd}`);
   }
-  if (!fs.statSync(real).isDirectory()) throw invalid(`cwd không phải thư mục: ${cwd}`);
+  if (!fs.statSync(real).isDirectory()) throw invalid(`cwd is not a directory: ${cwd}`);
   if (real !== realHome && !real.startsWith(realHome + path.sep)) {
-    throw invalid(`cwd phải nằm trong ${realHome}`);
+    throw invalid(`cwd must be inside ${realHome}`);
   }
   return real;
 }
 
 function assertTitle(title) {
-  if (typeof title !== "string") throw invalid("title phải là chuỗi");
+  if (typeof title !== "string") throw invalid("title must be a string");
   const trimmed = title.trim();
   if (trimmed.length < 1 || trimmed.length > TITLE_MAX) {
-    throw invalid(`title phải dài 1–${TITLE_MAX} ký tự`);
+    throw invalid(`title must be 1–${TITLE_MAX} characters`);
   }
   return trimmed;
 }
@@ -107,24 +107,24 @@ function assertTitle(title) {
  */
 function assertLinks(links) {
   if (links === null || typeof links !== "object" || Array.isArray(links)) {
-    throw invalid("links phải là object");
+    throw invalid("links must be an object");
   }
   const out = { pr: null, plane: null, obsidian: null, branch: null };
   for (const [key, value] of Object.entries(links)) {
-    if (!LINK_KEYS.includes(key)) throw invalid(`links: không có trường "${key}"`);
+    if (!LINK_KEYS.includes(key)) throw invalid(`links: unknown field "${key}"`);
     if (value === null || value === undefined) continue;
     if (typeof value !== "string" || value.length > LINK_MAX) {
-      throw invalid(`links.${key} phải là chuỗi ≤ ${LINK_MAX} ký tự`);
+      throw invalid(`links.${key} must be a string of at most ${LINK_MAX} characters`);
     }
     if (URL_LINK_KEYS.has(key)) {
       let parsed;
       try {
         parsed = new URL(value);
       } catch {
-        throw invalid(`links.${key} không phải URL`);
+        throw invalid(`links.${key} is not a URL`);
       }
       if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-        throw invalid(`links.${key} chỉ nhận http/https`);
+        throw invalid(`links.${key} accepts http/https only`);
       }
     }
     out[key] = value;
@@ -157,7 +157,7 @@ export function listProjects({ projectsDir = DEFAULT_PROJECTS_DIR } = {}) {
         },
       });
     } catch (error) {
-      console.warn(`[projects] bỏ qua "${e.name}" (${error.message})`);
+      console.warn(`[projects] skipping "${e.name}" (${error.message})`);
     }
   }
   return out.sort((a, b) => a.slug.localeCompare(b.slug));
@@ -168,7 +168,7 @@ export function readProject({ projectsDir = DEFAULT_PROJECTS_DIR, slug }) {
   try {
     return readJson(path.join(dir, "project.json"));
   } catch {
-    throw fail("NOT_FOUND", `không có dự án "${slug}"`);
+    throw fail("NOT_FOUND", `no such project "${slug}"`);
   }
 }
 
@@ -183,12 +183,12 @@ export function createProject({
 }) {
   const slug = slugify(name);
   if (!templateNames(templatesDir).includes(template)) {
-    throw invalid(`không có template "${template}"`);
+    throw invalid(`no such template "${template}"`);
   }
   const realCwd = assertCwdInHome(cwd, homeDir);
 
   const dir = projectDir(projectsDir, slug);
-  if (fs.existsSync(dir)) throw fail("EXISTS", `dự án "${slug}" đã tồn tại`);
+  if (fs.existsSync(dir)) throw fail("EXISTS", `project "${slug}" already exists`);
 
   const templateDir = path.join(templatesDir, template);
   fs.mkdirSync(dir, { recursive: true });
@@ -203,9 +203,9 @@ export function createProject({
 /** Coerce one outbox line / API payload into a stored item. Throws INVALID. */
 function makeItem({ id, title, source, status, fromIdea = null, assignee = null, links = {}, now }) {
   const clean = assertTitle(title);
-  if (!ITEM_SOURCES.includes(source)) throw invalid(`source phải là ${ITEM_SOURCES.join("|")}`);
+  if (!ITEM_SOURCES.includes(source)) throw invalid(`source must be one of ${ITEM_SOURCES.join("|")}`);
   const finalStatus = status ?? (source === "human" ? "idea" : "doing");
-  if (!ITEM_STATUSES.includes(finalStatus)) throw invalid(`status phải là ${ITEM_STATUSES.join("|")}`);
+  if (!ITEM_STATUSES.includes(finalStatus)) throw invalid(`status must be one of ${ITEM_STATUSES.join("|")}`);
   return {
     id: id ?? `it-${randomUUID().slice(0, 8)}`,
     title: clean,
@@ -252,7 +252,7 @@ function drainOutbox(dir, itemsFile, raw) {
       const parsed = JSON.parse(line);
       drained.push(makeItem({ ...parsed, now: parsed.createdAt ?? new Date().toISOString() }));
     } catch (error) {
-      console.warn(`[projects] outbox giữ lại dòng hỏng (${error.message})`);
+      console.warn(`[projects] outbox kept a malformed line (${error.message})`);
       corrupt.push(line);
     }
   }
@@ -273,9 +273,9 @@ export function readItems({ projectsDir = DEFAULT_PROJECTS_DIR, slug, source } =
   try {
     raw = readJson(itemsFile);
   } catch {
-    throw fail("NOT_FOUND", `không có dự án "${slug}"`);
+    throw fail("NOT_FOUND", `no such project "${slug}"`);
   }
-  if (!Array.isArray(raw.items)) throw invalid(`${itemsFile}: thiếu mảng "items"`);
+  if (!Array.isArray(raw.items)) throw invalid(`${itemsFile}: missing the "items" array`);
 
   raw = drainOutbox(dir, itemsFile, raw);
   return source ? raw.items.filter((i) => i.source === source) : raw.items;
@@ -300,16 +300,16 @@ export function updateItem({
 }) {
   const items = readItems({ projectsDir, slug });
   const index = items.findIndex((i) => i.id === id);
-  if (index === -1) throw fail("NOT_FOUND", `không có item "${id}"`);
+  if (index === -1) throw fail("NOT_FOUND", `no such item "${id}"`);
 
   const changes = {};
   for (const key of Object.keys(patch)) {
-    if (!PATCHABLE.includes(key)) throw invalid(`không sửa được trường "${key}"`);
+    if (!PATCHABLE.includes(key)) throw invalid(`field "${key}" is not editable`);
     changes[key] = patch[key];
   }
   if ("title" in changes) changes.title = assertTitle(changes.title);
   if ("status" in changes && !ITEM_STATUSES.includes(changes.status)) {
-    throw invalid(`status phải là ${ITEM_STATUSES.join("|")}`);
+    throw invalid(`status must be one of ${ITEM_STATUSES.join("|")}`);
   }
   if ("links" in changes) {
     // Only the keys the caller actually sent may change. assertLinks() fills the four keys
@@ -367,8 +367,8 @@ export function createProjectsHttpHandler({
           respond(status, { error: error.message });
           return;
         }
-        console.error("[projects] lỗi:", error);
-        respond(500, { error: "lỗi máy chủ" });
+        console.error("[projects] error:", error);
+        respond(500, { error: "server error" });
       }
     };
 
@@ -412,8 +412,8 @@ export function createProjectsHttpHandler({
         const slug = url.searchParams.get("project");
         const source = url.searchParams.get("source") ?? undefined;
         guard(() => {
-          if (!slug) throw invalid("thiếu ?project=");
-          if (source && !ITEM_SOURCES.includes(source)) throw invalid(`source phải là ${ITEM_SOURCES.join("|")}`);
+          if (!slug) throw invalid("missing ?project=");
+          if (source && !ITEM_SOURCES.includes(source)) throw invalid(`source must be one of ${ITEM_SOURCES.join("|")}`);
           respond(200, { items: readItems({ projectsDir, slug, source }) });
         });
         return true;
