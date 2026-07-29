@@ -1,0 +1,43 @@
+# Template: Content Studio (một người) — công ty đa agent cho sáng tạo nội dung.
+# Apply bằng: `node scripts/company-template.mjs apply content-studio`
+# Mọi member là skill ĐÃ CÀI trên máy người tạo template. Khi apply, CLI sẽ báo skill nào
+# thiếu trên máy đích để bạn chạy `company-hire` (scan an toàn) trước khi dùng.
+version: 1
+updated: 2026-07-10
+departments:
+  media:
+    model_routing:
+      script_creative: opus
+      compose_render: sonnet
+      caption_batch: haiku
+    budget_usd_per_day: 100
+    repos: []
+    members:
+      - { name: hyperframes, source: "~/.claude/skills", hired: 2026-07-10, role: "Entry skill dựng video HTML/GSAP" }
+      - { name: hyperframes-explainer, source: "~/.claude/skills", hired: 2026-07-10, role: "Explainer đa scene + voiceover tiếng Việt" }
+      - { name: fal-ai-media, source: "~/.claude/skills", hired: 2026-07-10, role: "Sinh ảnh/video/audio qua fal.ai" }
+      - { name: canvas-design, source: "~/.claude/skills", hired: 2026-07-10, role: "Thiết kế thumbnail/poster/visual tĩnh" }
+      - { name: video-editing, source: "~/.claude/skills", hired: 2026-07-10, role: "Hậu kỳ video tổng quát" }
+  marketing:
+    model_routing:
+      strategy: opus
+      draft_content: sonnet
+      repurpose_batch: haiku
+    budget_usd_per_day: 50
+    repos: []
+    members:
+      - { name: content-engine, source: "~/.claude/skills", hired: 2026-07-10, role: "Máy sản xuất content đa kênh" }
+      - { name: crosspost, source: "~/.claude/skills", hired: 2026-07-10, role: "Đăng chéo 1 nội dung ra nhiều nền tảng" }
+      - { name: youtube-seo, source: "~/.claude/skills", hired: 2026-07-10, role: "SEO YouTube thành 1 hệ thống (title/desc/tags/thumbnail)" }
+      - { name: competitive-ads-extractor, source: "~/.claude/skills", hired: 2026-07-10, role: "Bóc quảng cáo đối thủ" }
+  research:
+    model_routing:
+      synthesize: opus
+      search_read: sonnet
+      scrape_batch: haiku
+    budget_usd_per_day: 50
+    repos: []
+    members:
+      - { name: deep-research, source: "~/.claude/skills", hired: 2026-07-10, role: "Research đa nguồn có trích dẫn (firecrawl+exa)" }
+      - { name: exa-search, source: "~/.claude/skills", hired: 2026-07-10, role: "Search web ngữ nghĩa nhanh" }
+      - { name: market-research, source: "~/.claude/skills", hired: 2026-07-10, role: "Nghiên cứu thị trường" }

@@ -1,0 +1,13 @@
+{
+  "name": "@agent-office/protocol",
+  "version": "0.0.1",
+  "description": "DRAFT event schema shared between the data pipeline (daemon) and the renderer",
+  "type": "module",
+  "main": "src/events.ts",
+  "types": "src/events.ts",
+  "files": [
+    "src",
+    "schema"
+  ],
+  "license": "MIT"
+}

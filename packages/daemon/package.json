@@ -1,0 +1,17 @@
+{
+  "name": "@agent-office/daemon",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tails Claude Code transcript JSONL files and broadcasts normalized events over WebSocket.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "license": "MIT"
+}

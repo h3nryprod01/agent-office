@@ -1,0 +1,26 @@
+{
+ "bundles": [
+  {
+   "name": "office",
+   "assets": [
+    {
+     "alias": "office-tileset",
+     "src": "spritesheets/office-tileset.json"
+    },
+    {
+     "alias": "characters",
+     "src": "spritesheets/characters.json"
+    }
+   ]
+  },
+  {
+   "name": "office-kenney-fallback",
+   "assets": [
+    {
+     "alias": "kenney-library",
+     "src": "spritesheets/kenney-library.json"
+    }
+   ]
+  }
+ ]
+}

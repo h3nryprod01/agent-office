@@ -1,0 +1,39 @@
+# Template: Coding — công ty đa agent cho một dự án phần mềm.
+# Apply bằng: `node scripts/company-template.mjs apply coding`
+# Mọi member là agent/skill ĐÃ CÀI trên máy người tạo template. Khi apply, CLI sẽ báo cái nào
+# thiếu trên máy đích để bạn chạy `company-hire` (scan an toàn) trước khi dùng.
+version: 1
+updated: 2026-07-10
+departments:
+  engineering:
+    model_routing:
+      architecture: opus
+      implement: sonnet
+      mechanical_fix: haiku
+    budget_usd_per_day: 80
+    repos: []
+    members:
+      - { name: planner, source: "~/.claude/agents", hired: 2026-07-10, role: "Lập kế hoạch tính năng, chia pha" }
+      - { name: architect, source: "~/.claude/agents", hired: 2026-07-10, role: "Thiết kế hệ thống, quyết định kiến trúc" }
+      - { name: build-error-resolver, source: "~/.claude/agents", hired: 2026-07-10, role: "Dọn lỗi build/type, diff tối thiểu" }
+      - { name: typescript-reviewer, source: "~/.claude/agents", hired: 2026-07-10, role: "Review TypeScript/JavaScript" }
+      - { name: refactor-cleaner, source: "~/.claude/agents", hired: 2026-07-10, role: "Xoá dead code, gộp trùng lặp" }
+      - { name: doc-updater, source: "~/.claude/agents", hired: 2026-07-10, role: "Cập nhật codemap và tài liệu" }
+  quality:
+    repos: []
+    members:
+      - { name: tdd-guide, source: "~/.claude/agents", hired: 2026-07-10, role: "Ép viết test trước (RED→GREEN)" }
+      - { name: code-reviewer, source: "~/.claude/agents", hired: 2026-07-10, role: "Review chất lượng sau mỗi thay đổi" }
+      - { name: e2e-runner, source: "~/.claude/agents", hired: 2026-07-10, role: "E2E cho luồng người dùng quan trọng" }
+  security:
+    repos: []
+    members:
+      - { name: security-reviewer, source: "~/.claude/agents", hired: 2026-07-10, role: "Quét lỗ hổng trước khi commit" }
+  planning:
+    repos: []
+    members:
+      - { name: to-spec, source: "~/.claude/skills", hired: 2026-07-10, role: "Yêu cầu thô → spec, from mattpocock/skills (MIT) — scan SAFE" }
+      - { name: to-tickets, source: "~/.claude/skills", hired: 2026-07-10, role: "Spec → ticket chia nhỏ, from mattpocock/skills (MIT) — scan SAFE" }
+      - { name: wayfinder, source: "~/.claude/skills", hired: 2026-07-10, role: "Dò đường trong codebase lạ, from mattpocock/skills (MIT) — scan SAFE" }
+      - { name: triage, source: "~/.claude/skills", hired: 2026-07-10, role: "Phân loại bug/issue theo mức độ, from mattpocock/skills (MIT) — scan SAFE" }
+      - { name: resolving-merge-conflicts, source: "~/.claude/skills", hired: 2026-07-10, role: "Gỡ conflict khi nhiều chip cùng sửa, from mattpocock/skills (MIT) — scan SAFE" }

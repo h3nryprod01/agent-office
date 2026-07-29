@@ -1,0 +1,96 @@
+# Template: Real Estate Marketing — công ty đa agent cho team marketing bất động sản.
+# Apply bằng: `node scripts/company-template.mjs apply real-estate-marketing`
+#
+# Bản GENERAL: chưa gắn với khách cụ thể. Các chỗ trống (<TÊN ĐƠN VỊ>, <SẢN PHẨM>, ...)
+# nằm trong goals.md — điền trước khi giao cho company-pm.
+#
+# Mọi member DƯỚI ĐÂY là skill/agent ĐÃ CÀI trên máy người tạo template. Khi apply, CLI báo
+# skill nào thiếu trên máy đích → chạy `company-hire` (scan an toàn) trước khi dùng.
+#
+# Năng lực template CHƯA có → xem 2 mục trong goals.md, KHÔNG thêm vào file này cho tới khi cài:
+#   - "Cần tuyển" — gap thật (đăng FB/TikTok/Zalo, chạy ads, định giá, pháp lý dự án).
+#   - "Roster đề xuất — cần tuyển" — 22 skill còn lại của coreyhaines31/marketingskills (CHƯA cài).
+#     10 skill của bộ này đã cài 2026-07-09 và đã nằm trong danh sách member bên dưới.
+version: 1
+updated: 2026-07-10
+departments:
+  marketing:
+    model_routing:
+      strategy: opus
+      draft_content: sonnet
+      repurpose_batch: haiku
+    budget_usd_per_day: 60
+    repos: []
+    members:
+      - { name: content-engine, source: "~/.claude/skills", hired: 2026-07-10, role: "Máy sản xuất content đa kênh (post listing, script video)" }
+      - { name: content-research-writer, source: "~/.claude/skills", hired: 2026-07-10, role: "Bài dài có dẫn nguồn: review dự án, kiến thức mua nhà" }
+      - { name: competitive-ads-extractor, source: "~/.claude/skills", hired: 2026-07-10, role: "Bóc ads đối thủ để tìm góc quảng cáo" }
+      - { name: ui-ux-pro-max, source: "~/.claude/skills", hired: 2026-07-10, role: "Thiết kế + dựng landing page thu lead" }
+      - { name: "marketing:campaign-plan", source: "plugin marketing", hired: 2026-07-10, role: "Lên kế hoạch chiến dịch lead-gen" }
+      - { name: "marketing:email-sequence", source: "plugin marketing", hired: 2026-07-10, role: "Chuỗi nurture lead sau khi để lại thông tin" }
+      - { name: marketing-content-creator, source: "~/.claude/agents", hired: 2026-07-10, role: "Editorial calendar + copy đa kênh" }
+      # Từ plugin marketingskills (MIT) — cài lẻ dạng prose, scan verdict CAUTION nhưng 3 finding
+      # spot-check đều false-positive trong docs, 0 file thực thi. Xác nhận lại 2026-07-10: cả 9
+      # skill dưới đây là thư mục thật trong ~/.claude/skills, có SKILL.md, 0 file .sh/.py/.js.
+      - { name: copywriting, source: "marketingskills (MIT), scan CAUTION verified-fp 2026-07-09", hired: 2026-07-09, role: "Copy landing/hero/CTA cho trang dự án" }
+      - { name: content-strategy, source: "marketingskills (MIT), scan CAUTION verified-fp 2026-07-09", hired: 2026-07-09, role: "Chọn chủ đề, content pillar, topic cluster theo khu vực" }
+      - { name: cro, source: "marketingskills (MIT), scan CAUTION verified-fp 2026-07-09", hired: 2026-07-09, role: "Tối ưu tỉ lệ chuyển đổi landing + form thu lead" }
+      - { name: seo-audit, source: "marketingskills (MIT), scan CAUTION verified-fp 2026-07-09", hired: 2026-07-09, role: "Audit SEO website/landing dự án (thay marketing:seo-audit)" }
+      - { name: marketing-psychology, source: "marketingskills (MIT), scan CAUTION verified-fp 2026-07-09", hired: 2026-07-09, role: "Tâm lý người mua nhà: neo giá, khan hiếm, bằng chứng xã hội" }
+      - { name: referrals, source: "marketingskills (MIT), scan CAUTION verified-fp 2026-07-09", hired: 2026-07-09, role: "Chương trình giới thiệu — kênh lớn nhất của môi giới BĐS" }
+      - { name: lead-magnets, source: "marketingskills (MIT), scan CAUTION verified-fp 2026-07-09", hired: 2026-07-09, role: "Mồi thu email: bảng giá, checklist kiểm nhà, hướng dẫn vay" }
+      - { name: ad-creative, source: "marketingskills (MIT), scan CAUTION verified-fp 2026-07-09", hired: 2026-07-09, role: "Sinh biến thể ad copy hàng loạt (KHÔNG chạy ads — xem gap)" }
+      - { name: social, source: "marketingskills (MIT), scan CAUTION verified-fp 2026-07-09", hired: 2026-07-09, role: "Soạn nội dung social + social listening (KHÔNG đăng bài — xem gap)" }
+  media:
+    model_routing:
+      script_creative: opus
+      compose_render: sonnet
+      caption_batch: haiku
+    budget_usd_per_day: 100
+    repos: []
+    members:
+      - { name: hyperframes, source: "~/.claude/skills", hired: 2026-07-10, role: "Entry skill dựng video HTML/GSAP" }
+      - { name: hyperframes-explainer, source: "~/.claude/skills", hired: 2026-07-10, role: "Explainer đa scene + voiceover tiếng Việt (giới thiệu dự án)" }
+      - { name: product-launch-video, source: "~/.claude/skills", hired: 2026-07-10, role: "Video ra mắt dự án / mở bán" }
+      - { name: fal-ai-media, source: "~/.claude/skills", hired: 2026-07-10, role: "Sinh ảnh/video/audio AI (phối cảnh, nội thất gợi ý)" }
+      - { name: image-enhancer, source: "~/.claude/skills", hired: 2026-07-10, role: "Nâng chất ảnh chụp căn/dự án trước khi đăng" }
+      - { name: canvas-design, source: "~/.claude/skills", hired: 2026-07-10, role: "Thumbnail/poster/bảng giá dạng visual" }
+      - { name: video-editing, source: "~/.claude/skills", hired: 2026-07-10, role: "Hậu kỳ reel/tour căn hộ" }
+      - { name: design-image-prompt-engineer, source: "~/.claude/agents", hired: 2026-07-10, role: "Viết prompt ảnh BĐS đúng ánh sáng/góc máy" }
+  research:
+    model_routing:
+      synthesize: opus
+      search_read: sonnet
+      scrape_batch: haiku
+    budget_usd_per_day: 50
+    repos: []
+    members:
+      - { name: deep-research, source: "~/.claude/skills", hired: 2026-07-10, role: "Research đa nguồn có trích dẫn (báo cáo thị trường khu vực)" }
+      - { name: exa-search, source: "~/.claude/skills", hired: 2026-07-10, role: "Search web ngữ nghĩa nhanh" }
+      - { name: market-research, source: "~/.claude/skills", hired: 2026-07-10, role: "Nghiên cứu thị trường / phân khúc" }
+      - { name: lead-research-assistant, source: "~/.claude/skills", hired: 2026-07-10, role: "Research khách/chủ đầu tư tiềm năng" }
+      - { name: product-trend-researcher, source: "~/.claude/agents", hired: 2026-07-10, role: "Bắt trend + phân tích đối thủ khu vực" }
+      - { name: customer-research, source: "marketingskills (MIT), scan CAUTION verified-fp 2026-07-09", hired: 2026-07-09, role: "Phỏng vấn/tổng hợp tiếng nói khách mua nhà, dựng persona (JTBD)" }
+  social:
+    model_routing:
+      channel_strategy: sonnet
+      adapt_caption: haiku
+    budget_usd_per_day: 30
+    repos: []
+    members:
+      - { name: crosspost, source: "~/.claude/skills", hired: 2026-07-10, role: "Đăng chéo 1 nội dung ra X/LinkedIn/Threads/Bluesky (KHÔNG có FB/TikTok/Zalo — xem goals)" }
+      - { name: youtube-seo, source: "~/.claude/skills", hired: 2026-07-10, role: "SEO YouTube cho video tour/review dự án" }
+      - { name: marketing-video-optimization-specialist, source: "~/.claude/agents", hired: 2026-07-10, role: "Retention, thumbnail concept, syndication video đa kênh" }
+  ops:
+    model_routing:
+      analysis: sonnet
+      routine_brief: haiku
+    budget_usd_per_day: 30
+    repos: []
+    members:
+      - { name: "small-business:lead-triage", source: "plugin small-business", hired: 2026-07-10, role: "Phân loại lead vào/nóng-lạnh" }
+      - { name: "small-business:crm-maintenance", source: "plugin small-business", hired: 2026-07-10, role: "Giữ CRM sạch, cập nhật trạng thái lead" }
+      - { name: "small-business:run-campaign", source: "plugin small-business", hired: 2026-07-10, role: "Vận hành chiến dịch theo checklist" }
+      - { name: file-organizer, source: "~/.claude/skills", hired: 2026-07-10, role: "Dọn kho ảnh/video listing theo dự án" }
+      # Lịch lặp lại (báo cáo tuần/tháng): chưa có member. Skill `schedule` trên máy này chỉ là
+      # symlink vào phiên Claude Desktop → không phải bản cài bền. Xem "Cần tuyển" trong goals.md.

@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/h3nryprod01/agent-office/packages/protocol/schema/events.schema.json",
+  "title": "Agent Office event protocol — DRAFT v0",
+  "description": "One event per WebSocket message. See packages/protocol/README.md for status and change process.",
+  "oneOf": [
+    { "$ref": "#/$defs/session_started" },
+    { "$ref": "#/$defs/session_ended" },
+    { "$ref": "#/$defs/agent_spawned" },
+    { "$ref": "#/$defs/agent_despawned" },
+    { "$ref": "#/$defs/agent_status_changed" },
+    { "$ref": "#/$defs/tool_call_started" },
+    { "$ref": "#/$defs/tool_call_finished" },
+    { "$ref": "#/$defs/agent_message" }
+  ],
+  "$defs": {
+    "base": {
+      "type": "object",
+      "properties": {
+        "v": { "const": 0 },
+        "id": { "type": "string", "minLength": 1 },
+        "timestamp": { "type": "integer", "description": "ms since epoch" },
+        "sessionId": { "type": "string", "minLength": 1 },
+        "agentId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Root agent uses agentId === sessionId; sub-agents use transcript agentId"
+        },
+        "parentId": { "type": ["string", "null"] }
+      },
+      "required": ["v", "id", "type", "timestamp", "sessionId", "agentId", "parentId"]
+    },
+    "agentStatus": {
+      "enum": [
+        "working",
+        "reading",
+        "running_command",
+        "waiting_permission",
+        "blocked",
+        "error",
+        "idle",
+        "done"
+      ]
+    },
+    "session_started": {
+      "allOf": [{ "$ref": "#/$defs/base" }],
+      "properties": {
+        "type": { "const": "session_started" },
+        "cwd": { "type": ["string", "null"] },
+        "label": { "type": "string" }
+      },
+      "required": ["cwd", "label"],
+      "unevaluatedProperties": false
+    },
+    "session_ended": {
+      "allOf": [{ "$ref": "#/$defs/base" }],
+      "properties": {
+        "type": { "const": "session_ended" },
+        "reason": { "type": ["string", "null"] }
+      },
+      "required": ["reason"],
+      "unevaluatedProperties": false
+    },
+    "agent_spawned": {
+      "allOf": [{ "$ref": "#/$defs/base" }],
+      "properties": {
+        "type": { "const": "agent_spawned" },
+        "name": { "type": "string", "minLength": 1 },
+        "role": {
+          "type": ["string", "null"],
+          "description": "Only when derivable from real data — never invented"
+        },
+        "cwd": {
+          "type": ["string", "null"],
+          "description": "Optional (additive, Round 3): agent's project working dir, for the side panel"
+        }
+      },
+      "required": ["name", "role"],
+      "unevaluatedProperties": false
+    },
+    "agent_despawned": {
+      "allOf": [{ "$ref": "#/$defs/base" }],
+      "properties": {
+        "type": { "const": "agent_despawned" },
+        "reason": { "type": ["string", "null"] }
+      },
+      "required": ["reason"],
+      "unevaluatedProperties": false
+    },
+    "agent_status_changed": {
+      "allOf": [{ "$ref": "#/$defs/base" }],
+      "properties": {
+        "type": { "const": "agent_status_changed" },
+        "status": { "$ref": "#/$defs/agentStatus" },
+        "detail": { "type": ["string", "null"] }
+      },
+      "required": ["status", "detail"],
+      "unevaluatedProperties": false
+    },
+    "tool_call_started": {
+      "allOf": [{ "$ref": "#/$defs/base" }],
+      "properties": {
+        "type": { "const": "tool_call_started" },
+        "tool": { "type": "string", "minLength": 1 },
+        "toolUseId": { "type": ["string", "null"] },
+        "detail": { "type": ["string", "null"] }
+      },
+      "required": ["tool", "toolUseId", "detail"],
+      "unevaluatedProperties": false
+    },
+    "tool_call_finished": {
+      "allOf": [{ "$ref": "#/$defs/base" }],
+      "properties": {
+        "type": { "const": "tool_call_finished" },
+        "tool": { "type": "string", "minLength": 1 },
+        "toolUseId": { "type": ["string", "null"] },
+        "ok": { "type": "boolean" },
+        "detail": { "type": ["string", "null"] }
+      },
+      "required": ["tool", "toolUseId", "ok", "detail"],
+      "unevaluatedProperties": false
+    },
+    "agent_message": {
+      "allOf": [{ "$ref": "#/$defs/base" }],
+      "properties": {
+        "type": { "const": "agent_message" },
+        "text": { "type": "string" }
+      },
+      "required": ["text"],
+      "unevaluatedProperties": false
+    }
+  }
+}

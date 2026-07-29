@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Office — 10 skin robot</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0d1117; overflow: hidden;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace; color: #cbd5e1; }
+    #c { display: block; width: 100vw; height: 100vh; }
+    #hud { position: fixed; top: 14px; left: 16px; z-index: 5; pointer-events: none; }
+    #hud h1 { margin: 0; font-size: 15px; letter-spacing: .14em; color: #e8ecf4; }
+    #hud h1 b { color: #38e0d0; }
+    #hud .sub { font-size: 11px; color: #64748b; margin-top: 3px; letter-spacing: .06em; }
+    #ctl { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 5;
+      display: flex; gap: 8px; background: rgba(12,17,26,.82); border: 1px solid #2a3446;
+      border-radius: 12px; padding: 8px; backdrop-filter: blur(6px); }
+    #ctl button { background: #16203a; color: #cbd5e1; border: 1px solid #2a3446; border-radius: 8px;
+      font: 600 12px ui-monospace, monospace; padding: 8px 12px; cursor: pointer; }
+    #ctl button:hover { border-color: #3b4a66; color: #fff; }
+    #ctl button.on { background: linear-gradient(180deg,#fbbf24,#f59e0b); color: #160f02; border: none; }
+    #note { position: fixed; bottom: 18px; right: 16px; z-index: 5; font-size: 11px; color: #475569;
+      max-width: 240px; text-align: right; }
+    #note b { color: #7fe9dd; }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="hud">
+    <h1>ĐẦU MÀN HÌNH — <b>10 SKIN</b></h1>
+    <div class="sub">Mỗi agent trong Văn phòng sẽ nhận 1 skin (thân / viền / màn hình)</div>
+  </div>
+  <div id="ctl">
+    <button id="btn-walk">🚶 Xem dáng đi</button>
+    <button id="btn-night">🌙 Tắt đèn</button>
+  </div>
+  <div id="note">Mỗi bệ xoay chậm để xem đủ góc. Chọn số nào, mình ghép mẫu đó vào <b>Văn phòng</b>.</div>
+  <script type="module" src="/src/render3d/robots.ts"></script>
+</body>
+</html>

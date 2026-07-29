@@ -1,0 +1,1070 @@
+{
+ "frames": {
+  "kenney/bookStand_E": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1032,
+    "y": 1542
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/bookStand_N": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 774,
+    "y": 1542
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/bookStand_S": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1290,
+    "y": 1542
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/bookStand_W": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1548,
+    "y": 1542
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/bookcaseBooks_E": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1290,
+    "y": 0
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/bookcaseBooks_N": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1032,
+    "y": 0
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/bookcaseBooks_S": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1548,
+    "y": 0
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/bookcaseBooks_W": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 514
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/bookcaseHalfBooks_E": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 516,
+    "y": 514
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/bookcaseHalfBooks_N": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 258,
+    "y": 514
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/bookcaseHalfBooks_S": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 774,
+    "y": 514
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/bookcaseHalfBooks_W": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1032,
+    "y": 514
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/bookcaseWideBooksDesk_E": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 258,
+    "y": 0
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/bookcaseWideBooksDesk_N": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/bookcaseWideBooksDesk_S": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 516,
+    "y": 0
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/bookcaseWideBooksDesk_W": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 774,
+    "y": 0
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/displayCaseBooks_E": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 258,
+    "y": 2056
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/displayCaseBooks_N": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 2056
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/displayCaseBooks_S": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 516,
+    "y": 2056
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/displayCaseBooks_W": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 774,
+    "y": 2056
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/floorCarpetSmall_E": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 516,
+    "y": 2570
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/floorCarpetSmall_N": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 258,
+    "y": 2570
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/floorCarpetSmall_S": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 774,
+    "y": 2570
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/floorCarpetSmall_W": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1032,
+    "y": 2570
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/floorCarpet_E": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1290,
+    "y": 2056
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/floorCarpet_N": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1032,
+    "y": 2056
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/floorCarpet_S": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1548,
+    "y": 2056
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/floorCarpet_W": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 2570
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/libraryChair_E": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1548,
+    "y": 514
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/libraryChair_N": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1290,
+    "y": 514
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/libraryChair_S": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 1028
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/libraryChair_W": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 258,
+    "y": 1028
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/longTableChairs_E": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 1542
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/longTableChairs_N": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1548,
+    "y": 1028
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/longTableChairs_S": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 258,
+    "y": 1542
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/longTableChairs_W": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 516,
+    "y": 1542
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/longTable_E": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 774,
+    "y": 1028
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/longTable_N": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 516,
+    "y": 1028
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/longTable_S": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1032,
+    "y": 1028
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/longTable_W": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1290,
+    "y": 1028
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/wallDoorway_E": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1548,
+    "y": 2570
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/wallDoorway_N": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 1290,
+    "y": 2570
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/wallDoorway_S": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 3084
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  },
+  "kenney/wallDoorway_W": {
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8594
+   },
+   "frame": {
+    "h": 512,
+    "w": 256,
+    "x": 258,
+    "y": 3084
+   },
+   "rotated": false,
+   "sourceSize": {
+    "h": 512,
+    "w": 256
+   },
+   "spriteSourceSize": {
+    "h": 512,
+    "w": 256,
+    "x": 0,
+    "y": 0
+   },
+   "trimmed": false
+  }
+ },
+ "meta": {
+  "app": "agent-office/assets/tools",
+  "format": "RGBA8888",
+  "image": "kenney-library.png",
+  "scale": "1",
+  "size": {
+   "h": 3598,
+   "w": 1806
+  }
+ }
+}

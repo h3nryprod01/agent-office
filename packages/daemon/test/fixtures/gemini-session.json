@@ -1,0 +1,159 @@
+{
+  "sessionId": "9efa18e9-0761-4d8d-93bd-8667266e4464",
+  "projectHash": "d65767b751381c16773d1cf6e5522fc739db9e835f658e925502169a1c980077",
+  "startTime": "2026-07-09T18:53:55.764Z",
+  "lastUpdated": "2026-07-09T18:54:03.647Z",
+  "messages": [
+    {
+      "id": "9f2901ed-f385-4c75-b862-add08f7b109d",
+      "timestamp": "2026-07-09T18:53:55.764Z",
+      "type": "user",
+      "content": [
+        {
+          "text": "Do these one at a time with your tools: (1) list_directory here, (2) read_file a.txt, (3) read_file b.txt, (4) glob for *.md, then say DONE."
+        }
+      ]
+    },
+    {
+      "id": "b9dfc36b-9c1a-4dc2-8f33-e35e882228ce",
+      "timestamp": "2026-07-09T18:54:01.529Z",
+      "type": "gemini",
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "list_directory_1783623239753_0",
+          "name": "list_directory",
+          "args": {
+            "dir_path": "."
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "list_directory_1783623239753_0",
+                "name": "list_directory",
+                "response": {
+                  "output": "<trimmed>"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-07-09T18:54:01.529Z",
+          "resultDisplay": "Listed 3 item(s). (1 ignored)",
+          "displayName": "ReadFolder",
+          "description": "Lists the names of files and subdirectories directly within ",
+          "renderOutputAsMarkdown": true
+        },
+        {
+          "id": "read_file_1783623240459_1",
+          "name": "read_file",
+          "args": {
+            "file_path": "a.txt"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "read_file_1783623240459_1",
+                "name": "read_file",
+                "response": {
+                  "output": "<trimmed>"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-07-09T18:54:01.529Z",
+          "resultDisplay": "",
+          "displayName": "ReadFile",
+          "description": "Reads and returns the content of a specified file. If the fi",
+          "renderOutputAsMarkdown": true
+        },
+        {
+          "id": "read_file_1783623240883_2",
+          "name": "read_file",
+          "args": {
+            "file_path": "b.txt"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "read_file_1783623240883_2",
+                "name": "read_file",
+                "response": {
+                  "output": "<trimmed>"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-07-09T18:54:01.529Z",
+          "resultDisplay": "",
+          "displayName": "ReadFile",
+          "description": "Reads and returns the content of a specified file. If the fi",
+          "renderOutputAsMarkdown": true
+        },
+        {
+          "id": "glob_1783623241508_3",
+          "name": "glob",
+          "args": {
+            "pattern": "*.md"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "glob_1783623241508_3",
+                "name": "glob",
+                "response": {
+                  "output": "<trimmed>"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-07-09T18:54:01.529Z",
+          "resultDisplay": "Found 1 matching file(s)",
+          "displayName": "FindFiles",
+          "description": "Efficiently finds files matching specific glob patterns (e.g",
+          "renderOutputAsMarkdown": true
+        }
+      ],
+      "thoughts": [
+        {
+          "subject": "Processing Tool Execution",
+          "description": "I am now initiating the first step, which involves listing t",
+          "timestamp": "2026-07-09T18:53:58.035Z"
+        },
+        {
+          "subject": "Exploring Directory Contents",
+          "description": "I'm beginning by listing the files in this directory. This i",
+          "timestamp": "2026-07-09T18:53:59.173Z"
+        }
+      ],
+      "model": "gemini-2.5-pro",
+      "tokens": {
+        "input": 8606,
+        "output": 29,
+        "cached": 0,
+        "thoughts": 145,
+        "tool": 0,
+        "total": 8780
+      }
+    },
+    {
+      "id": "1e1f1907-1a75-47a8-85fc-912bb6c20931",
+      "timestamp": "2026-07-09T18:54:03.647Z",
+      "type": "gemini",
+      "content": "DONE",
+      "thoughts": [],
+      "tokens": {
+        "input": 9086,
+        "output": 2,
+        "cached": 6890,
+        "thoughts": 0,
+        "tool": 0,
+        "total": 9088
+      },
+      "model": "gemini-2.5-pro"
+    }
+  ]
+}

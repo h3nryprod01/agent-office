@@ -1,0 +1,22 @@
+node_modules/
+*.log
+__pycache__/
+*.pyc
+# git worktrees live here (.claude/worktrees/<name>) — never commit the checkouts
+.claude/worktrees/
+.DS_Store
+
+# Per-repo agent memory: working notes, session ids, and whatever the day's work
+# happened to involve. Local by design — it is the fastest way to leak a client's
+# hostname or an unrelated project's name into a public repo.
+.claude/memory/
+
+# Scratch output from e2e runs
+demo/
+
+# Optional TTS virtualenv (see packages/daemon/src/tts.js)
+.venv-tts/
+
+# Large media belongs in a GitHub Release, not in every clone
+*.mov
+*.mp4

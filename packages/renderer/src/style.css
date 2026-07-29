@@ -1,0 +1,1946 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  background: #171a23;
+  color: #e2e8f0;
+  font-family: system-ui, sans-serif;
+  overflow: hidden;
+}
+
+#app,
+#app canvas {
+  width: 100vw;
+  height: 100vh;
+  display: block;
+}
+
+#controls {
+  position: fixed;
+  left: calc(var(--nav-w) + 12px);
+  bottom: 64px; /* above the replay timeline bar */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+#controls button {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+#controls button:hover {
+  background: #334155;
+}
+
+#controls button.sfx-on {
+  background: #14532d;
+  border-color: #22c55e;
+  color: #dcfce7;
+}
+
+#controls .btn-speed.active {
+  background: #4ade80;
+  color: #0f172a;
+  border-color: #4ade80;
+}
+
+#controls #progress,
+#controls #fps {
+  color: #94a3b8;
+  min-width: 70px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Mission Control: side panel ─────────────────────────────── */
+
+.side-panel {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: 320px;
+  overflow-y: auto;
+  padding: 14px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.side-panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.side-panel h2 {
+  font-size: 15px;
+}
+
+.side-panel h2 small {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.side-panel h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+  margin: 14px 0 6px;
+}
+
+.side-panel [data-close] {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.side-panel .row {
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.side-panel .row .k {
+  flex: 0 0 96px;
+  color: #94a3b8;
+}
+
+.side-panel .row .v {
+  flex: 1;
+  word-break: break-all;
+}
+
+.side-panel code {
+  font-size: 12px;
+  color: #a5b4fc;
+}
+
+.side-panel .timeline {
+  list-style: none;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.side-panel .timeline li {
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+  word-break: break-word;
+}
+
+.side-panel .timeline time {
+  color: #64748b;
+  font-size: 11px;
+  margin-right: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.side-panel .timeline .tl-result {
+  color: #94a3b8;
+}
+
+.side-panel .timeline .tl-message {
+  color: #bae6fd;
+}
+
+/* ── see-more (wi-office-life): collapsed row text clips, ▸ expands ─────── */
+
+.side-panel .timeline .row-toggle {
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 4px 0 0;
+  vertical-align: top;
+}
+
+.side-panel .timeline .row-toggle:hover {
+  color: #e2e8f0;
+}
+
+.side-panel .timeline .row-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.side-panel .timeline li.expanded .row-text {
+  -webkit-line-clamp: unset;
+  display: block;
+}
+
+.side-panel .transcript-more {
+  display: block;
+  margin: 8px auto 0;
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.side-panel .transcript-more:hover {
+  border-color: #4ade80;
+}
+
+.side-panel .placeholder {
+  color: #64748b;
+  font-style: italic;
+}
+
+.status-chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f172a;
+  background: #94a3b8;
+}
+
+.status-chip.status-waiting_permission,
+.status-chip.status-blocked {
+  background: #ef4444;
+  color: #fff;
+}
+
+.status-chip.status-error {
+  background: #f97316;
+}
+
+.status-chip.status-working,
+.status-chip.status-done {
+  background: #4ade80;
+}
+
+.status-chip.status-reading {
+  background: #60a5fa;
+}
+
+.status-chip.status-running_command {
+  background: #facc15;
+}
+
+/* ── Mission Control: intervention queue ─────────────────────── */
+
+.queue-panel {
+  position: fixed;
+  top: 12px;
+  left: calc(var(--nav-w) + 12px);
+  width: 280px;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid #7f1d1d;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.queue-panel h2 {
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.queue-panel .count {
+  display: inline-block;
+  min-width: 18px;
+  text-align: center;
+  background: #ef4444;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 11px;
+  padding: 1px 5px;
+}
+
+.queue-panel ul {
+  list-style: none;
+}
+
+.queue-panel li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 8px;
+  padding: 6px 8px;
+  margin: 4px 0;
+  border-radius: 8px;
+  background: rgba(127, 29, 29, 0.25);
+  border-left: 3px solid #ef4444;
+  cursor: pointer;
+}
+
+.queue-panel li.status-error {
+  border-left-color: #f97316;
+  background: rgba(124, 45, 18, 0.25);
+}
+
+.queue-panel li:hover {
+  background: rgba(127, 29, 29, 0.5);
+}
+
+.queue-panel .who {
+  font-weight: 700;
+}
+
+.queue-panel .since {
+  color: #fca5a5;
+  font-variant-numeric: tabular-nums;
+}
+
+.queue-panel .what {
+  grid-column: 1 / -1;
+  color: #94a3b8;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Approve gateway spike (R5②): pending PermissionRequest, answerable inline. */
+.queue-panel li.approval {
+  border-left-color: #4ade80;
+  background: rgba(22, 101, 52, 0.25);
+  cursor: default;
+}
+
+.queue-panel .approve-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.queue-panel .approve-actions button {
+  border: none;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.queue-panel .approve-actions .allow {
+  background: #4ade80;
+  color: #0f172a;
+}
+
+.queue-panel .approve-actions .allow:hover {
+  background: #86efac;
+}
+
+.queue-panel .approve-actions .deny {
+  background: #ef4444;
+  color: #fff;
+}
+
+.queue-panel .approve-actions .deny:hover {
+  background: #f87171;
+}
+
+.queue-panel li.approval .preview {
+  font-family: monospace;
+}
+
+/* ── Replay: timeline bar ────────────────────────────────────── */
+
+#timeline-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+#timeline-bar button {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+#timeline-bar button:hover {
+  background: #334155;
+}
+
+#timeline-bar .speeds {
+  display: flex;
+  gap: 4px;
+}
+
+#timeline-bar .rp-speed.active {
+  background: #4ade80;
+  color: #0f172a;
+  border-color: #4ade80;
+}
+
+#timeline-bar #rp-live.active {
+  background: #ef4444;
+  color: #fff;
+  border-color: #ef4444;
+}
+
+#timeline-bar #rp-scrub {
+  width: min(38vw, 420px);
+  accent-color: #4ade80;
+}
+
+#timeline-bar #rp-time {
+  color: #94a3b8;
+  min-width: 90px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+#timeline-bar #rp-msg {
+  color: #facc15;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Mission Control: work item deep links (side panel + board) ── */
+
+.status-chip.status-in_progress {
+  background: #facc15;
+}
+
+.wi-links {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.wi-link {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 2px 10px;
+  font-size: 12px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.wi-link:hover {
+  background: #334155;
+}
+
+.wi-link.wi-disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.work-item .wi-title {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.work-item .wi-meta {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+/* Task ancestry: "Vì sao" chain under the work item (child → parent → goal). */
+.why-chain {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #334155;
+}
+
+.why-chain .why-label {
+  color: #64748b;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.why-chain .why-row {
+  font-size: 12px;
+  color: #cbd5e1;
+  padding: 1px 0;
+}
+
+.why-chain .why-arrow {
+  color: #64748b;
+}
+
+/* ── Mission Control: mini kanban board ─────────────────────── */
+
+.board {
+  position: fixed;
+  left: calc(var(--nav-w) + 12px);
+  bottom: 120px; /* above #controls */
+  max-width: 340px;
+  font-size: 13px;
+}
+
+.board .board-toggle {
+  background: rgba(15, 23, 42, 0.85);
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.board .board-toggle:hover {
+  background: #1e293b;
+}
+
+.board .board-list {
+  list-style: none;
+  margin-top: 6px;
+  padding: 10px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid #334155;
+  border-radius: 10px;
+}
+
+.board .board-list li {
+  padding: 6px 0;
+  border-bottom: 1px solid #1e293b;
+}
+
+.board .board-list li:last-child {
+  border-bottom: none;
+}
+
+/* ── office tabs (Round 4: multi-office) ─────────────────────────────── */
+
+.office-tabs {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  z-index: 5;
+  max-width: min(70vw, 900px);
+  overflow-x: auto;
+}
+
+.office-tabs:empty {
+  display: none;
+}
+
+.office-tabs button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #94a3b8;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.office-tabs button:hover {
+  background: rgba(51, 65, 85, 0.5);
+}
+
+.office-tabs button.active {
+  background: #334155;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+.office-tabs .badge {
+  min-width: 18px;
+  text-align: center;
+  background: #475569;
+  color: #e2e8f0;
+  border-radius: 999px;
+  font-size: 11px;
+  padding: 1px 5px;
+}
+
+.office-tabs .alert-dot {
+  display: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
+
+.office-tabs .alert-dot.on {
+  display: block;
+}
+
+/* ── org chart overlay ("Sơ đồ tổ chức", wi-orgchart) ─────────────────── */
+
+.orgchart {
+  position: fixed;
+  left: calc(var(--nav-w) + 12px);
+  bottom: 160px; /* above #board */
+  font-size: 13px;
+}
+
+/* rule body restored (wi-hiring-hall): the #19/#21 merge dropped it, and the
+   dangling `{` swallowed every later rule as CSS-nested children of the
+   toggle — costs/orgchart-overlay CSS has been dead on main since. Body
+   mirrors .costs-toggle (the twin button), pairing with :hover below. */
+.orgchart .orgchart-toggle {
+  background: rgba(15, 23, 42, 0.85);
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+/* ── Cost dashboard (wi-cost-dashboard) ──────────────────────── */
+
+.costs {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 6; /* above the side panel, which shares this corner */
+  font-size: 13px;
+}
+
+.costs .costs-toggle {
+  background: rgba(15, 23, 42, 0.85);
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.orgchart .orgchart-toggle:hover {
+  background: #1e293b;
+}
+
+.orgchart-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+/* the class's display:flex beats the UA's [hidden]{display:none} — without
+   this the dark backdrop covers the whole office on load (the "độ sáng thấp"
+   bug, surfaced once the missing-} CSS parse fix revived this rule) */
+.orgchart-overlay[hidden] {
+  display: none;
+}
+
+.orgchart-panel {
+  background: rgba(15, 23, 42, 0.97);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 14px 18px;
+  min-width: 340px;
+  max-width: 60vw;
+  max-height: 75vh;
+  overflow: auto;
+  color: #e2e8f0;
+}
+
+.orgchart-panel h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.orgchart-panel .orgchart-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.orgchart-panel .empty {
+  color: #64748b;
+  font-style: italic;
+}
+
+.org-repo h3 {
+  margin: 10px 0 4px;
+  font-size: 13px;
+  color: #7dd3fc;
+}
+
+.org-repo .org-counts {
+  margin-left: 8px;
+  font-weight: 400;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.org-tree,
+.org-tree ul {
+  list-style: none;
+  margin: 2px 0;
+  padding-left: 0;
+}
+
+.org-tree ul {
+  /* connector: vertical spine down the parent, ticks per child (::before) */
+  margin-left: 9px;
+  padding-left: 14px;
+  border-left: 1px solid #334155;
+}
+
+.org-tree li {
+  position: relative;
+  padding: 2px 0;
+}
+
+.org-tree ul li::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 13px;
+  width: 10px;
+  border-top: 1px solid #334155;
+}
+
+.org-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.org-node:hover {
+  background: #1e293b;
+}
+
+.org-node .org-name {
+  font-weight: 600;
+  float: right;
+}
+
+/* ── Building view ("Tòa nhà", R10-b) ──────────────────────── */
+
+.building {
+  position: fixed;
+  left: calc(var(--nav-w) + 12px);
+  bottom: 200px; /* stacked above #orgchart */
+  font-size: 13px;
+}
+
+.building .building-toggle {
+  background: rgba(15, 23, 42, 0.85);
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.building .building-toggle:hover {
+  background: #1e293b;
+}
+
+.building-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+/* [hidden] must beat display:flex or the backdrop covers the office on load
+   (same "độ sáng thấp" trap as the org chart overlay). */
+.building-overlay[hidden] {
+  display: none;
+}
+
+.building-panel {
+  background: rgba(15, 23, 42, 0.97);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 14px 18px;
+  min-width: 320px;
+  max-width: 60vw;
+  max-height: 75vh;
+  overflow: auto;
+  color: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.building-panel h2 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.building-panel .building-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.building-panel .empty {
+  color: #64748b;
+  font-style: italic;
+}
+
+/* a floor: stacked like stories of a building, lit when staffed, red dot when
+   an agent in that repo is stuck. */
+.building-panel .floor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  background: #1c2233;
+  color: #94a3b8;
+  border: 1px solid #2b3245;
+  border-left: 4px solid #334155;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.building-panel .floor:hover {
+  background: #242b3d;
+}
+
+.building-panel .floor.active {
+  color: #e2e8f0;
+  border-left-color: #38bdf8;
+}
+
+.building-panel .floor.alert {
+  border-left-color: #ef4444;
+}
+
+.building-panel .floor-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.building-panel .floor-count {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.building-panel .floor-alert {
+  color: #ef4444;
+  text-shadow: 0 0 6px #ef4444;
+}
+
+.costs .costs-toggle:hover {
+  border-color: #4ade80;
+}
+
+.costs .costs-panel {
+  clear: both;
+  margin-top: 6px;
+  width: 360px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid #334155;
+  border-radius: 12px;
+}
+
+.costs .cost-head {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.costs .cost-window {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.costs .cost-window.active {
+  background: #4ade80;
+  color: #0f172a;
+  border-color: #4ade80;
+}
+
+.costs .cost-total {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.costs .cost-dim {
+  color: #94a3b8;
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.costs .cost-unknown {
+  color: #facc15;
+  font-size: 11px;
+  margin: 4px 0;
+}
+
+.costs .cost-overbudget {
+  color: #f87171;
+  font-size: 11px;
+  font-weight: 600;
+  margin: 4px 0;
+}
+
+.costs h3 {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 10px 0 4px;
+}
+
+.costs .cost-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.costs .cost-table td {
+  padding: 2px 4px;
+  vertical-align: middle;
+}
+
+.costs .cost-label {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.costs .cost-bar-cell {
+  width: 40%;
+}
+
+.costs .cost-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: #4ade80;
+  min-width: 2px;
+}
+
+.costs .cost-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Filing cabinet / outputs panel (wi-office-life) ─────────────────── */
+
+.outputs-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+/* ── Hiring Hall overlay (wi-hiring-hall) ─────────────────────────── */
+
+.hiring-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.outputs-panel {
+  background: rgba(15, 23, 42, 0.97);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 14px 18px;
+  min-width: 360px;
+  min-width: 380px;
+  max-width: 60vw;
+  max-height: 75vh;
+  overflow: auto;
+  color: #e2e8f0;
+}
+
+/* display:flex đè thuộc tính hidden — phải chốt lại cho cả hai overlay
+   (orgchart dính y hệt, chỉ chưa lộ vì CSS của nó chết cho tới fix ở trên) */
+.outputs-overlay[hidden],
+.hiring-overlay[hidden],
+.tpl-overlay[hidden],
+.orgchart-overlay[hidden] {
+  display: none;
+}
+
+.hiring-panel {
+  background: rgba(15, 23, 42, 0.97);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 14px 18px;
+  min-width: 360px;
+  min-width: 380px;
+  max-width: 60vw;
+  max-height: 75vh;
+  overflow: auto;
+  color: #e2e8f0;
+}
+
+.outputs-panel h2 {
+  font-size: 13px;
+}
+
+.hiring-panel h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.outputs-panel .outputs-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.hiring-panel .hiring-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.outputs-panel .empty,
+.outputs-panel .placeholder {
+  color: #64748b;
+  font-style: italic;
+}
+
+.hiring-panel .empty {
+  color: #64748b;
+  font-style: italic;
+}
+
+.outputs-list {
+  list-style: none;
+}
+
+.outputs-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.outputs-list li:last-child {
+  border-bottom: none;
+}
+
+.outputs-list .out-icon {
+  font-size: 16px;
+}
+
+.outputs-list .out-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outputs-list .out-meta {
+  color: #94a3b8;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.outputs-list .out-actions {
+}
+
+.hiring-panel .hh-note {
+  color: #64748b;
+  font-size: 11px;
+  margin: 6px 0;
+}
+
+.hiring-panel .hh-updated {
+  color: #94a3b8;
+  font-size: 12px;
+  margin: 4px 0 8px;
+}
+
+.hiring-panel .hh-dept h3 {
+  margin: 10px 0 4px;
+  font-size: 13px;
+  color: #7dd3fc;
+}
+
+.hiring-panel .hh-count {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.hiring-panel .hh-budget {
+  margin-left: 8px;
+  font-weight: 400;
+  color: #f59e0b;
+  font-size: 11px;
+}
+
+.hiring-panel .hh-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.hiring-panel .hh-table td {
+  padding: 2px 8px 2px 0;
+  vertical-align: top;
+}
+
+.hiring-panel .hh-name {
+  color: #e2e8f0;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.hiring-panel .hh-role {
+  color: #94a3b8;
+}
+
+.hiring-panel .hh-hired {
+  color: #64748b;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.hiring-panel .hh-form-title {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  color: #f59e0b;
+}
+
+.hiring-panel .hh-form {
+  display: flex;
+  gap: 6px;
+}
+
+.outputs-list .out-actions button {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.outputs-list .out-actions button:hover {
+  border-color: #4ade80;
+}
+
+.hiring-panel .hh-form input {
+  flex: 1;
+  background: #10131c;
+  color: #e2e8f0;
+  border: 1px solid #2b3245;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  outline: none;
+}
+
+.hiring-panel .hh-form input:focus {
+  border-color: #f59e0b;
+}
+
+.hiring-panel .hh-form button {
+  background: #f59e0b;
+  color: #10131c;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.hiring-panel .hh-form button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.hiring-panel .hh-status {
+  margin: 8px 0 0;
+  color: #7dd3fc;
+  font-size: 12px;
+}
+
+/* ── "Công ty đóng hộp" — company templates panel (wi-templates-panel) ─── */
+
+.templates {
+  position: fixed;
+  top: 56px; /* dưới nút "bảng lương" (.costs) ở cùng góc phải */
+  right: 12px;
+  z-index: 6;
+  font-size: 13px;
+}
+/* the "Công ty đóng hộp" button sits top-right; the agent side panel opens there
+   too (right:12, width:320). sidePanel toggles body.side-panel-open → slide the
+   button left of the panel so it never covers it. (body-class, not :has(): :has
+   doesn't reliably invalidate an unrelated descendant like .templates when
+   #side-panel[hidden] flips via JS.) */
+body.side-panel-open .templates {
+  right: 346px;
+}
+
+.templates .tpl-toggle {
+  background: rgba(15, 23, 42, 0.85);
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.templates .tpl-toggle:hover {
+  background: #1e293b;
+}
+
+.tpl-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.tpl-panel {
+  background: rgba(15, 23, 42, 0.97);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 14px 18px;
+  min-width: 420px;
+  max-width: 60vw;
+  max-height: 75vh;
+  overflow: auto;
+  color: #e2e8f0;
+}
+
+.tpl-panel h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tpl-panel .tpl-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.tpl-panel .tpl-note,
+.tpl-panel .empty,
+.tpl-panel .placeholder {
+  color: #94a3b8;
+  font-size: 12px;
+  margin: 0 0 10px;
+}
+
+.tpl-card {
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.tpl-card h3 {
+  margin: 0;
+  font-size: 14px;
+  color: #7dd3fc;
+}
+
+.tpl-card .tpl-meta,
+.tpl-card .tpl-depts {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.tpl-warn {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #fbbf24;
+}
+
+.tpl-confirm {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #fca5a5;
+}
+
+.tpl-apply {
+  margin-top: 8px;
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/* nút đã "lên nòng" — lần bấm tiếp theo GHI ĐÈ roster thật */
+.tpl-card .tpl-confirm ~ .tpl-apply,
+.tpl-apply:hover {
+  background: #334155;
+}
+
+.tpl-result {
+  border-top: 1px solid #334155;
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.tpl-result-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: #4ade80;
+}
+
+.tpl-result-line {
+  margin: 2px 0;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.tpl-goals-title {
+  margin: 10px 0 4px;
+  font-size: 12px;
+  color: #7dd3fc;
+}
+
+.tpl-goals {
+  margin: 0;
+  padding: 8px;
+  background: rgba(2, 6, 23, 0.6);
+  border-radius: 8px;
+  font-size: 11px;
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   R13-B — navbar rail + top-level views (Văn phòng / Bảng việc / Chi phí /
+   Cấu hình). App opens to Bảng việc (main.ts sets body[data-view="kanban"]);
+   each view shows one panel group, CSS hides the rest.
+   ponytail: office-canvas panel offsets under the rail are partial — the
+   panels are class-styled by their mount modules; nudging each left edge is
+   deferred to Opus's visual review / R13-B-2.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* UX polish: the rail auto-collapses to a 64px icon strip and expands to a 210px
+   label rail on hover. Crucially it PUSHES content via --nav-w rather than
+   overlaying it — the popup must never cover log rows or the office error panel.
+   Buttons carry title= for a tooltip when collapsed. */
+:root {
+  --nav-w: 64px;
+}
+body:has(#navbar:hover) {
+  --nav-w: 210px;
+}
+#navbar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: var(--nav-w);
+  height: 100vh;
+  background: #12151d;
+  border-right: 1px solid #2a2f3a;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 0;
+  gap: 2px;
+  z-index: 60;
+  overflow: hidden;
+}
+#navbar:hover {
+  box-shadow: 6px 0 28px rgba(0, 0, 0, 0.45);
+}
+#navbar .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 18px;
+  background: none;
+  border: none;
+  border-left: 3px solid transparent;
+  color: #94a3b8;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+#navbar .nav-item:hover {
+  background: #1a1f2b;
+  color: #e2e8f0;
+}
+#navbar .nav-item.active,
+#navbar .nav-item[aria-current="page"] {
+  color: #f59e0b;
+  background: #1a1f2b;
+  border-left-color: #f59e0b;
+}
+#navbar .nav-icon {
+  font-size: 18px;
+  width: 22px;
+  text-align: center;
+}
+#navbar .nav-badge {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #334155;
+  color: #e2e8f0;
+  font-size: 11px;
+  text-align: center;
+}
+#navbar .nav-label {
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity 120ms ease;
+}
+#navbar:not(:hover) .nav-label {
+  opacity: 0;
+}
+#navbar:not(:hover) .nav-badge {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  #navbar .nav-label {
+    transition: none;
+  }
+}
+
+/* shift the office canvas right of the collapsed rail (64px; hover expands the
+   rail as an overlay, so this offset never changes) */
+#app {
+  margin-left: 64px;
+  width: calc(100vw - 64px);
+}
+
+/* views: show one panel group at a time. Offset by --nav-w and PUSH with it, so
+   the hover-expanded rail slides these right instead of covering their text. */
+#kanban,
+#log,
+#settings {
+  display: none;
+  margin-left: var(--nav-w);
+  width: calc(100vw - var(--nav-w));}
+body[data-view="kanban"] #kanban {
+  display: flex;
+  flex-direction: column;
+}
+body[data-view="log"] #log {
+  display: block;
+}
+body[data-view="settings"] #settings {
+  display: block;
+}
+/* Cấu hình view: daemon connection + harness status. Semantic chips
+   (ok/off/warn) read state at a glance; utilitarian, matches Mission Control. */
+.settings {
+  height: 100vh;
+  overflow: auto;
+  padding: 28px 40px 200px; /* bottom clears the fixed PM chat dock */
+  color: #cbd5e1;
+  max-width: 760px;
+}
+.set-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin: 0 0 22px;
+}
+.set-block {
+  margin-bottom: 28px;
+}
+.set-block h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  margin: 0 0 10px;
+}
+.set-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin: -4px 0 12px;
+}
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid #1e242e;
+}
+.set-row-label {
+  flex: 1;
+  font-size: 13px;
+  color: #e2e8f0;
+}
+.set-row-chips {
+  display: flex;
+  gap: 6px;
+}
+.set-chip {
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.set-chip.ok {
+  background: #14532d;
+  color: #dcfce7;
+}
+.set-chip.off {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+.set-chip.warn {
+  background: #78350f;
+  color: #fde68a;
+}
+.set-chip.muted {
+  background: #1e293b;
+  color: #94a3b8;
+}
+.set-probe {
+  background: #1e293b;
+  color: #cbd5e1;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.set-probe:hover {
+  border-color: #f59e0b;
+}
+.set-probe:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.set-note,
+.set-about {
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin: 0;
+}
+/* office canvas + office chrome: hidden unless the office view is active.
+   ponytail: the Pixi ticker keeps running while #app is display:none — pausing
+   it properly is R13-B-2+. */
+body:not([data-view="office"]) #app,
+body:not([data-view="office"]) #office-tabs,
+body:not([data-view="office"]) #controls,
+body:not([data-view="office"]) #timeline-bar,
+body:not([data-view="office"]) #queue-panel,
+body:not([data-view="office"]) #board,
+body:not([data-view="office"]) #orgchart,
+body:not([data-view="office"]) #building,
+body:not([data-view="office"]) #side-panel,
+body:not([data-view="office"]) #outputs,
+body:not([data-view="office"]) #hiring-hall,
+body:not([data-view="office"]) #templates {
+  display: none;
+}
+/* costs is its own view now (it used to always overlay the office) */
+body:not([data-view="costs"]) #costs {
+  display: none;
+}
+/* the "Chi phí" nav view promotes the corner widget to a full-width panel so
+   the click lands on the dashboard, not a lone toggle pill. main.ts forces the
+   panel open (costs.expand) when this view activates; the bottom padding clears
+   the fixed PM chat dock. */
+body[data-view="costs"] #costs {
+  position: static;
+  margin-left: var(--nav-w);
+  width: calc(100vw - var(--nav-w));
+  height: 100vh;
+  overflow: auto;
+  padding: 20px 28px 200px;}
+body[data-view="costs"] #costs .costs-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: default;
+}
+body[data-view="costs"] #costs .costs-panel {
+  margin-top: 14px;
+  width: 100%;
+  max-width: 760px;
+  max-height: none;
+  padding: 0;
+  border: none;
+  background: none;
+}
+/* reserve room at the foot of the scrolling views for the fixed PM chat dock
+   (bottom ~44px, grows with its log) so it never covers the last row / input.
+   ponytail: 200px clears the dock at rest + a short log; a long open log scrolls. */
+body[data-view="kanban"] .kanban,
+body[data-view="log"] .activity-log {
+  padding-bottom: 200px;
+}
+
+/* kanban (the default view) */
+.kanban {
+  padding: 20px 28px;
+  height: 100vh;
+  overflow: auto;
+  color: #e2e8f0;
+}
+.kanban-placeholder {
+  color: #94a3b8;
+  padding: 24px;
+}
+/* first-run / empty board: guidance instead of a bare column grid */
+.kanban-empty {
+  text-align: center;
+  padding: 64px 24px;
+  color: #94a3b8;
+}
+.kanban-empty-emoji {
+  font-size: 40px;
+  margin-bottom: 12px;
+  opacity: 0.85;
+}
+.kanban-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 0 0 6px;
+}
+.kanban-empty-sub {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 auto;
+  max-width: 380px;
+}
+/* first-run: guidance + quick-add input as one centered column (the input sits
+   right under the "ô bên dưới" message instead of floating bottom-left) */
+.kanban-firstrun {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 6vh;
+}
+.kanban-firstrun .kanban-empty {
+  padding: 24px 24px 4px;
+}
+.kanban-firstrun .kanban-input {
+  width: min(440px, 82%);
+  margin-top: 12px;
+}
+.kanban-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.kanban-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #1e2430;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #94a3b8;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.kanban-tab.active {
+  background: #f59e0b;
+  color: #12151d;
+  border-color: #f59e0b;
+}
+.kanban-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.25);
+  font-size: 11px;
+  text-align: center;
+}
+.kanban-board {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.kanban-col {
+  flex: 0 0 260px;
+  background: #1a1f2b;
+  border: 1px solid #2a2f3a;
+  border-radius: 10px;
+  padding: 12px;
+  min-height: 120px;
+}
+.kanban-col h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+  margin-bottom: 10px;
+}
+.kanban-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  background: #12151d;
+  border: 1px solid #2a2f3a;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+/* R13-B-3: "Giao cho PM" — flex-basis 100% drops it to its own row under the
+   title (the card wraps), so it never crowds the badge+title line. */
+.kanban-assign {
+  flex-basis: 100%;
+  margin-top: 4px;
+  padding: 5px 8px;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  color: #fbbf24;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.kanban-assign:hover {
+  border-color: #f59e0b;
+}
+.kanban-source {
+  flex-shrink: 0;
+}
+.kanban-title {
+  word-break: break-word;
+}
+.kanban-more {
+  font-size: 12px;
+  color: #64748b;
+  text-align: center;
+  padding: 4px;
+}
+.kanban-input {
+  margin-top: 18px;
+  width: min(460px, 60vw);
+  padding: 11px 14px;
+  background: #12151d;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #e2e8f0;
+  font: inherit;
+  font-size: 14px;
+}
+.kanban-input::placeholder {
+  color: #64748b;
+}
+.kanban-input:focus {
+  outline: none;
+  border-color: #f59e0b;
+}
+
+/* activity log ("Nhật ký", R13-B-2) — de-jargoned transcript feed. Same
+   shell as the kanban; rows are time + content, tech mode shows the raw
+   tool name as a chip + the command/text in mono. */
+.activity-log {
+  padding: 20px 28px;
+  height: 100vh;
+  overflow: auto;
+  color: #e2e8f0;
+}
+.activity-log-placeholder,
+.activity-log-empty,
+.costs-placeholder {
+  color: #94a3b8;
+  padding: 24px;
+}
+.activity-log-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.activity-log-mode {
+  padding: 7px 14px;
+  background: #12151d;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #94a3b8;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.activity-log-mode.active {
+  background: #1e293b;
+  border-color: #f59e0b;
+  color: #f8fafc;
+}
+.activity-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.activity-log-row {
+  display: flex;
+  gap: 12px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #1e242e;
+  font-size: 13px;
+}
+.activity-log-time {
+  flex: 0 0 44px;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+.activity-log-content {
+  flex: 1;
+  word-break: break-word;
+}
+.activity-log-tool {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #1e293b;
+  color: #f59e0b;
+  font-size: 11px;
+}
+.activity-log-raw {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.activity-log-xn {
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: #1e293b;
+  color: #94a3b8;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Shown instead of the office when WebGL is unavailable. The 3D view is the
+   nice-to-have; Bảng việc / Nhật ký / Chi phí / Cấu hình still work, so say so
+   rather than leaving a blank canvas. */
+.office-fallback {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 460px;
+  padding: 22px 24px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  color: #e2e8f0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.office-fallback h2 {
+  font-size: 16px;
+  margin-bottom: 10px;
+  color: #fbbf24;
+}
+.office-fallback p {
+  margin-bottom: 8px;
+}
+.office-fallback .hint {
+  color: #94a3b8;
+  font-size: 12px;
+  margin-bottom: 0;
+}
