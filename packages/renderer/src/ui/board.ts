@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 // Mini kanban on the office wall: in_progress / blocked / done counts from
 // the work registry, click to expand the item list with deep links. Plain
 // DOM like the other Mission Control panels. Fetches on mount and on each
@@ -19,7 +20,7 @@ export function mountBoard(
 
   function render(): void {
     const count = (s: string) => items.filter((it) => it.status === s).length;
-    const header = `<button class="board-toggle">Board · ${count("in_progress")} làm · ${count("blocked")} kẹt · ${count("done")} xong</button>`;
+    const header = `<button class="board-toggle">${t("board.toggle", { doing: count("in_progress"), blocked: count("blocked"), done: count("done") })}</button>`;
     const list = open
       ? `<ul class="board-list">${
           items
@@ -27,7 +28,7 @@ export function mountBoard(
               (it) =>
                 `<li><span class="status-chip status-${esc(it.status ?? "unknown")}">${esc(it.status ?? "?")}</span> ${esc(it.title)} ${workItemLinksHtml(it)}</li>`,
             )
-            .join("") || "<li>Registry trống.</li>"
+            .join("") || `<li>${t("board.empty")}</li>`
         }</ul>`
       : "";
     root.innerHTML = header + list;

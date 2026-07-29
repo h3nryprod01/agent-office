@@ -5,6 +5,7 @@
 // unit-test without a browser. The harness list is live-mode only (needs the
 // daemon); mock shows a note.
 
+import { getLang, setLang, t, type Lang } from "../i18n";
 export interface HarnessStatus {
   key: string;
   label: string;
@@ -36,28 +37,28 @@ interface SettingsDeps {
  * daemon serving the page, so the screen calls itself broken while working.
  */
 export function connectionHtml(connected: boolean, daemonUrl: string, live = true): string {
-  if (!live) return `<span class="set-chip muted">● Chế độ demo (mock) — không nối daemon</span>`;
+  if (!live) return `<span class="set-chip muted">${t("settings.mockMode")}</span>`;
   return connected
-    ? `<span class="set-chip ok">● Đã kết nối</span>`
-    : `<span class="set-chip off">● Mất kết nối — daemon (${esc(daemonUrl)}) có đang chạy?</span>`;
+    ? `<span class="set-chip ok">${t("settings.connected")}</span>`
+    : `<span class="set-chip off">${t("settings.disconnected", { url: esc(daemonUrl) })}</span>`;
 }
 
 /** One harness row: installed + login chips, and a "Kiểm tra" button if installed. Pure. */
 export function harnessRowHtml(h: HarnessStatus): string {
   const installed = h.installed
-    ? `<span class="set-chip ok">Đã cài</span>`
-    : `<span class="set-chip off">Chưa cài</span>`;
+    ? `<span class="set-chip ok">${t("settings.installed")}</span>`
+    : `<span class="set-chip off">${t("settings.notInstalled")}</span>`;
   let login = "";
   if (h.installed) {
     login =
       h.loggedIn === true
-        ? `<span class="set-chip ok">Đã đăng nhập</span>`
+        ? `<span class="set-chip ok">${t("settings.loggedIn")}</span>`
         : h.loggedIn === false
-          ? `<span class="set-chip warn">${esc(h.reason || "Chưa đăng nhập")}</span>`
-          : `<span class="set-chip muted">Chưa kiểm tra</span>`;
+          ? `<span class="set-chip warn">${esc(h.reason || t("settings.notLoggedIn"))}</span>`
+          : `<span class="set-chip muted">${t("settings.notChecked")}</span>`;
   }
   const probe = h.installed
-    ? `<button class="set-probe" type="button" data-probe="${esc(h.key)}">Kiểm tra</button>`
+    ? `<button class="set-probe" type="button" data-probe="${esc(h.key)}">${t("settings.check")}</button>`
     : "";
   return (
     `<div class="set-row">` +
@@ -76,29 +77,53 @@ export function mountSettings(root: HTMLElement, deps: SettingsDeps): SettingsHa
 
   function render(): void {
     const harnessBody = !deps.fetchHarnesses
-      ? `<p class="set-note">Nguồn agent chỉ hiện ở chế độ live (cần daemon).</p>`
+      ? `<p class="set-note">${t("settings.sourcesLiveOnly")}</p>`
       : loaded
         ? harnesses.map(harnessRowHtml).join("")
-        : `<p class="set-note">Đang kiểm tra…</p>`;
+        : `<p class="set-note">${t("settings.checking")}</p>`;
     root.innerHTML =
-      `<h1 class="set-title">Cấu hình</h1>` +
-      `<section class="set-block"><h2>Kết nối</h2>` +
+      `<h1 class="set-title">${t("nav.settings")}</h1>` +
+      `<section class="set-block"><h2>${t("settings.connection")}</h2>` +
       `<div class="set-row"><span class="set-row-label">Daemon · ws://${esc(deps.daemonUrl)}</span>` +
       `<span class="set-row-chips" data-conn>${connectionHtml(connected, deps.daemonUrl, !!deps.fetchHarnesses)}</span></div>` +
       `</section>` +
-      `<section class="set-block"><h2>Nguồn agent</h2>` +
-      `<p class="set-hint">Các CLI agent mà văn phòng nhìn thấy. "Kiểm tra" xác nhận đăng nhập.</p>` +
+      `<section class="set-block"><h2>${t("settings.agentSources")}</h2>` +
+      `<p class="set-hint">${t("settings.sourcesHint")}</p>` +
       harnessBody +
       `</section>` +
-      `<section class="set-block"><h2>Về</h2>` +
-      `<p class="set-about">Agent Office — văn phòng trực quan cho công ty một-người vận hành bằng AI agent. "Công ty đóng hộp" cho từng loại việc.</p>` +
+      `<section class="set-block"><h2>${t("settings.language")}</h2>` +
+      `<div class="set-row"><span class="set-row-chips">` +
+      langButton("en", "English") +
+      langButton("vi", "Tiếng Việt") +
+      `</span></div>` +
+      `<p class="set-hint">${t("settings.languageHint")}</p>` +
+      `</section>` +
+      `<section class="set-block"><h2>${t("settings.about")}</h2>` +
+      `<p class="set-about">${t("settings.aboutText")}</p>` +
       `</section>`;
   }
 
+  function langButton(lang: Lang, label: string): string {
+    const active = getLang() === lang ? " active" : "";
+    return `<button class="set-lang${active}" type="button" data-lang="${lang}" aria-pressed="${!!active}">${label}</button>`;
+  }
+
   root.addEventListener("click", (ev) => {
+    const langBtn = (ev.target as HTMLElement).closest<HTMLElement>("[data-lang]");
+    if (langBtn) {
+      const lang = langBtn.dataset.lang as Lang;
+      if (lang !== getLang()) {
+        setLang(lang);
+        // Every rendered string was read at render time; a reload is simpler and
+        // more honest than re-rendering panels that may not be mounted right now.
+        location.reload();
+      }
+      return;
+    }
+
     const btn = (ev.target as HTMLElement).closest<HTMLElement>("[data-probe]");
     if (!btn || !deps.probeHarness) return;
-    btn.textContent = "Đang kiểm tra…";
+    btn.textContent = t("settings.checking");
     (btn as HTMLButtonElement).disabled = true;
     deps
       .probeHarness(btn.dataset.probe!)
@@ -108,7 +133,7 @@ export function mountSettings(root: HTMLElement, deps: SettingsDeps): SettingsHa
         render();
       })
       .catch(() => {
-        btn.textContent = "Lỗi — thử lại";
+        btn.textContent = t("settings.checkFailed");
         (btn as HTMLButtonElement).disabled = false;
       });
   });

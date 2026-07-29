@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { StationId } from "../sim/model";
 import type { GridPos } from "./iso";
 
@@ -91,7 +92,7 @@ export const RECEPTION_DESK: GridPos = { gx: 2.2, gy: 10.3 };
 export const RECEPTION_GREET_SPOT: GridPos = { gx: 3.4, gy: 10.6 };
 
 export const DECOR: DecorDef[] = [
-  { frame: "ceo_desk_E", at: CEO_DESK, label: "Bàn PM/CEO" },
+  { frame: "ceo_desk_E", at: CEO_DESK, label: t("station.pmDesk") },
   { frame: "chair_exec_E", at: CEO_CHAIR },
   { frame: "plant_big", at: { gx: 0.6, gy: 0.6 } },
   { frame: "neon_sign", at: { gx: 3.2, gy: 0.3 } },
@@ -104,7 +105,7 @@ export const DECOR: DecorDef[] = [
   { frame: "water_cooler", at: { gx: 8.5, gy: 0.6 } },
   // wi-office-life: beside the bookshelf station (gx11-12, gy1) — click opens
   // the outputs panel ("tủ hồ sơ", GET /outputs)
-  { frame: "filing_cabinet", at: { gx: 13, gy: 1 }, label: "Tủ hồ sơ", id: "filing_cabinet" },
+  { frame: "filing_cabinet", at: { gx: 13, gy: 1 }, label: t("station.cabinet"), id: "filing_cabinet" },
   { frame: "server_rack", at: { gx: 13.2, gy: 3.2 }, label: "Server" },
   { frame: "plant_big", at: { gx: 13.2, gy: 9 } },
   // wall-mounted decor (on the NE back wall, gy≈0 → sorts behind the room)
@@ -136,7 +137,7 @@ export const WALL_BOARDS: WallBoardDef[] = [
 export const STATIONS: StationDef[] = [
   {
     id: "bookshelf",
-    label: "Kệ sách (đọc file)",
+    label: t("station.bookshelf"),
     color: 0x8b5cf6,
     footprint: [
       { gx: 11, gy: 1 },
@@ -151,7 +152,7 @@ export const STATIONS: StationDef[] = [
   },
   {
     id: "arcade",
-    label: "Máy arcade (chạy lệnh)",
+    label: t("station.arcade"),
     color: 0x06b6d4,
     footprint: [
       { gx: 11.5, gy: 6 },
@@ -166,7 +167,7 @@ export const STATIONS: StationDef[] = [
   },
   {
     id: "meeting",
-    label: "Bàn họp (giao việc)",
+    label: t("station.meeting"),
     color: 0xf59e0b,
     footprint: [
       { gx: 11, gy: 10.5 },

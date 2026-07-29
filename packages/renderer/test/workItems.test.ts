@@ -85,8 +85,8 @@ describe("workItemLinksHtml", () => {
 describe("workItemSectionHtml states", () => {
   it("mock mode / loading / no match placeholders", () => {
     expect(workItemSectionHtml(agent(), undefined)).toContain("live mode");
-    expect(workItemSectionHtml(agent(), null)).toContain("Đang tải");
-    expect(workItemSectionHtml(agent({ name: "x" }), [])).toContain("Không có work item");
+    expect(workItemSectionHtml(agent(), null)).toContain("Loading");
+    expect(workItemSectionHtml(agent({ name: "x" }), [])).toContain("No work item");
   });
 });
 
@@ -117,14 +117,14 @@ describe("ancestryOf", () => {
 });
 
 describe("whyChainHtml", () => {
-  it("chuỗi nhiều tầng → chứa mọi tiêu đề + nhãn Vì sao", () => {
+  it("chuỗi nhiều tầng → chứa mọi tiêu đề + nhãn Why", () => {
     const items = [
       item({ id: "a", title: "việc a", parentItemId: "b" }),
       item({ id: "b", title: "việc b", parentItemId: "c" }),
       item({ id: "c", title: "việc c" }),
     ];
     const html = whyChainHtml(items[0], items);
-    expect(html).toContain("Vì sao");
+    expect(html).toContain("Why");
     expect(html).toContain("việc a");
     expect(html).toContain("việc b");
     expect(html).toContain("việc c");

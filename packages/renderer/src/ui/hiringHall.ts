@@ -12,6 +12,7 @@
 // Raw daemon frames arrive through main.ts's WS raw-frame tap — the same
 // path ApprovalsStore uses — so this opens no extra socket.
 
+import { t } from "../i18n";
 export interface RosterMember {
   name: string;
   role: string | null;
@@ -50,7 +51,7 @@ const HTTP_BASE = "";
 
 /** The exact turn handed to the PM — company-hire owns the process (scan bắt buộc). */
 export function hirePrompt(gap: string): string {
-  return `Dùng skill company-hire: tuyển ${gap}. Báo cáo verdict scan + kết quả vào chat.`;
+  return t("hiring.prompt", { gap });
 }
 
 /**
@@ -90,11 +91,11 @@ export function rosterFrameDiff(
 export function rosterHtml(roster: RosterPayload): string {
   const total = roster.departments.reduce((n, d) => n + d.members.length, 0);
   if (total === 0 && roster.departments.length === 0) {
-    return `<p class="empty">Chưa có roster — tuyển người đầu tiên bằng form dưới, hoặc chạy skill company-roster để bootstrap.</p>`;
+    return `<p class="empty">${t("hiring.noRoster")}</p>`;
   }
   const depts = roster.departments
     .map((d) => {
-      const budget = d.budgetUsdPerDay !== null ? `<span class="hh-budget">trần $${d.budgetUsdPerDay}/ngày</span>` : "";
+      const budget = d.budgetUsdPerDay !== null ? `<span class="hh-budget">${t("hiring.budgetCap", { amount: d.budgetUsdPerDay })}</span>` : "";
       const rows = d.members
         .map((m) => {
           const scan = m.cv?.scan_verdict ? ` · scan: ${String(m.cv.scan_verdict)}` : "";
@@ -108,11 +109,11 @@ export function rosterHtml(roster: RosterPayload): string {
         .join("");
       return `<section class="hh-dept">
         <h3>${esc(d.name)} <span class="hh-count">(${d.members.length})</span> ${budget}</h3>
-        ${d.members.length ? `<table class="hh-table">${rows}</table>` : `<p class="empty">phòng trống</p>`}
+        ${d.members.length ? `<table class="hh-table">${rows}</table>` : `<p class="empty">${t("hiring.emptyDept")}</p>`}
       </section>`;
     })
     .join("");
-  return `<p class="hh-updated">Cập nhật roster: ${esc(roster.updated ?? "?")} · ${total} thành viên</p>${depts}`;
+  return `<p class="hh-updated">${t("hiring.rosterUpdated", { when: esc(roster.updated ?? "?"), total })}</p>${depts}`;
 }
 
 export interface HiringHallHandle {
@@ -137,16 +138,16 @@ export function mountHiringHall(
   root.innerHTML = `
     <div class="hiring-overlay" hidden>
       <div class="hiring-panel">
-        <h2>🪪 Tuyển dụng <button class="hiring-close" title="Đóng">✕</button></h2>
-        <p class="hh-note">Thành viên roster = skill/agent ĐÃ CÀI trên máy (từ ~/.claude/company/roster.yaml) — khác với nhân vật session đang chạy trong office.</p>
-        <div class="hh-roster"><p class="empty">Đang tải…</p></div>
-        <h3 class="hh-form-title">Tuyển người mới</h3>
+        <h2>${t("hiring.title")} <button class="hiring-close" title="${t("panel.close")}">✕</button></h2>
+        <p class="hh-note">${t("hiring.note")}</p>
+        <div class="hh-roster"><p class="empty">${t("hiring.loading")}</p></div>
+        <h3 class="hh-form-title">${t("hiring.newHire")}</h3>
         <form class="hh-form">
-          <input type="text" placeholder="Mô tả gap — vd: cần thumbnail designer cho phòng media" />
-          <button type="submit">Giao cho PM tuyển</button>
+          <input type="text" placeholder="${t("hiring.gapPlaceholder")}" />
+          <button type="submit">${t("hiring.askPm")}</button>
         </form>
         <p class="hh-status" hidden></p>
-        <p class="hh-note">PM sẽ chạy skill <b>company-hire</b>: săn ứng viên GitHub → <b>bắt buộc</b> quét an toàn (skillspector) → cài → ghi roster. Theo dõi tiến trình ở chatbox; người mới sẽ đi qua cửa chào cả văn phòng.</p>
+        <p class="hh-note">${t("hiring.flow")}</p>
       </div>
     </div>`;
 
@@ -169,10 +170,10 @@ export function mountHiringHall(
 
   const renderRoster = (): void => {
     if (!opts.fetchRoster) {
-      rosterBox.innerHTML = `<p class="empty">Roster chỉ có ở live mode (cần daemon 127.0.0.1:8787).</p>`;
+      rosterBox.innerHTML = `<p class="empty">${t("hiring.liveOnly", { url: location.host })}</p>`;
       return;
     }
-    rosterBox.innerHTML = snapshot ? rosterHtml(snapshot) : `<p class="empty">Không đọc được roster — daemon có đang chạy không?</p>`;
+    rosterBox.innerHTML = snapshot ? rosterHtml(snapshot) : `<p class="empty">${t("hiring.unreadable")}</p>`;
   };
 
   const refreshRoster = (): void => {
@@ -194,7 +195,7 @@ export function mountHiringHall(
     if (!gap || hiring || !opts.fetchRoster) return;
     hiring = true;
     submit.disabled = true;
-    setStatus("⏳ PM đang tuyển… (company-hire: săn ứng viên → scan → cài). Chi tiết ở chatbox.");
+    setStatus(t("hiring.inProgress"));
     fetch(`${HTTP_BASE}/chat`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -213,7 +214,7 @@ export function mountHiringHall(
       .catch(() => {
         hiring = false;
         submit.disabled = false;
-        setStatus("⚠ Không kết nối được daemon (127.0.0.1:8787) — daemon có đang chạy không?");
+        setStatus(t("hiring.noDaemon", { url: location.host }));
       });
   });
 
@@ -240,7 +241,7 @@ export function mountHiringHall(
         snapshot = diff.roster;
         if (!overlay.hidden) renderRoster();
         if (diff.newNames.length > 0) {
-          setStatus(`🎉 ${diff.newNames.join(", ")} đã vào roster.`);
+          setStatus(t("hiring.joined", { names: diff.newNames.join(", ") }));
         }
         return;
       }
@@ -253,11 +254,11 @@ export function mountHiringHall(
         if (role === "assistant" && done) {
           hiring = false;
           submit.disabled = false;
-          setStatus("✅ PM xong turn — xem kết quả ở chatbox. Người mới (nếu tuyển được) sẽ tự vào roster.");
+          setStatus(t("hiring.turnDone"));
         } else if (role === "system" && (done || error)) {
           hiring = false;
           submit.disabled = false;
-          setStatus(`⚠ ${text ?? "PM turn lỗi"}`);
+          setStatus(`⚠ ${text ?? t("hiring.turnFailed")}`);
         }
       }
     },

@@ -1246,7 +1246,7 @@ body {
 
 .templates {
   position: fixed;
-  top: 56px; /* dưới nút "bảng lương" (.costs) ở cùng góc phải */
+  top: 56px; /* below the spend button (.costs), same corner */
   right: 12px;
   z-index: 6;
   font-size: 13px;
@@ -1944,3 +1944,12 @@ body[data-view="log"] .activity-log {
   font-size: 12px;
   margin-bottom: 0;
 }
+
+/* Language picker in Settings — same chip look as the harness rows. */
+.set-lang {
+  background: #1c2333; color: #c9d4e8; border: 1px solid #2b3550;
+  border-radius: 6px; padding: 4px 12px; margin-right: 8px; cursor: pointer;
+  font: inherit; font-size: 13px;
+}
+.set-lang:hover { border-color: #3d4b6e; }
+.set-lang.active { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }

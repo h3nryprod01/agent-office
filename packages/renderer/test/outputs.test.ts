@@ -20,7 +20,7 @@ describe("outputsListHtml", () => {
   });
 
   it("empty state when no files", () => {
-    expect(outputsListHtml([])).toContain("Chưa có output");
+    expect(outputsListHtml([])).toContain("Nothing in docs/media");
   });
 
   it("renders name, open/reveal buttons with the full path", () => {

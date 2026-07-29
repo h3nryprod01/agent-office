@@ -22,16 +22,16 @@ const studio: TemplateSummary = {
 
 describe("summaryMeta", () => {
   it("counts departments and members, and flags goals.md", () => {
-    expect(summaryMeta(studio)).toBe("2 phòng · 8 thành viên · có goals.md");
+    expect(summaryMeta(studio)).toBe("2 departments · 8 people · has goals.md");
   });
 
   it("says so when a template has no goals", () => {
-    expect(summaryMeta({ ...studio, hasGoals: false })).toContain("chưa có goals.md");
+    expect(summaryMeta({ ...studio, hasGoals: false })).toContain("no goals.md");
   });
 
   it("handles an empty template without dividing by zero-ish nonsense", () => {
     expect(summaryMeta({ ...studio, departments: [], memberTotal: 0 })).toBe(
-      "0 phòng · 0 thành viên · có goals.md",
+      "0 departments · 0 people · has goals.md",
     );
   });
 });
@@ -43,7 +43,7 @@ describe("missingLabel", () => {
 
   it("names the missing skills and points at company-hire", () => {
     const label = missingLabel(["ads-manager", "zalo-poster"])!;
-    expect(label).toContain("Thiếu 2 skill");
+    expect(label).toContain("Missing 2 skill");
     expect(label).toContain("ads-manager, zalo-poster");
     expect(label).toContain("company-hire");
   });
@@ -71,15 +71,15 @@ describe("two-step confirm", () => {
   });
 
   it("labels the armed button as a destructive overwrite", () => {
-    expect(applyButtonLabel(false)).toBe("Áp dụng");
-    expect(applyButtonLabel(true)).toContain("GHI ĐÈ");
+    expect(applyButtonLabel(false)).toBe("Apply");
+    expect(applyButtonLabel(true)).toContain("OVERWRITE");
   });
 
   it("warns which file is overwritten and that a backup is taken first", () => {
     const warn = armWarning("content-studio");
     expect(warn).toContain("content-studio");
     expect(warn).toContain("~/.claude/company/roster.yaml");
-    expect(warn).toContain("backup");
+    expect(warn).toContain("backed up");
   });
 });
 
@@ -91,12 +91,12 @@ describe("applyLines", () => {
       goals: null,
     });
     expect(lines[0]).toContain("roster.yaml.2026-07-10T09-00-00-000Z.bak");
-    expect(lines[1]).toContain("đã cài");
+    expect(lines[1]).toContain("already installed");
   });
 
   it("says a new roster was created when there was nothing to back up", () => {
     const lines = applyLines({ backupPath: null, missingSkills: [], goals: null });
-    expect(lines[0]).toContain("chưa có roster cũ");
+    expect(lines[0]).toContain("there was no previous one");
   });
 
   it("surfaces missing skills instead of silently installing them", () => {

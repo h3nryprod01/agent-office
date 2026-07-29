@@ -5,6 +5,7 @@
 // orgchart.ts's toggle+overlay pattern minus the toggle button (triggered by
 // the in-world sprite click instead — main.ts wires OfficeView.onFurnitureClick).
 
+import { t } from "../i18n";
 export interface OutputFile {
   name: string;
   path: string;
@@ -32,7 +33,7 @@ export function fmtSize(bytes: number): string {
 }
 
 export function outputsListHtml(files: OutputFile[]): string {
-  if (files.length === 0) return `<p class="empty">Chưa có output nào trong docs/media/.</p>`;
+  if (files.length === 0) return `<p class="empty">${t("outputs.empty")}</p>`;
   return `<ul class="outputs-list">${files
     .map(
       (f) => `<li>
@@ -40,8 +41,8 @@ export function outputsListHtml(files: OutputFile[]): string {
         <span class="out-name" title="${esc(f.path)}">${esc(f.name)}</span>
         <span class="out-meta">${fmtSize(f.size)} · ${new Date(f.mtime).toLocaleDateString()}</span>
         <span class="out-actions">
-          <button data-open="${esc(f.path)}">Mở</button>
-          <button data-reveal="${esc(f.path)}">Mở thư mục chứa</button>
+          <button data-open="${esc(f.path)}">${t("outputs.open")}</button>
+          <button data-reveal="${esc(f.path)}">${t("outputs.reveal")}</button>
         </span>
       </li>`,
     )
@@ -58,7 +59,7 @@ export function mountOutputs(
   const overlay = root.querySelector<HTMLElement>(".outputs-overlay")!;
 
   function render(body: string): void {
-    overlay.innerHTML = `<div class="outputs-panel"><h2>Tủ hồ sơ <button class="outputs-close" title="Đóng">✕</button></h2>${body}</div>`;
+    overlay.innerHTML = `<div class="outputs-panel"><h2>${t("station.cabinet")} <button class="outputs-close" title="${t("panel.close")}">✕</button></h2>${body}</div>`;
   }
 
   function close(): void {
@@ -86,13 +87,13 @@ export function mountOutputs(
     show(): void {
       overlay.hidden = false;
       if (!fetchOutputs) {
-        render(`<p class="empty">Tủ hồ sơ chỉ hoạt động ở live mode (?ws=1).</p>`);
+        render(`<p class="empty">${t("outputs.liveOnly")}</p>`);
         return;
       }
-      render(`<p class="placeholder">Đang tải…</p>`);
+      render(`<p class="placeholder">${t("panel.loading")}</p>`);
       fetchOutputs()
         .then((data) => render(outputsListHtml(data.files)))
-        .catch(() => render(`<p class="empty">Không kết nối được daemon.</p>`));
+        .catch(() => render(`<p class="empty">${t("outputs.noDaemon")}</p>`));
     },
   };
 }

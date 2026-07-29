@@ -5,6 +5,7 @@
 // is the DOM binding; it fetches via the injected fetchItems and writes new
 // ideas via addItem (both live-mode only — mock degrades to a placeholder).
 
+import { t } from "../i18n";
 export type SubTab = "mine" | "agent";
 
 export interface KanbanItem {
@@ -17,13 +18,13 @@ export interface KanbanItem {
 /** [status, column label] per sub-tab. mine = a person's ideas; agent = chip work. */
 export const COLUMNS: Record<SubTab, [string, string][]> = {
   mine: [
-    ["idea", "Ý tưởng"],
+    ["idea", t("kanban.ideas")],
     ["done", "Xong"],
   ],
   agent: [
-    ["idea", "Chờ xử lý"],
-    ["doing", "Đang làm"],
-    ["review", "Chờ duyệt"],
+    ["idea", t("kanban.queued")],
+    ["doing", t("wall.inProgress")],
+    ["review", t("kanban.review")],
     ["done", "Xong"],
   ],
 };
@@ -90,7 +91,7 @@ export function mountKanban(root: HTMLElement, opts: KanbanOpts): KanbanHandle {
   let tab: SubTab = "mine";
 
   if (!fetchItems) {
-    root.innerHTML = `<p class="kanban-placeholder">Bảng việc chỉ có ở live mode.</p>`;
+    root.innerHTML = `<p class="kanban-placeholder">${t("kanban.liveOnly")}</p>`;
     return { refresh: async () => {} };
   }
   // Rebind to a non-optional type so the narrowing survives into the closures
@@ -148,14 +149,14 @@ export function mountKanban(root: HTMLElement, opts: KanbanOpts): KanbanHandle {
             .map(([status, label]) => {
               const { shown, hidden } = columnCards(pool, status);
               const cards = shown.map(card).join("");
-              const more = hidden > 0 ? `<p class="kanban-more">… ${hidden} thẻ nữa</p>` : "";
+              const more = hidden > 0 ? `<p class="kanban-more">${t("kanban.more", { n: hidden })}</p>` : "";
               return `<section class="kanban-col"><h3>${esc(label)}</h3>${cards}${more}</section>`;
             })
             .join("") +
           `</div>`;
     const input =
       tab === "mine"
-        ? `<input class="kanban-input" type="text" placeholder="+ ghi nhanh một ý tưởng…" />`
+        ? `<input class="kanban-input" type="text" placeholder="${t("kanban.inputPlaceholder")}" />`
         : "";
     // First-run (empty): stack guidance + input in one centered column so the
     // "ô bên dưới" is literally right below the message, not floating bottom-left.
@@ -163,8 +164,8 @@ export function mountKanban(root: HTMLElement, opts: KanbanOpts): KanbanHandle {
       pool.length === 0 ? `<div class="kanban-firstrun">${boardHtml}${input}</div>` : boardHtml + input;
     root.innerHTML =
       `<div class="kanban-tabs">` +
-      tabButton("mine", "Ý tưởng của tôi", mine.length, tab === "mine") +
-      tabButton("agent", "Việc của agent", agent.length, tab === "agent") +
+      tabButton("mine", t("kanban.myIdeas"), mine.length, tab === "mine") +
+      tabButton("agent", t("kanban.agentWork"), agent.length, tab === "agent") +
       `</div>` +
       body;
   }
@@ -177,8 +178,8 @@ export function mountKanban(root: HTMLElement, opts: KanbanOpts): KanbanHandle {
 export function emptyState(tab: SubTab): string {
   const [emoji, title, sub] =
     tab === "mine"
-      ? ["💡", "Chưa có ý tưởng nào", "Gõ ý tưởng đầu tiên vào ô bên dưới rồi Enter — PM sẽ nhặt việc từ đây."]
-      : ["📥", "Agent chưa có việc nào", "Sang tab “Ý tưởng của tôi”, ghi một ý rồi bấm “Giao cho PM”."];
+      ? ["💡", t("kanban.noIdeas"), t("kanban.noIdeasHint")]
+      : ["📥", t("kanban.agentNoWork"), t("kanban.agentNoWorkHint")];
   return (
     `<div class="kanban-empty">` +
     `<div class="kanban-empty-emoji">${emoji}</div>` +

@@ -102,11 +102,11 @@ describe("COLUMNS", () => {
 });
 
 // #7: an agent item still in "idea" (PM hasn't split it into chip work yet) must
-// land in the agent tab's first column "Chờ xử lý" — not vanish (the old agent
+// land in the agent tab's first column "Queued" — not vanish (the old agent
 // columns started at "doing", so idea items were counted in the tab badge but
 // shown nowhere, reading as "1 thẻ" with an empty board).
 describe("agent idea column (#7)", () => {
-  it("an agent item status=idea shows in the agent tab's Chờ xử lý column", () => {
+  it("an agent item status=idea shows in the agent tab's Queued column", () => {
     const agentIdea = item({ id: "wi-building-view", source: "agent", status: "idea" });
     const pool = forTab([agentIdea], "agent");
     expect(pool.map((i) => i.id)).toEqual(["wi-building-view"]);
@@ -134,11 +134,11 @@ describe("assignableId (Giao cho PM)", () => {
 describe("emptyState", () => {
   it("mine tab nudges to the input; agent tab points at Giao cho PM", () => {
     const mine = emptyState("mine");
-    expect(mine).toContain("Chưa có ý tưởng");
-    expect(mine).toContain("ô bên dưới");
+    expect(mine).toContain("No ideas yet");
+    expect(mine).toContain("below and press Enter");
 
     const agent = emptyState("agent");
-    expect(agent).toContain("Agent chưa có việc");
-    expect(agent).toContain("Giao cho PM");
+    expect(agent).toContain("No agent work yet");
+    expect(agent).toContain("hand it to the PM");
   });
 });

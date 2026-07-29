@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { OfficeState } from "../sim/model";
 import { EventRecorder, parseReplayFile } from "../replay/recorder";
 import { ReplayCursor } from "../replay/playback";
@@ -35,10 +36,10 @@ export function mountTimelineBar(
     ).join("")}</span>
     <input id="rp-scrub" type="range" min="0" max="0" value="0" step="100" />
     <span id="rp-time"></span>
-    <button id="rp-live" class="active" title="Quay về hiện tại">● LIVE</button>
-    <button id="rp-export" title="Export phiên ra JSON">💾</button>
+    <button id="rp-live" class="active" title="${t("timeline.backToLive")}">● LIVE</button>
+    <button id="rp-export" title="${t("timeline.exportTitle")}">💾</button>
     <button id="rp-record" title="Quay timelapse WebM">🎬</button>
-    <button id="rp-import" title="Import file replay JSON (hoặc kéo-thả vào trang)">📂</button>
+    <button id="rp-import" title="${t("timeline.importTitle")}">📂</button>
     <input id="rp-file" type="file" accept=".json,application/json" hidden />
     <span id="rp-msg"></span>
   `;
@@ -51,7 +52,7 @@ export function mountTimelineBar(
   const msgEl = root.querySelector<HTMLElement>("#rp-msg")!;
 
   let cursor: ReplayCursor | null = null; // null = live mode
-  let t = 0;
+  let cursorMs = 0;
   let speed = 4;
   let playing = false;
   let lastTick = 0; // performance.now() of the previous clock tick
@@ -73,22 +74,22 @@ export function mountTimelineBar(
 
   function emitView(): void {
     if (!cursor) return;
-    onView({ state: cursor.stateAt(t), now: t, speed });
+    onView({ state: cursor.stateAt(cursorMs), now: cursorMs, speed });
     scrub.min = String(cursor.startMs);
     scrub.max = String(cursor.endMs);
-    scrub.value = String(t);
-    timeEl.textContent = `${fmt(t - cursor.startMs)} / ${fmt(cursor.endMs - cursor.startMs)}`;
+    scrub.value = String(cursorMs);
+    timeEl.textContent = `${fmt(cursorMs - cursor.startMs)} / ${fmt(cursor.endMs - cursor.startMs)}`;
   }
 
   /** Detach from live into replay over the given events (or a fresh snapshot). */
   function enterReplay(events?: ReturnType<EventRecorder["snapshot"]>, atMs?: number): boolean {
     const list = events ?? recorder.snapshot();
     if (list.length === 0) {
-      message("Chưa có event nào để replay");
+      message(t("timeline.noEvents"));
       return false;
     }
     cursor = new ReplayCursor(list);
-    t = Math.min(Math.max(atMs ?? cursor.startMs, cursor.startMs), cursor.endMs);
+    cursorMs = Math.min(Math.max(atMs ?? cursor.startMs, cursor.startMs), cursor.endMs);
     emitView();
     syncButtons();
     return true;
@@ -107,7 +108,7 @@ export function mountTimelineBar(
       playing = true;
     } else {
       playing = !playing;
-      if (playing && t >= cursor.endMs) t = cursor.startMs; // replay again from the top
+      if (playing && cursorMs >= cursor.endMs) cursorMs = cursor.startMs; // replay again from the top
     }
     lastTick = performance.now();
     syncButtons();
@@ -125,7 +126,7 @@ export function mountTimelineBar(
     if (!cursor) {
       enterReplay(undefined, value);
     } else {
-      t = value;
+      cursorMs = value;
       emitView();
     }
   });
@@ -134,7 +135,7 @@ export function mountTimelineBar(
 
   root.querySelector("#rp-export")!.addEventListener("click", () => {
     if (recorder.size === 0) {
-      message("Chưa có event nào để export");
+      message(t("timeline.nothingToExport"));
       return;
     }
     const blob = new Blob([recorder.toJSON()], { type: "application/json" });
@@ -143,7 +144,7 @@ export function mountTimelineBar(
     a.download = `agent-office-replay-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
-    message(`Đã export ${recorder.size} event`);
+    message(t("timeline.exported", { n: recorder.size }));
   });
 
   // R10: record the canvas to a .webm timelapse (opt-in, degrades if unsupported)
@@ -151,17 +152,17 @@ export function mountTimelineBar(
   const exporter = createVideoExporter(canvas);
   if (!exporter.supported) {
     recordBtn.disabled = true;
-    recordBtn.title = "Trình duyệt không hỗ trợ quay video";
+    recordBtn.title = t("timeline.noRecording");
   } else {
     recordBtn.addEventListener("click", () => {
       if (exporter.recording()) {
         exporter.stop();
         recordBtn.textContent = "🎬";
-        message("Đã tải timelapse");
+        message(t("timeline.timelapseSaved"));
       } else {
         exporter.start();
         recordBtn.textContent = "⏺";
-        message("Đang quay — bật replay 60× rồi quay để có timelapse");
+        message(t("timeline.recording"));
       }
     });
   }
@@ -187,17 +188,17 @@ export function mountTimelineBar(
         try {
           const events = parseReplayFile(text);
           if (events.length === 0) {
-            message("File replay rỗng");
+            message(t("timeline.emptyFile"));
             return;
           }
           playing = false;
           enterReplay(events);
-          message(`Đã nạp ${events.length} event — kéo timeline hoặc bấm ▶`);
+          message(t("timeline.loaded", { n: events.length }));
         } catch (err) {
-          message(err instanceof Error ? err.message : "Không đọc được file");
+          message(err instanceof Error ? err.message : t("timeline.unreadableFile"));
         }
       },
-      () => message("Không đọc được file"),
+      () => message(t("timeline.unreadableFile")),
     );
   }
 
@@ -215,10 +216,10 @@ export function mountTimelineBar(
     }
     if (!playing) return;
     const now = performance.now();
-    t += (now - lastTick) * speed;
+    cursorMs += (now - lastTick) * speed;
     lastTick = now;
-    if (t >= cursor.endMs) {
-      t = cursor.endMs;
+    if (cursorMs >= cursor.endMs) {
+      cursorMs = cursor.endMs;
       playing = false;
       syncButtons();
     }

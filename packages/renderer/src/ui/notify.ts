@@ -1,5 +1,5 @@
 import type { OfficeState } from "../sim/model";
-import { statusLabelVi } from "../sim/model";
+import { statusLabel } from "../sim/model";
 import { interventionQueue } from "../sim/selectors";
 
 /**
@@ -75,7 +75,7 @@ export function mountNotifier(onSelect: (agentId: string) => void): Notifier {
         const a = state.agents.get(agentId);
         if (!a) continue;
         const opts: NotificationOptions & { renotify?: boolean } = {
-          body: statusLabelVi(a.status) + (a.statusDetail ? ` — ${a.statusDetail}` : ""),
+          body: statusLabel(a.status) + (a.statusDetail ? ` — ${a.statusDetail}` : ""),
           tag: agentId, // one live toast per agent; renotify on a new status
           renotify: true,
         };

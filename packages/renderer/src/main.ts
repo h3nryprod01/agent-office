@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { INITIAL_STATE, type OfficeState } from "./sim/model";
 import { reduce } from "./sim/reducer";
 import { filterStateByRepo } from "./sim/selectors";
@@ -60,11 +61,10 @@ async function boot(): Promise<void> {
     const box = document.createElement("div");
     box.className = "office-fallback";
     box.innerHTML =
-      `<h2>Không bật được đồ hoạ 3D</h2>` +
-      `<p>Máy này không dùng được WebGL, nên khung Văn phòng 3D không hiển thị.</p>` +
-      `<p>Mọi thứ khác vẫn chạy bình thường: <b>Bảng việc</b>, <b>Nhật ký</b>, ` +
-      `<b>Chi phí</b>, <b>Cấu hình</b> — bấm ở thanh bên trái.</p>` +
-      `<p class="hint">Thường do card đồ hoạ/driver cũ, hoặc đang chạy qua remote desktop / máy ảo không có tăng tốc phần cứng.</p>`;
+      `<h2>${t("webgl.title")}</h2>` +
+      `<p>${t("webgl.body")}</p>` +
+      `<p>${t("webgl.stillWorks")}</p>` +
+      `<p class="hint">${t("webgl.hint")}</p>`;
     host.appendChild(box);
   }
 
@@ -183,11 +183,11 @@ async function boot(): Promise<void> {
   // the 2026-07-10 "open to Bảng việc" call. A refresh must always land on the
   // office, live or mock.
   const navbarItems: NavItem[] = [
-    { key: "office", icon: "🏢", label: "Văn phòng" },
-    { key: "kanban", icon: "🗂", label: "Bảng việc" },
-    { key: "log", icon: "🕑", label: "Nhật ký" },
-    { key: "costs", icon: "💰", label: "Chi phí" },
-    { key: "settings", icon: "⚙", label: "Cấu hình" },
+    { key: "office", icon: "🏢", label: t("nav.office") },
+    { key: "kanban", icon: "🗂", label: t("nav.board") },
+    { key: "log", icon: "🕑", label: t("nav.log") },
+    { key: "costs", icon: "💰", label: t("nav.costs") },
+    { key: "settings", icon: "⚙", label: t("nav.settings") },
   ];
   const kanban = mountKanban(document.querySelector<HTMLElement>("#kanban")!, {
     project: "agent-office",
@@ -197,7 +197,7 @@ async function boot(): Promise<void> {
     // chatHandle at click time; it's assigned later in boot when useWs mounts
     // the box, null in mock → no-op). Does NOT auto-send.
     onAssignToPM: (item) =>
-      chatHandle?.prefill(`Nhờ PM xử lý ý tưởng: "${item.title}"`),
+      chatHandle?.prefill(t("kanban.askPm", { title: item.title })),
   });
   const activityLog = mountActivityLog(document.querySelector<HTMLElement>("#log")!, {
     ...(fetchRecentTranscript ? { fetchTranscript: fetchRecentTranscript } : {}),
@@ -272,7 +272,7 @@ async function boot(): Promise<void> {
               .querySelector("#outputs .outputs-panel h2")
               ?.insertAdjacentHTML(
                 "afterend",
-                `<p class="empty">⚠ Mở thất bại: ${error instanceof Error ? error.message : String(error)}</p>`,
+                `<p class="empty">${t("office.openFailed", { error: error instanceof Error ? error.message : String(error) })}</p>`,
               );
           })
     : undefined;
@@ -511,13 +511,13 @@ async function boot(): Promise<void> {
     // live status in a child span (not root.textContent) so the sfx toggle
     // appended below survives onStatus re-renders.
     const status = document.createElement("span");
-    status.textContent = `live: đang kết nối ${wsBase()}…`;
+    status.textContent = t("office.connecting", { url: wsBase() });
     controlsRoot.append(status);
     if (source instanceof WebSocketEventSource) {
       source.onStatus = (connected) => {
         status.textContent = connected
           ? `live: ${wsBase()}`
-          : "⚠ daemon offline — đang kết nối lại…";
+          : t("office.offline");
         status.style.color = connected ? "" : "#f87171";
       };
     }
@@ -529,7 +529,7 @@ async function boot(): Promise<void> {
     sfxBtn.textContent = sfx.enabled() ? "🔊" : "🔇";
     sfxBtn.classList.toggle("sfx-on", sfx.enabled());
   };
-  sfxBtn.title = "Bật/tắt âm thanh môi trường (clack / ting / buzz)";
+  sfxBtn.title = t("office.soundTitle");
   sfxBtn.addEventListener("click", () => {
     sfx.setEnabled(!sfx.enabled());
     paintSfx();
@@ -541,8 +541,8 @@ async function boot(): Promise<void> {
   if (office3d) {
     // R10-b: recenter the office — undoes a drag-pan or a focus-pan.
     const recenterBtn = document.createElement("button");
-    recenterBtn.textContent = "⌖ Giữa";
-    recenterBtn.title = "Đưa văn phòng về giữa khung nhìn";
+    recenterBtn.textContent = t("office.center");
+    recenterBtn.title = t("office.centerTitle");
     recenterBtn.addEventListener("click", () => {
       office3d?.recenter();
       recenterBtn.blur();
@@ -553,8 +553,8 @@ async function boot(): Promise<void> {
     let night = false;
     const nightBtn = document.createElement("button");
     const paintNight = (): void => {
-      nightBtn.textContent = night ? "☀️ Bật đèn" : "🌙 Tắt đèn";
-      nightBtn.title = night ? "Bật đèn văn phòng" : "Tắt đèn — chỉ còn màn hình và đèn neon";
+      nightBtn.textContent = night ? t("office.lightsOn") : t("office.lightsOff");
+      nightBtn.title = night ? t("office.lightsOnTitle") : t("office.lightsOffTitle");
       nightBtn.classList.toggle("sfx-on", night);
     };
     nightBtn.addEventListener("click", () => {
@@ -570,8 +570,8 @@ async function boot(): Promise<void> {
     let meeting = false;
     const meetBtn = document.createElement("button");
     const paintMeet = (): void => {
-      meetBtn.textContent = meeting ? "🏢 Về bàn" : "👥 Họp nhanh";
-      meetBtn.title = meeting ? "Cho mọi người về bàn làm việc" : "Gọi cả team ra bàn họp";
+      meetBtn.textContent = meeting ? t("office.toDesks") : t("office.huddle");
+      meetBtn.title = meeting ? t("office.toDesksTitle") : t("office.huddleTitle");
       meetBtn.classList.toggle("sfx-on", meeting);
     };
     meetBtn.addEventListener("click", () => {

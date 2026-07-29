@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /**
  * PM chatbox — bottom-center dock. Round 5: one PM PER REPO — the box talks
  * to the PM of the currently active office tab (tab "All" → the daemon's
@@ -72,7 +73,7 @@ const STYLE = `
 #chat-box .chat-log:empty, #chat-box .chat-log[hidden] { display: none; }
 #chat-box .chat-line { white-space: pre-wrap; word-break: break-word; }
 #chat-box .chat-line.user { color: #93c5fd; }
-#chat-box .chat-line.user::before { content: "bạn › "; color: #475569; }
+#chat-box .chat-line.user::before { content: t("chat.youPrefix"); color: #475569; }
 #chat-box .chat-line.assistant::before { content: "PM › "; color: #f59e0b; }
 #chat-box .chat-line.system { color: #f87171; font-style: italic; }
 #chat-box .chat-line.info { color: #94a3b8; font-style: italic; }
@@ -130,17 +131,17 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
   const root = document.createElement("div");
   root.id = "chat-box";
   root.innerHTML = `
-    <button type="button" class="chat-collapse" title="Ẩn/hiện khung chat">▾</button>
+    <button type="button" class="chat-collapse" title="${t("chat.toggleTitle")}">▾</button>
     <div class="chat-logs"></div>
-    <div class="chat-typing" hidden><span>PM đang gõ…</span><button type="button" class="stop" title="Dừng turn PM đang chạy. CHỈ dừng được PM chat này — các session Claude khác của bạn phải dừng ở app gốc.">⏹ dừng</button></div>
+    <div class="chat-typing" hidden><span>${t("chat.typing")}</span><button type="button" class="stop" title="${t("chat.stopTitle")}">${t("chat.stop")}</button></div>
     <div class="chat-row">
-      <input type="text" placeholder="Nhắn cho PM… (Enter để gửi)" />
+      <input type="text" placeholder="${t("chat.placeholder")}" />
       <button type="button" class="mic">🎤</button>
-      <button type="button" class="tts" title="PM đọc to reply (giọng Đoan) — bấm để bật/tắt">🗣️</button>
-      <button type="button" class="handover" title="Tiếp tục phiên PM này trong Claude Code — copy lệnh 'claude --resume' của repo đang mở">🔗</button>
-      <button type="button" class="send">Gửi</button>
+      <button type="button" class="tts" title="${t("chat.ttsTitle")}">🗣️</button>
+      <button type="button" class="handover" title="${t("chat.resumeTitle")}">🔗</button>
+      <button type="button" class="send">${t("chat.send")}</button>
     </div>
-    <div class="chat-note" title="Chatbox nói chuyện với PM của repo trong tab đang mở (tab All = repo mặc định). Muốn phê duyệt tool cho một session đang chờ permission, phải làm trong app Claude Code gốc của session đó.">ⓘ chat không duyệt được permission — xử lý ở app gốc · mỗi tin = 1 turn Claude thật</div>
+    <div class="chat-note" title="${t("chat.hint")}">${t("chat.note")}</div>
   `;
   document.body.appendChild(root);
 
@@ -200,7 +201,7 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
     const key = activeKey();
     for (const [k, log] of logs) log.hidden = k !== key;
     const label = activeRepo ?? defaultRepo;
-    input.placeholder = label ? `Nhắn cho PM · ${label}… (Enter để gửi)` : "Nhắn cho PM… (Enter để gửi)";
+    input.placeholder = label ? t("chat.placeholderRepo", { repo: label }) : t("chat.placeholder");
     const log = logs.get(key);
     if (log) log.scrollTop = log.scrollHeight;
   };
@@ -255,12 +256,12 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        appendLine(activeKey(), "system", body?.error ?? `Gửi thất bại (HTTP ${res.status})`);
+        appendLine(activeKey(), "system", body?.error ?? t("chat.sendFailed", { status: res.status }));
         setWaiting(false);
       }
       // on 202 the user line + reply arrive as WS frames
     } catch {
-      appendLine(activeKey(), "system", "Không kết nối được daemon (127.0.0.1:8787) — daemon có đang chạy không?");
+      appendLine(activeKey(), "system", t("chat.noDaemon", { url: location.host }));
       setWaiting(false);
     }
   };
@@ -284,7 +285,7 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
         body: JSON.stringify(activeRepo ? { repo: activeRepo } : {}),
       });
     } catch {
-      appendLine(activeKey(), "system", "Không kết nối được daemon để dừng turn.");
+      appendLine(activeKey(), "system", t("chat.stopFailed"));
     }
     stopBtn.disabled = false;
   });
@@ -301,18 +302,18 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
       const body = await res.json();
       const entry = body?.repos?.[key] as { sessionId?: string; cwd?: string } | undefined;
       if (!entry?.sessionId || !entry.cwd) {
-        appendLine(key, "system", "Chưa có phiên PM cho repo này — nhắn PM một câu trước đã.");
+        appendLine(key, "system", t("chat.noSession"));
         return;
       }
       const cmd = `cd "${entry.cwd}" && claude --resume ${entry.sessionId}`;
       try {
         await navigator.clipboard.writeText(cmd);
-        appendLine(key, "info", `đã copy 🔗 ${cmd}`);
+        appendLine(key, "info", `${t("panel.copied")} 🔗 ${cmd}`);
       } catch {
-        appendLine(key, "info", `copy tay lệnh này: ${cmd}`);
+        appendLine(key, "info", t("chat.copyManually", { cmd }));
       }
     } catch {
-      appendLine(key, "system", "Không kết nối được daemon (127.0.0.1:8787).");
+      appendLine(key, "system", t("chat.daemonUnreachable", { url: location.host }));
     }
     handoverBtn.blur();
   });

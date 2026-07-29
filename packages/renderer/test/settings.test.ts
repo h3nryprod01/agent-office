@@ -4,27 +4,27 @@ import { connectionHtml, harnessRowHtml, type HarnessStatus } from "../src/ui/se
 describe("connectionHtml", () => {
   it("shows a connected chip", () => {
     const h = connectionHtml(true, "127.0.0.1:8787");
-    expect(h).toContain("Đã kết nối");
+    expect(h).toContain("Connected");
     expect(h).toContain("set-chip ok");
   });
 
   it("shows an offline chip with the daemon address", () => {
     const h = connectionHtml(false, "127.0.0.1:8787");
-    expect(h).toContain("Mất kết nối");
+    expect(h).toContain("Disconnected");
     expect(h).toContain("127.0.0.1:8787");
     expect(h).toContain("set-chip off");
   });
 
   // ?mock=1 never opens a socket, so `connected` is false there forever. Reading
-  // that as "Mất kết nối" made the demo accuse the daemon that was serving it.
+  // that as "Disconnected" made the demo accuse the daemon that was serving it.
   it("says demo mode, not disconnected, when we never dialled the daemon", () => {
     const h = connectionHtml(false, "127.0.0.1:8787", false);
-    expect(h).toContain("Chế độ demo");
-    expect(h).not.toContain("Mất kết nối");
+    expect(h).toContain("Demo mode");
+    expect(h).not.toContain("Disconnected");
   });
 
   it("still reports a real outage in live mode", () => {
-    expect(connectionHtml(false, "127.0.0.1:8787", true)).toContain("Mất kết nối");
+    expect(connectionHtml(false, "127.0.0.1:8787", true)).toContain("Disconnected");
   });
 });
 
@@ -33,27 +33,27 @@ describe("harnessRowHtml", () => {
 
   it("installed + logged in → both green chips + a probe button", () => {
     const h = harnessRowHtml({ ...base, loggedIn: true });
-    expect(h).toContain("Đã cài");
-    expect(h).toContain("Đã đăng nhập");
+    expect(h).toContain("Installed");
+    expect(h).toContain("Signed in");
     expect(h).toContain('data-probe="claude"');
   });
 
-  it("not installed → 'Chưa cài', no login chip, no probe button", () => {
+  it("not installed → 'Not installed', no login chip, no probe button", () => {
     const h = harnessRowHtml({ ...base, installed: false });
-    expect(h).toContain("Chưa cài");
-    expect(h).not.toContain("đăng nhập");
+    expect(h).toContain("Not installed");
+    expect(h).not.toContain("Signed in");
     expect(h).not.toContain("data-probe");
   });
 
-  it("installed but not probed → 'Chưa kiểm tra' + probe button", () => {
+  it("installed but not probed → 'Not checked' + probe button", () => {
     const h = harnessRowHtml({ ...base, loggedIn: null });
-    expect(h).toContain("Chưa kiểm tra");
+    expect(h).toContain("Not checked");
     expect(h).toContain('data-probe="claude"');
   });
 
   it("installed but logged out → warn chip carrying the reason", () => {
-    const h = harnessRowHtml({ ...base, loggedIn: false, reason: "cần đăng nhập" });
+    const h = harnessRowHtml({ ...base, loggedIn: false, reason: "signed in" });
     expect(h).toContain("set-chip warn");
-    expect(h).toContain("cần đăng nhập");
+    expect(h).toContain("signed in");
   });
 });

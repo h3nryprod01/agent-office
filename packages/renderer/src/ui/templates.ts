@@ -8,6 +8,7 @@
 // that comes from the daemon — template names, skill names, backup paths, goals
 // — reaches the DOM through textContent, never innerHTML.
 
+import { t } from "../i18n";
 export interface TemplateDept {
   name: string;
   memberCount: number;
@@ -30,26 +31,30 @@ export interface ApplyResult {
 /** Where apply writes, shown before the user commits. The daemon owns the real path. */
 export const ROSTER_PATH_HINT = "~/.claude/company/roster.yaml";
 
-/** "2 phòng · 8 thành viên · có goals.md" */
-export function summaryMeta(t: TemplateSummary): string {
-  const goals = t.hasGoals ? "có goals.md" : "chưa có goals.md";
-  return `${t.departments.length} phòng · ${t.memberTotal} thành viên · ${goals}`;
+/** "2 departments · 8 people · has goals.md" */
+export function summaryMeta(tpl: TemplateSummary): string {
+  const goals = tpl.hasGoals ? t("templates.hasGoals") : t("templates.noGoals");
+  return t("templates.meta", {
+    depts: tpl.departments.length,
+    members: tpl.memberTotal,
+    goals,
+  });
 }
 
 /** The skill-gap warning, or null when the machine already has everything. */
 export function missingLabel(missing: string[]): string | null {
   if (missing.length === 0) return null;
-  return `⚠ Thiếu ${missing.length} skill: ${missing.join(", ")} — chạy skill company-hire để tuyển (bắt buộc scan an toàn).`;
+  return t("templates.missingSkills", { n: missing.length, list: missing.join(", ") });
 }
 
 /** What the apply button says, armed or not. */
 export function applyButtonLabel(armed: boolean): string {
-  return armed ? "⚠ Bấm lần nữa để GHI ĐÈ roster" : "Áp dụng";
+  return armed ? t("templates.confirmOverwrite") : t("templates.apply");
 }
 
 /** The warning shown between the two clicks. */
 export function armWarning(name: string): string {
-  return `Áp dụng "${name}" sẽ ghi đè ${ROSTER_PATH_HINT}. Roster hiện tại được backup trước → ${ROSTER_PATH_HINT}.<timestamp>.bak`;
+  return t("templates.applyWarning", { name, path: ROSTER_PATH_HINT });
 }
 
 /**
@@ -70,11 +75,11 @@ export function nextArm(
 export function applyLines(result: ApplyResult): string[] {
   const lines = [
     result.backupPath
-      ? `✅ Đã backup roster cũ → ${result.backupPath}`
-      : "✅ Đã tạo roster mới (máy này chưa có roster cũ để backup).",
+      ? t("templates.backedUp", { path: result.backupPath })
+      : t("templates.createdFresh"),
   ];
   const missing = missingLabel(result.missingSkills);
-  lines.push(missing ?? "✅ Tất cả skill của template đã cài trên máy này.");
+  lines.push(missing ?? t("templates.allSkillsPresent"));
   return lines;
 }
 
@@ -98,12 +103,12 @@ export function mountTemplates(
 
   root.classList.add("templates");
   root.innerHTML = `
-    <button class="tpl-toggle">🏢 Công ty đóng hộp</button>
+    <button class="tpl-toggle">${t("templates.button")}</button>
     <div class="tpl-overlay" hidden>
       <div class="tpl-panel">
-        <h2>🏢 Công ty đóng hộp <button class="tpl-close" title="Đóng">✕</button></h2>
-        <p class="tpl-note">Mỗi template là một công ty đa agent đóng gói sẵn (sơ đồ phòng ban + mục tiêu). <b>Áp dụng sẽ ghi đè roster thật</b> của máy này — roster cũ luôn được backup trước.</p>
-        <div class="tpl-list"><p class="placeholder">Đang tải…</p></div>
+        <h2>${t("templates.button")} <button class="tpl-close" title="${t("templates.close")}">✕</button></h2>
+        <p class="tpl-note">${t("templates.note")}</p>
+        <div class="tpl-list"><p class="placeholder">${t("templates.loading")}</p></div>
         <div class="tpl-result" hidden></div>
       </div>
     </div>`;
@@ -127,36 +132,36 @@ export function mountTemplates(
     const templates = cache;
     list.replaceChildren();
     if (templates.length === 0) {
-      list.append(el("p", "empty", "Chưa có template nào trong templates/."));
+      list.append(el("p", "empty", t("templates.empty")));
       return;
     }
-    for (const t of templates) {
+    for (const tpl of templates) {
       const card = el("section", "tpl-card");
-      card.append(el("h3", "tpl-name", t.name), el("p", "tpl-meta", summaryMeta(t)));
+      card.append(el("h3", "tpl-name", tpl.name), el("p", "tpl-meta", summaryMeta(tpl)));
 
-      const depts = t.departments.map((d) => `${d.name} (${d.memberCount})`).join(" · ");
+      const depts = tpl.departments.map((d) => `${d.name} (${d.memberCount})`).join(" · ");
       if (depts) card.append(el("p", "tpl-depts", depts));
 
-      const warn = missingLabel(t.missingSkills);
+      const warn = missingLabel(tpl.missingSkills);
       if (warn) card.append(el("p", "tpl-warn", warn));
 
       const button = document.createElement("button");
       button.className = "tpl-apply";
-      button.dataset.apply = t.name;
-      button.textContent = applyButtonLabel(armed === t.name);
+      button.dataset.apply = tpl.name;
+      button.textContent = applyButtonLabel(armed === tpl.name);
       card.append(button);
 
-      if (armed === t.name) card.append(el("p", "tpl-confirm", armWarning(t.name)));
+      if (armed === tpl.name) card.append(el("p", "tpl-confirm", armWarning(tpl.name)));
       list.append(card);
     }
   }
 
   function renderResult(name: string, r: ApplyResult): void {
     result.hidden = false;
-    result.replaceChildren(el("h3", "tpl-result-title", `Đã áp dụng "${name}"`));
+    result.replaceChildren(el("h3", "tpl-result-title", t("templates.applied", { name })));
     for (const line of applyLines(r)) result.append(el("p", "tpl-result-line", line));
     if (r.goals) {
-      result.append(el("h4", "tpl-goals-title", "Mục tiêu (goals.md) — giao cho company-pm"));
+      result.append(el("h4", "tpl-goals-title", t("templates.goalsHeading")));
       result.append(el("pre", "tpl-goals", r.goals));
     }
   }
@@ -168,7 +173,7 @@ export function mountTemplates(
         renderList();
       })
       .catch(() => {
-        list.replaceChildren(el("p", "empty", "Không kết nối được daemon (127.0.0.1:8787)."));
+        list.replaceChildren(el("p", "empty", t("templates.noDaemon", { url: location.host })));
       });
   }
 
@@ -180,7 +185,7 @@ export function mountTemplates(
   function doApply(name: string): void {
     busy = true;
     result.hidden = false;
-    result.replaceChildren(el("p", "placeholder", `Đang áp dụng "${name}"…`));
+    result.replaceChildren(el("p", "placeholder", t("templates.applying", { name })));
     applyTemplate(name)
       .then((r) => {
         reset();
@@ -190,7 +195,7 @@ export function mountTemplates(
       .catch((error: unknown) => {
         reset();
         result.replaceChildren(
-          el("p", "tpl-warn", `⚠ Áp dụng thất bại: ${error instanceof Error ? error.message : String(error)}`),
+          el("p", "tpl-warn", t("templates.applyFailed", { error: error instanceof Error ? error.message : String(error) })),
         );
         refresh();
       });

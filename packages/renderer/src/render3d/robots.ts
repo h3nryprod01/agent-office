@@ -3,6 +3,7 @@
 // (The other 9 designs still live in robotKit.ts — swap `chosenBuilder` for
 // `ROBOTS[n].build` to compare shapes again.)
 
+import { t } from "../i18n";
 import * as THREE from "three";
 import { chosenBuilder, attachFace, drawFace, SKINS, type Face, type Mood, type Skin } from "./robotKit";
 
@@ -106,7 +107,7 @@ SKINS.forEach((skin, i) => {
   spin.add(built.inner);
   stand.add(spin);
 
-  const label = makeLabel(String(i + 1).padStart(2, "0"), skin.name, skin.body > 0x888888 ? "thân sáng" : "thân tối", hex);
+  const label = makeLabel(String(i + 1).padStart(2, "0"), skin.name, skin.body > 0x888888 ? t("robot.shellLight") : t("robot.shellDark"), hex);
   label.position.set(0, 3.15, 0);
   stand.add(label);
 
@@ -122,7 +123,7 @@ let night = false;
 document.getElementById("btn-walk")!.addEventListener("click", (e) => {
   walking = !walking;
   (e.currentTarget as HTMLElement).classList.toggle("on", walking);
-  (e.currentTarget as HTMLElement).textContent = walking ? "⏸ Dừng đi" : "🚶 Xem dáng đi";
+  (e.currentTarget as HTMLElement).textContent = walking ? t("robot.walkStop") : t("robot.walkStart");
 });
 document.getElementById("btn-night")!.addEventListener("click", (e) => {
   night = !night;

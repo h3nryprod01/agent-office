@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { OfficeState } from "../sim/model";
 import { repoTabs, type RepoTab } from "../sim/selectors";
 
@@ -19,7 +20,7 @@ export function mountBuildingView(
   const toggle = document.createElement("button");
   toggle.className = "building-toggle";
   toggle.type = "button";
-  toggle.textContent = "🏢 Tòa nhà";
+  toggle.textContent = t("building.button");
   const overlay = document.createElement("div");
   overlay.className = "building-overlay";
   overlay.hidden = true;
@@ -40,19 +41,19 @@ export function mountBuildingView(
     panel.className = "building-panel";
 
     const h2 = document.createElement("h2");
-    h2.textContent = "Tòa nhà ";
+    h2.textContent = t("building.title") + " ";
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
     closeBtn.className = "building-close";
     closeBtn.textContent = "✕";
-    closeBtn.title = "Đóng";
+    closeBtn.title = t("panel.close");
     h2.appendChild(closeBtn);
     panel.appendChild(h2);
 
     if (tabs.length === 0) {
       const empty = document.createElement("p");
       empty.className = "empty";
-      empty.textContent = "Chưa có phòng ban nào đang hoạt động.";
+      empty.textContent = t("building.empty");
       panel.appendChild(empty);
     } else {
       for (const t of tabs) panel.appendChild(buildFloor(t));
@@ -124,7 +125,7 @@ function buildFloor(tab: RepoTab): HTMLButtonElement {
     const dot = document.createElement("span");
     dot.className = "floor-alert";
     dot.textContent = "●";
-    dot.title = "có agent đang kẹt";
+    dot.title = t("building.hasBlocked");
     btn.appendChild(dot);
   }
   return btn;

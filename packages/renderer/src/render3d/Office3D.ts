@@ -7,10 +7,11 @@
 //
 // Mounted by src/main.ts as the "Văn phòng" view.
 
+import { t } from "../i18n";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { statusLabelVi, type AgentModel, type OfficeState, type StationId } from "../sim/model";
+import { statusLabel, type AgentModel, type OfficeState, type StationId } from "../sim/model";
 import { ceoQueue } from "../sim/selectors";
 import { ceoActivityDelay, nextCeoActivity, type CeoActivity } from "../render/ceoActivity";
 import { type WallBoardData } from "../ui/wallBoardData";
@@ -211,14 +212,14 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
       body(ctx, W, H);
       tex.needsUpdate = true;
     };
-    panel(scrumBoard, "BẢNG VIỆC", (ctx) => {
+    panel(scrumBoard, t("wall.scrumBoard"), (ctx) => {
       const s = boardData.scrum;
       if (!s) {
         ctx.fillStyle = "#4b6b73"; ctx.font = "30px ui-monospace, monospace";
-        ctx.fillText("daemon ngoại tuyến", 26, 128);
+        ctx.fillText(t("wall.daemonOffline"), 26, 128);
         return;
       }
-      ([["Chờ làm", s.todo, "#94a3b8"], ["Đang làm", s.inProgress, "#ff9100"], ["Xong", s.done, "#00e676"]] as const)
+      ([[t("wall.queued"), s.todo, "#94a3b8"], [t("wall.inProgress"), s.inProgress, "#ff9100"], ["Xong", s.done, "#00e676"]] as const)
         .forEach(([label, n, col], i) => {
           const x = 26 + i * 205;
           ctx.fillStyle = "#8fa0ba"; ctx.font = "26px ui-monospace, monospace"; ctx.fillText(label, x, 116);
@@ -227,14 +228,14 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
       ctx.fillStyle = "#9fb2c9"; ctx.font = "24px ui-monospace, monospace";
       s.titles.slice(0, 3).forEach((t, i) => ctx.fillText("• " + t.slice(0, 36), 26, 232 + i * 30));
     });
-    panel(veloBoard, "NĂNG SUẤT", (ctx) => {
+    panel(veloBoard, t("wall.productivity"), (ctx) => {
       const v = boardData.velocityUsd;
       if (v === null) {
         ctx.fillStyle = "#4b6b73"; ctx.font = "30px ui-monospace, monospace";
-        ctx.fillText("daemon ngoại tuyến", 26, 128);
+        ctx.fillText(t("wall.daemonOffline"), 26, 128);
         return;
       }
-      ctx.fillStyle = "#8fa0ba"; ctx.font = "26px ui-monospace, monospace"; ctx.fillText("24 giờ qua", 26, 116);
+      ctx.fillStyle = "#8fa0ba"; ctx.font = "26px ui-monospace, monospace"; ctx.fillText(t("wall.last24h"), 26, 116);
       ctx.fillStyle = "#f5a623"; ctx.font = "bold 72px ui-monospace, monospace";
       ctx.fillText("$" + v.toFixed(2), 26, 194);
     });
@@ -675,8 +676,8 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
     const lines: string[] = [];
     let line = "";
     for (const w of text.split(/\s+/)) {
-      const t = line ? line + " " + w : w;
-      if (x.measureText(t).width > W - 44) { if (line) lines.push(line); line = w; } else line = t;
+      const candidate = line ? line + " " + w : w;
+      if (x.measureText(candidate).width > W - 44) { if (line) lines.push(line); line = w; } else line = candidate;
       if (lines.length >= 3) break;
     }
     if (line && lines.length < 3) lines.push(line);
@@ -703,17 +704,17 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
     ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
     ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
-  function drawScreen(s: Seat, a: AgentModel | null, t: number): void {
+  function drawScreen(s: Seat, a: AgentModel | null, nowMs: number): void {
     const ctx = s.screen.ctx;
     ctx.fillStyle = night ? "#04171e" : "#082330"; ctx.fillRect(0, 0, 256, 152);
-    if (!a) { ctx.fillStyle = "#12303a"; ctx.font = "12px monospace"; ctx.fillText("— trống —", 90, 80); s.screen.tex.needsUpdate = true; return; }
+    if (!a) { ctx.fillStyle = "#12303a"; ctx.font = "12px monospace"; ctx.fillText(t("wall.empty"), 90, 80); s.screen.tex.needsUpdate = true; return; }
     const tint = "#" + agentColor(a).toString(16).padStart(6, "0");
     ctx.fillStyle = tint; ctx.fillRect(0, 0, 256, 26);
     ctx.fillStyle = "#04141a"; ctx.font = "bold 15px monospace"; ctx.fillText(a.name, 8, 18);
     ctx.fillStyle = "#" + (statusHue[a.status] ?? 0x7fe9dd).toString(16).padStart(6, "0");
-    ctx.font = "13px monospace"; ctx.fillText(statusLabelVi(a.status), 10, 48);
+    ctx.font = "13px monospace"; ctx.fillText(statusLabel(a.status), 10, 48);
     for (let i = 0; i < 5; i++) {
-      const w = 26 + (Math.sin(t / 380 + i * 1.3 + s.i) * 0.5 + 0.5) * 200;
+      const w = 26 + (Math.sin(nowMs / 380 + i * 1.3 + s.i) * 0.5 + 0.5) * 200;
       ctx.fillStyle = i % 2 ? "rgba(45,212,191,.55)" : "rgba(56,189,248,.5)";
       ctx.fillRect(10, 62 + i * 16, w, 9);
     }
@@ -725,7 +726,7 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
     ctx.fillStyle = "#e8ecf4"; ctx.font = "bold 22px ui-monospace, monospace"; ctx.textAlign = "center";
     ctx.fillText(a.name, 128, 32);
     ctx.fillStyle = "#" + (statusHue[a.status] ?? 0x9aa6bd).toString(16).padStart(6, "0");
-    ctx.font = "16px ui-monospace, monospace"; ctx.fillText(statusLabelVi(a.status), 128, 52);
+    ctx.font = "16px ui-monospace, monospace"; ctx.fillText(statusLabel(a.status), 128, 52);
     ctx.textAlign = "left";
     s.label.tex.needsUpdate = true;
   }

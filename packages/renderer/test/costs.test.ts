@@ -84,9 +84,9 @@ describe("agentLabel", () => {
 describe("costsPanelHtml over budget", () => {
   it("shows the over-budget warning when over, hides it when under", () => {
     const over = costsPanelHtml({ ...PAYLOAD, budgetUsd: 1, overBudget: true }, []);
-    expect(over).toContain("Vượt ngân sách");
+    expect(over).toContain("Over budget");
     const under = costsPanelHtml({ ...PAYLOAD, budgetUsd: 999, overBudget: false }, []);
-    expect(under).not.toContain("Vượt ngân sách");
+    expect(under).not.toContain("Over budget");
   });
 });
 
@@ -99,7 +99,7 @@ describe("costsPanelHtml", () => {
     expect(html).toContain("Theo harness");
     expect(html).toContain("Theo repo");
     expect(html).toContain("Theo agent");
-    expect(html).toContain("Theo ngày");
+    expect(html).toContain("By day");
     expect(html).toContain("agent-office");
   });
   it("lists every harness, including the ones whose models have no price", () => {

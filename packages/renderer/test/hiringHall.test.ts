@@ -81,10 +81,10 @@ describe("rosterFrameDiff (walk-in trigger, mock walkIn path)", () => {
 describe("rosterHtml", () => {
   it("renders departments, member rows and the updated stamp", () => {
     const html = rosterHtml(roster({ dev: ["forge"], media: ["hyperframes"] }));
-    expect(html).toContain("Cập nhật roster: 2026-07-08 · 2 thành viên");
+    expect(html).toContain("Roster updated: 2026-07-08 · 2 people");
     expect(html).toContain("dev");
     expect(html).toContain("forge");
-    expect(html).toContain("trần $100/ngày");
+    expect(html).toContain("cap $100/day");
     expect(html).toContain("📅 2026-07-08");
   });
 
@@ -106,7 +106,7 @@ describe("rosterHtml", () => {
   });
 
   it("shows an empty-state hint when there is no roster at all", () => {
-    expect(rosterHtml({ version: null, updated: null, departments: [] })).toContain("Chưa có roster");
+    expect(rosterHtml({ version: null, updated: null, departments: [] })).toContain("No roster yet");
   });
 });
 
@@ -114,7 +114,7 @@ describe("hirePrompt", () => {
   it("routes through company-hire and asks for the scan verdict", () => {
     const p = hirePrompt("thumbnail designer cho media");
     expect(p).toBe(
-      "Dùng skill company-hire: tuyển thumbnail designer cho media. Báo cáo verdict scan + kết quả vào chat.",
+      "Use the company-hire skill to hire thumbnail designer cho media. Report the scan verdict and the result back in chat.",
     );
   });
 });

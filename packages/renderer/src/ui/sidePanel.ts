@@ -1,4 +1,5 @@
-import { statusLabelVi, type AgentModel, type OfficeState, type TimelineEntry } from "../sim/model";
+import { t } from "../i18n";
+import { statusLabel, type AgentModel, type OfficeState, type TimelineEntry } from "../sim/model";
 import { toBusiness } from "./activityLog";
 import { formatSince } from "../sim/selectors";
 import { workItemSectionHtml, type WorkItem, type WorkItemsFile } from "./workItems";
@@ -80,10 +81,10 @@ export function mountSidePanel(
       navigator.clipboard
         .writeText(copyBtn.dataset.copy)
         .then(() => {
-          copyBtn.textContent = "đã copy";
+          copyBtn.textContent = t("panel.copied");
         })
         .catch(() => {
-          copyBtn.textContent = "copy tay dòng trên";
+          copyBtn.textContent = t("panel.copyManually");
         });
       return;
     }
@@ -115,7 +116,7 @@ export function mountSidePanel(
     if (!selectedId) return;
     const agent = state.agents.get(selectedId);
     if (!agent) {
-      root.innerHTML = `<header><h2>Agent đã biến mất</h2><button data-close>×</button></header>`;
+      root.innerHTML = `<header><h2>${t("panel.agentGone")}</h2><button data-close>×</button></header>`;
       lastSig = "gone";
       return;
     }
@@ -229,17 +230,17 @@ function panelHtml(
     ...(resumeCmd
       ? [
           [
-            "Tiếp tục trong Claude",
-            `<code>${esc(resumeCmd)}</code> <button data-copy="${esc(resumeCmd)}" title="Copy lệnh resume phiên PM này">copy</button>`,
+            t("panel.resumeInClaude"),
+            `<code>${esc(resumeCmd)}</code> <button data-copy="${esc(resumeCmd)}" title="${t("panel.resumeCopyTitle")}">copy</button>`,
           ],
         ]
       : []),
-    ["Trạng thái", `<span class="status-chip status-${a.status}">${esc(statusLabelVi(a.status))}</span> · <span data-since>${formatSince(a.statusSince, now)}</span>`],
-    ["Chi tiết", a.statusDetail ? esc(a.statusDetail) : "—"],
-    ["Đang làm", a.currentTool ? esc(toBusiness({ tool: a.currentTool })) : "—"],
-    ["Thư mục làm việc", a.cwd ? `<code>${esc(a.cwd)}</code>` : "—"],
-    ["Phiên", `<code>${esc(shorten(a.sessionId))}</code>`],
-    ["Nhân sự", `<code>${esc(shorten(a.agentId))}</code>${a.parentId ? ` · thuộc <code>${esc(shorten(a.parentId))}</code>` : " · cấp cao nhất"}`],
+    [t("panel.status"), `<span class="status-chip status-${a.status}">${esc(statusLabel(a.status))}</span> · <span data-since>${formatSince(a.statusSince, now)}</span>`],
+    [t("panel.detail"), a.statusDetail ? esc(a.statusDetail) : "—"],
+    [t("wall.inProgress"), a.currentTool ? esc(toBusiness({ tool: a.currentTool })) : "—"],
+    [t("panel.cwd"), a.cwd ? `<code>${esc(a.cwd)}</code>` : "—"],
+    [t("panel.session"), `<code>${esc(shorten(a.sessionId))}</code>`],
+    [t("panel.reportsTo"), `<code>${esc(shorten(a.agentId))}</code>${a.parentId ? ` · thuộc <code>${esc(shorten(a.parentId))}</code>` : t("panel.topLevel")}`],
   ]
     .map(([k, v]) => `<div class="row"><span class="k">${k}</span><span class="v">${v}</span></div>`)
     .join("");
@@ -247,12 +248,12 @@ function panelHtml(
   return `
     <header>
       <h2>${esc(a.name)}${a.role ? ` <small>· ${esc(a.role)}</small>` : ""}</h2>
-      <button data-close title="Đóng">×</button>
+      <button data-close title="${t("panel.close")}">×</button>
     </header>
     ${rows}
     <h3>Work item</h3>
     ${workItemSection}
-    <h3>Hoạt động gần nhất</h3>
+    <h3>${t("panel.recentActivity")}</h3>
     <ul class="timeline">${timelineHtml(a.timeline, expandedTimeline)}</ul>
     <h3>Transcript</h3>
     ${transcriptHtml(transcript, expandedTranscript, transcriptLimit)}
@@ -269,7 +270,7 @@ function panelHtml(
  *  become plain Vietnamese; assistant messages stay as written. Pure. Exported
  *  for tests. */
 export function timelineLabel(t: TimelineEntry): string {
-  if (t.kind === "status" && t.status) return statusLabelVi(t.status);
+  if (t.kind === "status" && t.status) return statusLabel(t.status);
   if ((t.kind === "tool" || t.kind === "result") && t.tool) {
     const mark = t.kind === "result" ? (t.text.startsWith("✗") ? "✗ " : "✓ ") : "";
     return mark + toBusiness({ tool: t.tool, text: t.text });
@@ -278,7 +279,7 @@ export function timelineLabel(t: TimelineEntry): string {
 }
 
 export function timelineHtml(entries: readonly TimelineEntry[], expanded: ReadonlySet<number>): string {
-  if (entries.length === 0) return "<li>Chưa có hoạt động.</li>";
+  if (entries.length === 0) return `<li>${t("panel.noActivity")}</li>`;
   return [...entries]
     .reverse()
     .map((t) => rowHtml(`tl-${t.kind}`, t.ts, expanded.has(t.ts), "data-toggle-timeline-ts", timelineLabel(t)))
@@ -295,13 +296,13 @@ export function transcriptHtml(
   limit: number,
 ): string {
   if (transcript === undefined) {
-    return `<p class="placeholder">Transcript chỉ có ở live mode (?ws=1).</p>`;
+    return `<p class="placeholder">${t("panel.transcriptLiveOnly")}</p>`;
   }
   if (transcript === null) {
-    return `<p class="placeholder">Đang tải…</p>`;
+    return `<p class="placeholder">${t("panel.loading")}</p>`;
   }
   if (transcript.length === 0) {
-    return `<p class="placeholder">Chưa có message nào trong buffer.</p>`;
+    return `<p class="placeholder">${t("panel.noMessages")}</p>`;
   }
   const lines = transcript
     .map((t) =>
@@ -320,7 +321,7 @@ export function transcriptHtml(
   const nextTier = TRANSCRIPT_LIMIT_TIERS[TRANSCRIPT_LIMIT_TIERS.indexOf(limit) + 1];
   const moreBtn =
     nextTier && transcript.length >= limit
-      ? `<button class="transcript-more" data-more-transcript>Xem thêm (${nextTier})</button>`
+      ? `<button class="transcript-more" data-more-transcript>${t("panel.showMore", { n: nextTier })}</button>`
       : "";
   return `<ul class="timeline">${lines}</ul>${moreBtn}`;
 }

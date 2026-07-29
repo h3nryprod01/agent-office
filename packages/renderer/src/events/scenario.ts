@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { AgentStatus, OfficeEvent, OfficeEventType } from "../../../protocol/src/events";
 
 /** One scenario entry: emit `event` when playback reaches `atMs`. */
@@ -54,12 +55,12 @@ export function buildScenario(extras = 0): TimedEvent[] {
   const events: TimedEvent[] = [
     ev(0, "session_started", PM, null, { cwd: "/Users/you/Projects/acme-web", label: "acme-web" }),
     ev(200, "agent_spawned", PM, null, { name: "PM (orchestrator)", role: "planner", cwd: "/Users/you/Projects/acme-web" }),
-    say(800, PM, null, "Đọc context dự án đã…"),
+    say(800, PM, null, t("demo.readContext")),
     toolStart(1_200, PM, null, "Read", "Read README.md"),
     toolEnd(3_200, PM, null, "Read", true),
     toolStart(3_500, PM, null, "Read", "Read .claude/memory/activeContext.md"),
     toolEnd(5_200, PM, null, "Read", true),
-    say(5_800, PM, null, "OK — chia việc cho 4 agents."),
+    say(5_800, PM, null, t("demo.split")),
     toolStart(6_500, PM, null, "Task", "Spawn sub-agents"),
 
     // sub-agents pop in at the meeting table, then walk to their desks
@@ -72,16 +73,16 @@ export function buildScenario(extras = 0): TimedEvent[] {
 
     // Coder A: read then write
     toolStart(9_800, coder1, PM, "Read", "Read src/tailer.js"),
-    say(10_500, coder1, PM, "Xem code cũ trước…"),
+    say(10_500, coder1, PM, t("demo.readOld")),
     toolEnd(13_000, coder1, PM, "Read", true),
     toolStart(13_400, coder1, PM, "Write", "Write src/feature.ts"),
     toolEnd(19_000, coder1, PM, "Write", true),
 
     // Coder B: bash test run → error → recover
     toolStart(10_400, coder2, PM, "Bash", "npm test"),
-    say(11_200, coder2, PM, "Chạy test suite…"),
+    say(11_200, coder2, PM, t("demo.runTests")),
     toolEnd(16_000, coder2, PM, "Bash", false, "3 tests failed"),
-    say(16_400, coder2, PM, "Test đỏ rồi — sửa đây 😅"),
+    say(16_400, coder2, PM, t("demo.testsRed")),
     status(18_500, coder2, PM, "working", "fixing failing tests"),
     toolStart(19_000, coder2, PM, "Edit", "Edit src/normalize.js"),
     toolEnd(23_500, coder2, PM, "Edit", true),
@@ -93,7 +94,7 @@ export function buildScenario(extras = 0): TimedEvent[] {
     toolStart(11_000, tester, PM, "Read", "Read test plan"),
     toolEnd(14_000, tester, PM, "Read", true),
     status(15_000, tester, PM, "waiting_permission", "Bash: rm -rf dist — needs approval"),
-    say(15_400, tester, PM, "Cần anh duyệt lệnh này!"),
+    say(15_400, tester, PM, t("demo.needApproval")),
     status(24_000, tester, PM, "running_command", "approved — running"),
     toolStart(24_200, tester, PM, "Bash", "rm -rf dist && npm run build"),
     toolEnd(30_000, tester, PM, "Bash", true),
@@ -103,11 +104,11 @@ export function buildScenario(extras = 0): TimedEvent[] {
     toolEnd(14_500, reviewer, PM, "Grep", true),
     toolStart(15_500, reviewer, PM, "Read", "Read diff"),
     toolEnd(21_000, reviewer, PM, "Read", true),
-    say(21_500, reviewer, PM, "Diff sạch, 1 nit nhỏ."),
+    say(21_500, reviewer, PM, t("demo.cleanDiff")),
     status(22_000, reviewer, PM, "working", "writing review notes"),
 
     // wrap-up: each sub-agent reports & despawns
-    say(31_000, coder1, PM, "Xong phần của em!"),
+    say(31_000, coder1, PM, t("demo.myPartDone")),
     status(31_200, coder1, PM, "done"),
     ev(33_000, "agent_despawned", coder1, PM, { reason: "task complete" }),
     status(32_000, tester, PM, "done"),
@@ -121,14 +122,14 @@ export function buildScenario(extras = 0): TimedEvent[] {
     // alert while you're watching acme-web ──────────────────────────────
     ev(4_000, "agent_spawned", demoApp, null, { name: "demo-app session", role: null, cwd: "/Users/you/Projects/demo-app" }),
     toolStart(5_000, demoApp, null, "Bash", "npm run test:e2e"),
-    say(6_000, demoApp, null, "Chạy e2e bên demo-app…"),
+    say(6_000, demoApp, null, t("demo.e2e")),
     status(17_000, demoApp, null, "waiting_permission", "Bash: npx playwright install — needs approval"),
     status(26_000, demoApp, null, "running_command", "approved — running"),
     toolEnd(33_000, demoApp, null, "Bash", true, "e2e green"),
     status(35_000, demoApp, null, "done"),
     ev(45_000, "agent_despawned", demoApp, null, { reason: "task complete" }),
 
-    say(38_500, PM, null, "Tổng hợp kết quả, viết báo cáo."),
+    say(38_500, PM, null, t("demo.report")),
     toolStart(39_000, PM, null, "Write", "Write docs/report.md"),
     toolEnd(43_000, PM, null, "Write", true),
     say(43_500, PM, null, "Done! 🎉"),

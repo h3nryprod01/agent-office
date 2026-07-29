@@ -16,6 +16,7 @@
 // Colour comes from a Skin (body / accent / screen), not a single hue, so a room
 // full of agents reads as varied instead of ten shades of the same tint.
 
+import { t } from "../i18n";
 import * as THREE from "three";
 
 export interface Skin {
@@ -34,15 +35,15 @@ export type RobotBuilder = (skin: Skin) => Built;
 /** 10 skins — 8 dark chassis + 2 light, each with a matching lit face. */
 export const SKINS: Skin[] = [
   { id: "cyber", name: "Cyber", body: 0x1b2433, accent: 0x0deef3, screen: 0x18ffff },
-  { id: "ember", name: "Lửa", body: 0x2b1f18, accent: 0xff9100, screen: 0xf5a623 },
-  { id: "matrix", name: "Lục", body: 0x15251d, accent: 0x00e676, screen: 0x69f0ae },
-  { id: "magenta", name: "Hồng tím", body: 0x241a2b, accent: 0xe040fb, screen: 0xff4081 },
+  { id: "ember", name: t("robot.color.fire"), body: 0x2b1f18, accent: 0xff9100, screen: 0xf5a623 },
+  { id: "matrix", name: t("robot.color.green"), body: 0x15251d, accent: 0x00e676, screen: 0x69f0ae },
+  { id: "magenta", name: t("robot.color.magenta"), body: 0x241a2b, accent: 0xe040fb, screen: 0xff4081 },
   { id: "cobalt", name: "Coban", body: 0x161f33, accent: 0x448aff, screen: 0x18ffff },
-  { id: "violet", name: "Tím", body: 0x1e1a33, accent: 0x7c4dff, screen: 0xb388ff },
-  { id: "rose", name: "Hồng", body: 0x2b1a22, accent: 0xff4081, screen: 0xff80ab },
-  { id: "mint", name: "Bạc hà", body: 0x16292a, accent: 0x69f0ae, screen: 0xa7ffeb },
-  { id: "snow", name: "Trắng", body: 0xdfe6f0, accent: 0x0deef3, screen: 0x18ffff },
-  { id: "sand", name: "Cát", body: 0xc9b79c, accent: 0xff9100, screen: 0xffd180 },
+  { id: "violet", name: t("robot.color.purple"), body: 0x1e1a33, accent: 0x7c4dff, screen: 0xb388ff },
+  { id: "rose", name: t("robot.color.pink"), body: 0x2b1a22, accent: 0xff4081, screen: 0xff80ab },
+  { id: "mint", name: t("robot.color.mint"), body: 0x16292a, accent: 0x69f0ae, screen: 0xa7ffeb },
+  { id: "snow", name: t("robot.color.white"), body: 0xdfe6f0, accent: 0x0deef3, screen: 0x18ffff },
+  { id: "sand", name: t("robot.color.sand"), body: 0xc9b79c, accent: 0xff9100, screen: 0xffd180 },
 ];
 
 // ── materials ──
@@ -224,16 +225,16 @@ const cube: RobotBuilder = (s) => {
 
 /** every design. `note` is short enough to sit on the 3D label. */
 export const ROBOTS: { id: string; name: string; note: string; build: RobotBuilder }[] = [
-  { id: "blocky", name: "Khối vuông", note: "voxel, thân thiện", build: blocky },
-  { id: "capsule", name: "Viên nang", note: "bo tròn, mềm, có visor", build: capsule },
-  { id: "hover", name: "Bay lơ lửng", note: "không chân — bay", build: hover },
-  { id: "mech", name: "Máy móc nặng", note: "to, công nghiệp, giáp vai", build: mech },
-  { id: "android", name: "Người máy thon", note: "cao, mảnh, thanh lịch", build: android },
-  { id: "retro", name: "Cổ điển", note: "robot thiếc 1950s", build: retro },
-  { id: "orb", name: "Mắt thần", note: "một mắt bay — tối giản", build: orb },
-  { id: "quad", name: "Bốn chân", note: "thú máy — thấp, bò", build: quad },
-  { id: "screen", name: "Đầu màn hình", note: "đầu = màn hình", build: screenHead },
-  { id: "cube", name: "Lập phương", note: "khối bay + tay rời", build: cube },
+  { id: "blocky", name: t("robot.body.boxy"), note: t("robot.body.boxyDesc"), build: blocky },
+  { id: "capsule", name: t("robot.body.capsule"), note: t("robot.body.capsuleDesc"), build: capsule },
+  { id: "hover", name: t("robot.body.hover"), note: t("robot.body.hoverDesc"), build: hover },
+  { id: "mech", name: t("robot.body.heavy"), note: t("robot.body.heavyDesc"), build: mech },
+  { id: "android", name: t("robot.body.slim"), note: t("robot.body.slimDesc"), build: android },
+  { id: "retro", name: t("robot.body.retro"), note: t("robot.body.retroDesc"), build: retro },
+  { id: "orb", name: t("robot.body.eye"), note: t("robot.body.eyeDesc"), build: orb },
+  { id: "quad", name: t("robot.body.quad"), note: t("robot.body.quadDesc"), build: quad },
+  { id: "screen", name: t("robot.body.screen"), note: t("robot.body.screenDesc"), build: screenHead },
+  { id: "cube", name: t("robot.body.cube"), note: t("robot.body.cubeDesc"), build: cube },
 ];
 
 /** the design the office uses (chosen 2026-07-16) */

@@ -258,7 +258,7 @@ describe("createVoiceMachine", () => {
 // ── wi-pm-ux: TTS language detection + markdown stripping ──────────────────
 describe("detectLang", () => {
   it("Vietnamese diacritics → vi-VN", () => {
-    expect(detectLang("Đã xong 3 việc, còn 2 việc đang chạy nhé")).toBe("vi-VN");
+    expect(detectLang("Done 3 việc, còn 2 việc đang chạy nhé")).toBe("vi-VN");
     expect(detectLang("ổn")).toBe("vi-VN");
     expect(detectLang("ĐANG LÀM")).toBe("vi-VN");
   });
@@ -275,8 +275,8 @@ describe("detectLang", () => {
 
 describe("stripForSpeech", () => {
   it("strips bold/italic/headers/bullets/inline code", () => {
-    expect(stripForSpeech("## Trạng thái\n- **wi-a**: `done`\n- _wi-b_: chạy")).toBe(
-      "Trạng thái wi-a: done wi-b: chạy",
+    expect(stripForSpeech("## Status\n- **wi-a**: `done`\n- _wi-b_: chạy")).toBe(
+      "Status wi-a: done wi-b: chạy",
     );
   });
 
@@ -288,11 +288,11 @@ describe("stripForSpeech", () => {
 
   it("markdown table becomes 'bảng N dòng' instead of pipes", () => {
     const md = "Kết quả:\n| wi | status |\n|---|---|\n| a | done |\n| b | doing |";
-    expect(stripForSpeech(md)).toBe("Kết quả: bảng 2 dòng");
+    expect(stripForSpeech(md)).toBe("Kết quả: table, 2 rows");
   });
 
   it("plain text passes through untouched", () => {
-    expect(stripForSpeech("Đã xong hết rồi.")).toBe("Đã xong hết rồi.");
+    expect(stripForSpeech("Done hết rồi.")).toBe("Done hết rồi.");
   });
 });
 
@@ -397,7 +397,7 @@ describe("createSpeaker — router VieNeu/system (wi-voice-vieneu)", () => {
 
   it("tab ẩn thì im: mở nhiều tab office không còn chồng giọng", async () => {
     const { speaker, fetched } = speakerHarness({ hidden: true });
-    speaker.speak("Chào anh. Đã xong việc thứ nhất.");
+    speaker.speak("Chào anh. Done việc thứ nhất.");
     await tick();
     expect(fetched).toEqual([]); // không gọi /tts
     expect(FakeAudio.all.length).toBe(0); // không phát gì
@@ -413,9 +413,9 @@ describe("createSpeaker — router VieNeu/system (wi-voice-vieneu)", () => {
 
   it("reply Việt → VieNeu: fetch từng câu theo thứ tự, phát <audio>, không đụng speechSynthesis", async () => {
     const { speaker, synth, fetched, revoked } = speakerHarness();
-    speaker.speak("Chào anh. Đã xong việc thứ nhất.");
+    speaker.speak("Chào anh. Done việc thứ nhất.");
     await tick();
-    expect(fetched).toEqual(["Chào anh.", "Đã xong việc thứ nhất."]); // câu 2 prefetch ngay
+    expect(fetched).toEqual(["Chào anh.", "Done việc thứ nhất."]); // câu 2 prefetch ngay
     expect(FakeAudio.all.length).toBe(1);
     expect(FakeAudio.all[0]!.url).toBe("blob:Chào anh.");
 
@@ -425,7 +425,7 @@ describe("createSpeaker — router VieNeu/system (wi-voice-vieneu)", () => {
     FakeAudio.all[1]!.onended?.();
     await tick();
     expect(synth.spoken).toEqual([]); // không rơi về giọng hệ thống
-    expect(revoked).toEqual(["blob:Chào anh.", "blob:Đã xong việc thứ nhất."]);
+    expect(revoked).toEqual(["blob:Chào anh.", "blob:Done việc thứ nhất."]);
   });
 
   it("reply English cũng đi VieNeu (Đoan) — KHÔNG dùng speechSynthesis", async () => {
@@ -488,9 +488,9 @@ describe("createSpeaker — router VieNeu/system (wi-voice-vieneu)", () => {
 
   it("VI line → VieNeu (Đoan), không đụng speechSynthesis", async () => {
     const { speaker, synth, fetched } = speakerHarness();
-    speaker.speak("Đã xong việc.");
+    speaker.speak("Done việc.");
     await tick();
-    expect(fetched).toContain("Đã xong việc.");
+    expect(fetched).toContain("Done việc.");
     expect(synth.spoken).toEqual([]);
     expect(synth.canceled).toBe(0); // không còn giọng hệ thống nào để phải cancel
   });

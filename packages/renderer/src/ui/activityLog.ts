@@ -6,6 +6,7 @@
 // and no network. mountActivityLog is the DOM binding; it fetches via the
 // injected fetchTranscript (live-mode only — mock degrades to a placeholder).
 
+import { t } from "../i18n";
 export interface TranscriptRow {
   ts: number;
   role: "assistant" | "tool";
@@ -39,18 +40,18 @@ export function toBusiness(input: { tool?: string; text?: string }): string {
     return text.trim();
   }
   if (tool === "Bash") {
-    if (/npm test|vitest|node --test/.test(text)) return "Đang chạy kiểm thử";
-    if (/\bgit /.test(text)) return "Thao tác mã nguồn (git)";
-    if (/\brm[ -]/.test(text)) return "Xoá tệp";
-    if (/\b(cp|mv) /.test(text)) return "Sao chép/di chuyển tệp";
-    if (/npm run build|vite build/.test(text)) return "Đóng gói bản chạy";
-    return "Chạy lệnh hệ thống";
+    if (/npm test|vitest|node --test/.test(text)) return t("activity.runningTests");
+    if (/\bgit /.test(text)) return t("activity.git");
+    if (/\brm[ -]/.test(text)) return t("activity.deleteFile");
+    if (/\b(cp|mv) /.test(text)) return t("activity.moveFile");
+    if (/npm run build|vite build/.test(text)) return t("activity.build");
+    return t("activity.shell");
   }
   const obj = fileObject(text);
-  if (tool === "Read" || tool === "Grep" || tool === "Glob") return obj ? `Đọc: ${obj}` : "Đọc & tra tài liệu";
-  if (tool === "Write" || tool === "Edit") return obj ? `Sửa: ${obj}` : "Soạn/sửa nội dung";
-  if (tool === "WebSearch" || tool === "WebFetch") return "Tra cứu trên web";
-  return "Đang xử lý";
+  if (tool === "Read" || tool === "Grep" || tool === "Glob") return obj ? t("activity.readingNamed", { name: obj }) : t("activity.reading");
+  if (tool === "Write" || tool === "Edit") return obj ? t("activity.editingNamed", { name: obj }) : t("activity.editing");
+  if (tool === "WebSearch" || tool === "WebFetch") return t("activity.web");
+  return t("activity.working");
 }
 
 /**
@@ -80,7 +81,7 @@ export function mountActivityLog(root: HTMLElement, opts: ActivityLogOpts): Acti
   let mode: Mode = "business";
 
   if (!fetchTranscript) {
-    root.innerHTML = `<p class="activity-log-placeholder">Nhật ký chỉ có ở live mode.</p>`;
+    root.innerHTML = `<p class="activity-log-placeholder">${t("activity.liveOnly")}</p>`;
     return { refresh: async () => {} };
   }
   // Rebind so the narrowing survives into the closures below.
@@ -109,11 +110,11 @@ export function mountActivityLog(root: HTMLElement, opts: ActivityLogOpts): Acti
     const items = mode === "tech" ? rows.map(techRow) : coalesceBusiness(rows);
     const listHtml = items.length
       ? items.join("")
-      : `<p class="activity-log-empty">Chưa có hoạt động nào.</p>`;
+      : `<p class="activity-log-empty">${t("activity.empty")}</p>`;
     root.innerHTML =
       `<div class="activity-log-toolbar">` +
-      modeButton("business", "Kinh doanh", mode === "business") +
-      modeButton("tech", "Kỹ thuật", mode === "tech") +
+      modeButton("business", t("activity.business"), mode === "business") +
+      modeButton("tech", t("activity.technical"), mode === "tech") +
       `</div>` +
       `<div class="activity-log-list">${listHtml}</div>`;
   }

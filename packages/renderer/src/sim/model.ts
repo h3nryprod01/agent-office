@@ -1,3 +1,4 @@
+import { t, type Key } from "../i18n";
 import type { AgentStatus } from "../../../protocol/src/events";
 
 /** Where a character stands in the office. Placeholder-station ids. */
@@ -18,26 +19,14 @@ export interface TimelineEntry {
   status?: AgentStatus;
 }
 
-/** Friendly Vietnamese label for a raw agent status — for non-tech readers. Pure. */
-export function statusLabelVi(status: AgentStatus): string {
-  switch (status) {
-    case "working":
-      return "Đang làm việc";
-    case "reading":
-      return "Đang đọc tài liệu";
-    case "running_command":
-      return "Đang chạy lệnh";
-    case "waiting_permission":
-      return "Chờ bạn duyệt";
-    case "blocked":
-      return "Đang kẹt";
-    case "error":
-      return "Gặp lỗi";
-    case "idle":
-      return "Đang rảnh";
-    case "done":
-      return "Đã xong";
-  }
+/**
+ * Plain-language label for a raw agent status, in the current UI language.
+ *
+ * Deliberately not the enum name: someone glancing at the office should read
+ * "Waiting for you", not `waiting_permission`.
+ */
+export function statusLabel(status: AgentStatus): string {
+  return t(`status.${status}` as Key);
 }
 
 /** Timeline rows kept per agent — enough for the side panel, tiny in memory. */

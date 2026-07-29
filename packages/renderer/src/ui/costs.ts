@@ -4,6 +4,7 @@
 // library. HTML builders are pure string functions so they unit-test
 // without a browser.
 
+import { t } from "../i18n";
 import type { WorkItem, WorkItemsFile } from "./workItems";
 
 export type CostWindow = "24h" | "7d" | "30d";
@@ -86,7 +87,7 @@ export function costsPanelHtml(data: CostsPayload, workItems: WorkItem[]): strin
       : "";
   const budget =
     data.overBudget && data.budgetUsd
-      ? `<p class="cost-overbudget">⚠ Vượt ngân sách: ${fmtUsd(data.totalUsd)} / ${fmtUsd(data.budgetUsd)}. Yêu cầu cần duyệt sẽ chờ bạn duyệt vượt.</p>`
+      ? `<p class="cost-overbudget">${t("costs.overBudget", { spent: fmtUsd(data.totalUsd), budget: fmtUsd(data.budgetUsd) })}</p>`
       : "";
   return `
     <div class="cost-head">${windows}</div>
@@ -97,7 +98,7 @@ export function costsPanelHtml(data: CostsPayload, workItems: WorkItem[]): strin
     ${costTableHtml("Theo harness", (data.byHarness ?? []).map((r) => ({ ...r, label: r.harness })))}
     ${costTableHtml("Theo repo", data.byRepo.map((r) => ({ ...r, label: r.repo })))}
     ${costTableHtml("Theo agent", data.byAgent.map((r) => ({ ...r, label: agentLabel(r.sessionId, workItems) })))}
-    ${costTableHtml("Theo ngày", data.byDay.map((r) => ({ ...r, label: r.day })))}
+    ${costTableHtml(t("costs.byDay"), data.byDay.map((r) => ({ ...r, label: r.day })))}
   `;
 }
 
@@ -111,7 +112,7 @@ export function mountCosts(
     // office: no daemon, no widget. R13-B promoted it to a nav tab, and a hidden
     // tab is a blank screen — the 💰 click landed on nothing at all. Say what
     // Bảng việc and Nhật ký say instead.
-    root.innerHTML = `<p class="costs-placeholder">Chi phí chỉ có ở live mode.</p>`;
+    root.innerHTML = `<p class="costs-placeholder">${t("costs.liveOnly")}</p>`;
     return { expand: () => {} };
   }
   root.classList.add("costs");
@@ -122,11 +123,11 @@ export function mountCosts(
 
   function render(): void {
     const label = data
-      ? `${data.overBudget ? "⚠ " : ""}Chi phí · ${fmtUsd(data.totalUsd)}`
-      : "Chi phí";
+      ? `${data.overBudget ? "⚠ " : ""}${t("nav.costs")} · ${fmtUsd(data.totalUsd)}`
+      : t("nav.costs");
     const header = `<button class="costs-toggle">${label}</button>`;
     const body = open
-      ? `<div class="costs-panel">${data ? costsPanelHtml(data, workItems) : `<p class="placeholder">Đang tải…</p>`}</div>`
+      ? `<div class="costs-panel">${data ? costsPanelHtml(data, workItems) : `<p class="placeholder">${t("costs.loading")}</p>`}</div>`
       : "";
     root.innerHTML = header + body;
   }

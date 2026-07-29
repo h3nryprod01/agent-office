@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { OfficeState } from "../sim/model";
 import { orgForest, type OrgNode, type OrgRepoTree } from "../sim/selectors";
 import type { TabKey } from "./officeTabs";
@@ -15,7 +16,7 @@ export function mountOrgChart(
   onSelect: (agentId: string) => void,
 ): void {
   root.classList.add("orgchart");
-  root.innerHTML = `<button class="orgchart-toggle">Sơ đồ tổ chức</button><div class="orgchart-overlay" hidden></div>`;
+  root.innerHTML = `<button class="orgchart-toggle">${t("org.button")}</button><div class="orgchart-overlay" hidden></div>`;
   const overlay = root.querySelector<HTMLElement>(".orgchart-overlay")!;
   let timer: ReturnType<typeof setInterval> | null = null;
   let lastSig = "";
@@ -35,8 +36,8 @@ export function mountOrgChart(
     lastSig = sig;
     overlay.innerHTML = `
       <div class="orgchart-panel">
-        <h2>Sơ đồ tổ chức <button class="orgchart-close" title="Đóng">✕</button></h2>
-        ${shown.map(repoHtml).join("") || `<p class="empty">Chưa có agent nào đang chạy.</p>`}
+        <h2>${t("org.title")} <button class="orgchart-close" title="${t("panel.close")}">✕</button></h2>
+        ${shown.map(repoHtml).join("") || `<p class="empty">${t("org.empty")}</p>`}
       </div>`;
   }
 

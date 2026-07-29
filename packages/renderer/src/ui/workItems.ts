@@ -2,6 +2,7 @@
 // the HTML fragments shared by the side panel and the mini board. Pure
 // string-building so the match/render logic is unit-testable without DOM.
 
+import { t } from "../i18n";
 /** One entry of the daemon's GET /work-items payload. */
 export interface WorkItem {
   id: string;
@@ -111,10 +112,10 @@ export function whyChainHtml(item: WorkItem, items: readonly WorkItem[]): string
   const rows = chain
     .map(
       (it, i) =>
-        `<div class="why-row">${i === 0 ? "" : '<span class="why-arrow">vì →</span> '}${esc(it.title)}</div>`,
+        `<div class="why-row">${i === 0 ? "" : '<span class="why-arrow">${t("work.because")}</span> '}${esc(it.title)}</div>`,
     )
     .join("");
-  return `<div class="why-chain"><div class="why-label">Vì sao</div>${rows}</div>`;
+  return `<div class="why-chain"><div class="why-label">${t("work.whyLabel")}</div>${rows}</div>`;
 }
 
 /**
@@ -126,14 +127,14 @@ export function workItemSectionHtml(
   items?: WorkItem[] | null,
 ): string {
   if (items === undefined) {
-    return `<p class="placeholder">Work item chỉ có ở live mode (?ws=1).</p>`;
+    return `<p class="placeholder">${t("work.liveOnly")}</p>`;
   }
   if (items === null) {
-    return `<p class="placeholder">Đang tải…</p>`;
+    return `<p class="placeholder">${t("panel.loading")}</p>`;
   }
   const item = matchWorkItem(agent, items);
   if (!item) {
-    return `<p class="placeholder">Không có work item cho agent này.</p>`;
+    return `<p class="placeholder">${t("work.none")}</p>`;
   }
   const status = item.status ?? "unknown";
   return `

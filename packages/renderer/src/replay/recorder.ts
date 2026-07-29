@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { OfficeEvent } from "../../../protocol/src/events";
 
 /** Ring-buffer cap — ~50k events is hours of a busy session, few MB of JSON. */
@@ -71,11 +72,11 @@ export function parseReplayFile(text: string): OfficeEvent[] {
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error("File không phải JSON hợp lệ");
+    throw new Error(t("timeline.notJson"));
   }
   const file = data as Partial<ReplayFile>;
   if (file?.format !== EXPORT_FORMAT || !Array.isArray(file.events)) {
-    throw new Error("Không phải file replay Agent Office");
+    throw new Error(t("timeline.notReplayFile"));
   }
   const events = (file.events as unknown[]).filter((e): e is OfficeEvent => {
     const ev = e as Partial<OfficeEvent> | null;

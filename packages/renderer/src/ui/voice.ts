@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 /**
  * Voice for the PM chatbox (Round 6, wi-voice) — zero dependencies.
  *
@@ -196,16 +197,16 @@ export function detectLang(text: string): "vi-VN" | "en-US" {
  * noise. Strip to plain text; a markdown table collapses to "bảng N dòng".
  */
 export function stripForSpeech(text: string): string {
-  let t = text.replace(/```[\s\S]*?```/g, " ");
-  const lines = t.split("\n");
+  let out = text.replace(/```[\s\S]*?```/g, " ");
+  const lines = out.split("\n");
   const isTableRow = (l: string): boolean => /^\s*\|.*\|\s*$/.test(l);
   const tableRows = lines.filter(isTableRow);
   if (tableRows.length >= 2) {
     // header + separator + data rows → read a summary instead of pipes
     const dataRows = tableRows.filter((l) => !/^\s*\|[\s:|-]+\|\s*$/.test(l)).length - 1;
-    t = [...lines.filter((l) => !isTableRow(l)), `bảng ${Math.max(dataRows, 0)} dòng`].join("\n");
+    out = [...lines.filter((l) => !isTableRow(l)), t("voice.tableSummary", { rows: Math.max(dataRows, 0) })].join("\n");
   }
-  return t
+  return out
     .replace(/`([^`]*)`/g, "$1")
     .replace(/https?:\/\/\S+/g, " ")
     .replace(/^#{1,6}\s+/gm, "")
@@ -451,7 +452,7 @@ export function wireVoice(o: WireVoiceOpts): VoiceHandle {
   const speaker = createSpeaker(o.onSpeaking, {
     fetchTtsUrl,
     onFallbackHint: () =>
-      o.appendSystemLine("🗣️ Giọng đọc (VieNeu) tạm lỗi ở câu này — thử lại hoặc tải lại trang."),
+      o.appendSystemLine(t("voice.ttsGlitch")),
   });
 
   const machine = createVoiceMachine(() => (Ctor ? new Ctor() : null), {
@@ -465,7 +466,7 @@ export function wireVoice(o: WireVoiceOpts): VoiceHandle {
     },
     onError: (code) => {
       if (code === "not-allowed" || code === "service-not-allowed") {
-        o.appendSystemLine("Mic bị chặn — cấp quyền microphone cho trang này rồi thử lại.");
+        o.appendSystemLine(t("voice.micBlocked"));
         return;
       }
       // "aborted" = user tự huỷ, "no-speech" = không nói gì: im lặng là đúng.
@@ -475,17 +476,17 @@ export function wireVoice(o: WireVoiceOpts): VoiceHandle {
       if (code === "aborted" || code === "no-speech") return;
       o.appendSystemLine(
         code === "network"
-          ? "Nhận giọng nói lỗi mạng — Web Speech của Chrome cần gọi server Google; kiểm tra VPN/tường lửa."
-          : `Nhận giọng nói lỗi: ${code}`,
+          ? t("voice.networkError")
+          : t("voice.error", { code }),
       );
     },
   });
 
   if (!Ctor) {
     o.micBtn.disabled = true;
-    o.micBtn.title = "Trình duyệt không hỗ trợ Web Speech API — thử Chrome/Edge";
+    o.micBtn.title = t("voice.unsupported");
   } else {
-    o.micBtn.title = "Bấm để nói (hoặc giữ Space khi không gõ) — thả ra là gửi, Esc để hủy";
+    o.micBtn.title = t("voice.micTitle");
     o.micBtn.addEventListener("click", () => {
       if (machine.status() === "listening") machine.stop();
       else machine.start();
@@ -495,13 +496,13 @@ export function wireVoice(o: WireVoiceOpts): VoiceHandle {
 
   if (!speaker.supported) {
     o.speakerBtn.disabled = true;
-    o.speakerBtn.title = "Trình duyệt không hỗ trợ speechSynthesis";
+    o.speakerBtn.title = t("voice.ttsUnsupported");
   } else {
     const paint = (): void => {
       o.speakerBtn.classList.toggle("on", speaker.enabled());
       o.speakerBtn.title = speaker.enabled()
-        ? "Đang đọc to reply của PM — bấm để tắt"
-        : "Bấm để PM đọc to reply (mặc định tắt)";
+        ? t("voice.ttsOn")
+        : t("voice.ttsOff");
     };
     paint();
     o.speakerBtn.addEventListener("click", () => {
