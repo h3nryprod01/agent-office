@@ -141,3 +141,20 @@ describe("daemon v1 -> protocol v0 adapter", () => {
     expect(out[0]).toMatchObject({ type: "agent_status_changed", status: "running_command" });
   });
 });
+
+// lane L3: harness / lane reach the renderer
+describe("harness and lane", () => {
+  it("agent_spawned carries harness; later events carry lane (the worker's model is only known after its first reply)", () => {
+    const adapt = makeAdapter();
+    const spawn = adapt(v1({ type: "session_start", status: "start", harness: "claude-worker", lane: null }));
+    expect(spawn.find((e) => e.type === "agent_spawned")).toMatchObject({ harness: "claude-worker", lane: null });
+    const later = adapt(v1({ type: "tool_call", tool: "Read", status: "start", harness: "claude-worker", lane: "deepseek" }));
+    expect(later[0]).toMatchObject({ type: "tool_call_started", lane: "deepseek" });
+  });
+
+  it("a pre-L3 daemon (no lane field) still adapts: lane is simply absent/null", () => {
+    const adapt = makeAdapter();
+    const out = adapt(v1({ type: "session_start", status: "start", harness: "claude-code" }));
+    expect(out.find((e) => e.type === "agent_spawned")).toMatchObject({ harness: "claude-code", lane: null });
+  });
+});

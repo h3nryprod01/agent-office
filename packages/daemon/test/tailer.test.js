@@ -91,3 +91,43 @@ test("ticks never overlap: a tick started while one is in flight is a no-op", as
 
   rmSync(root, { recursive: true, force: true });
 });
+
+test("several roots: each file is tagged with its root's harness; a nonexistent root contributes nothing", async () => {
+  const { mkdirSync } = await import("node:fs");
+  const a = makeRoot();
+  const b = makeRoot();
+  mkdirSync(a.project, { recursive: true });
+  mkdirSync(b.project, { recursive: true });
+  const SID_B = "bbbbbbbb-977b-449f-9a3d-7570a5720c9d";
+  writeFileSync(a.filePath, LINE);
+  writeFileSync(path.join(b.project, `${SID_B}.jsonl`), LINE.repeat(2));
+
+  const tailer = new TranscriptTailer({
+    roots: [
+      { root: a.root, harness: "claude-code" },
+      { root: b.root, harness: "claude-worker" },
+      { root: path.join(a.root, "does-not-exist"), harness: "claude-worker" },
+    ],
+  });
+  const lines = collect(tailer);
+  await tailer._tick();
+  assert.deepEqual(
+    lines.map((l) => [l.sessionId, l.harness]),
+    [[SID, "claude-code"], [SID_B, "claude-worker"], [SID_B, "claude-worker"]],
+  );
+
+  rmSync(a.root, { recursive: true, force: true });
+  rmSync(b.root, { recursive: true, force: true });
+});
+
+test("projectsRoot alone still means one claude-code root", async () => {
+  const { mkdirSync } = await import("node:fs");
+  const { root, project, filePath } = makeRoot();
+  mkdirSync(project, { recursive: true });
+  writeFileSync(filePath, LINE);
+  const tailer = new TranscriptTailer({ projectsRoot: root });
+  const lines = collect(tailer);
+  await tailer._tick();
+  assert.equal(lines[0].harness, "claude-code");
+  rmSync(root, { recursive: true, force: true });
+});

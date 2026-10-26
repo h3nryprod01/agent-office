@@ -3,6 +3,7 @@ import { statusLabel, type AgentModel, type OfficeState, type TimelineEntry } fr
 import { toBusiness } from "./activityLog";
 import { formatSince } from "../sim/selectors";
 import { workItemSectionHtml, type WorkItem, type WorkItemsFile } from "./workItems";
+import { vendorBadgeHtml } from "./vendor";
 
 /** One transcript line from the daemon's GET /transcript endpoint. */
 export interface TranscriptLine {
@@ -165,6 +166,7 @@ export function mountSidePanel(
       agent.status,
       agent.statusDetail,
       agent.currentTool,
+      agent.lane, // lane L3: the vendor badge appears once the worker's first reply names its model
       agent.timeline.length,
       transcript?.length ?? -1,
       workItemSection,
@@ -236,6 +238,8 @@ function panelHtml(
         ]
       : []),
     [t("panel.status"), `<span class="status-chip status-${a.status}">${esc(statusLabel(a.status))}</span> · <span data-since>${formatSince(a.statusSince, now)}</span>`],
+    // lane L3: plain Claude agents keep the panel exactly as before; only other vendors get a row
+    ...(a.harness !== "claude-code" || a.lane ? [[t("panel.vendor"), vendorBadgeHtml(a.harness, a.lane)]] : []),
     [t("panel.detail"), a.statusDetail ? esc(a.statusDetail) : "—"],
     [t("wall.inProgress"), a.currentTool ? esc(toBusiness({ tool: a.currentTool })) : "—"],
     [t("panel.cwd"), a.cwd ? `<code>${esc(a.cwd)}</code>` : "—"],

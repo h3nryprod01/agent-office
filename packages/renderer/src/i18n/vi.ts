@@ -333,4 +333,14 @@ export const vi: Record<string, string> = {
   "wall.scrumBoard": "BẢNG VIỆC",
   "chat.note": "\u24d8 chat kh\u00f4ng duy\u1ec7t \u0111\u01b0\u1ee3c permission \u2014 x\u1eed l\u00fd \u1edf app g\u1ed1c \u00b7 m\u1ed7i tin = 1 turn Claude th\u1eadt",
   "org.counts": "{total} agent · {working} làm · {blocked} kẹt · {done} xong",
+  // lane L3: đội đa hãng — làn worker, scorecard, nhãn hãng
+  "panel.vendor": "Hãng",
+  "costs.lanes": "Làn worker",
+  "costs.lanes.jobs": "Việc",
+  "costs.lanes.pass": "Qua review",
+  "costs.lanes.logged": "Ghi sổ $",
+  "costs.lanes.est": "Ước tính $",
+  "costs.lanes.tokens": "Tokens",
+  "costs.lanes.note":
+    "Việc, Qua review và Ghi sổ $ lấy từ nhật ký worker-run và review của bạn (Ghi sổ $ là chi phí chính xác của các lần chạy headless). Ước tính $ tính từ token theo giá công bố — gói trả phí cố định chỉ hiện token. — nghĩa là chưa có dữ liệu.",
 };

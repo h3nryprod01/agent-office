@@ -35,12 +35,21 @@ import { createStaticHttpHandler } from "./static-serve.js";
 import { createOriginGuard } from "./origin-guard.js";
 // lane L1: LAN access control (token auth for non-loopback requests)
 import { AccessStore, createAccessGuard, combineGuards, resolveBindHost, watchRevocations } from "./access.js";
+// lane L3: multi-vendor team — worker roots, Hermes, scorecard
+import { resolveClaudeRoots } from "./worker-lanes.js";
+import { HermesTailer } from "./hermes-tailer.js";
+import { HermesSessionNormalizer } from "./hermes-normalize.js";
+import { createScorecardHttpHandler } from "./scorecard.js";
 
 const PROJECTS_ROOT =
   process.env.CLAUDE_PROJECTS_ROOT ?? path.join(os.homedir(), ".claude", "projects");
 const CODEX_SESSIONS_ROOT =
   process.env.CODEX_SESSIONS_ROOT ?? path.join(os.homedir(), ".codex", "sessions");
 const GEMINI_TMP_ROOT = process.env.GEMINI_TMP_ROOT ?? path.join(os.homedir(), ".gemini", "tmp");
+// lane L3: Claude-format roots (main + ~/.claude-worker + AGENT_OFFICE_CLAUDE_ROOTS) and Hermes' SQLite store
+const CLAUDE_ROOTS = resolveClaudeRoots();
+const HERMES_DB_PATH =
+  process.env.HERMES_DB_PATH ?? path.join(process.env.HERMES_HOME ?? path.join(os.homedir(), ".hermes"), "state.db");
 const WS_PORT = Number(process.env.DAEMON_WS_PORT ?? 8787);
 // lane L1: ~/.agent-office/access.json decides the default bind (127.0.0.1 unless LAN mode is on)
 const accessStore = new AccessStore();
@@ -88,11 +97,14 @@ async function main() {
   const budgetUsd = Number(process.env.AGENT_OFFICE_BUDGET_USD) || null;
   const usageIndex = new UsageCostIndex({
     projectsRoot: PROJECTS_ROOT,
+    claudeRoots: CLAUDE_ROOTS, // lane L3
+    hermesDbPath: HERMES_DB_PATH, // lane L3
     codexSessionsRoot: CODEX_SESSIONS_ROOT,
     geminiTmpRoot: GEMINI_TMP_ROOT,
     budgetUsd,
   });
   const costsHttp = createCostsHttpHandler(usageIndex);
+  const scorecardHttp = createScorecardHttpHandler(); // lane L3
   // Filing cabinet (wi-office-life): needs server.workItemsPath, which only
   // exists once `server` is constructed — same lazy-reference trick as
   // approvalBroker's hasClients above (assigned before any request can land).
@@ -129,6 +141,7 @@ async function main() {
       zaloHttp(req, res, url) ||
       approvalHttp(req, res, url) ||
       costsHttp(req, res, url) ||
+      scorecardHttp(req, res, url) || // lane L3
       outputsHttp(req, res, url) ||
       rosterHttp(req, res, url) ||
       templatesHttp(req, res, url) ||
@@ -181,7 +194,7 @@ async function main() {
   );
   console.log(`[daemon] WebSocket server listening on ws://${WS_HOST}:${WS_PORT}`);
   console.log(`[daemon] serving work registry from ${server.workItemsPath}`);
-  console.log(`[daemon] tailing transcripts under ${PROJECTS_ROOT}`);
+  console.log(`[daemon] tailing transcripts under ${CLAUDE_ROOTS.map((r) => `${r.root} (${r.harness})`).join(", ")}`);
   console.log(`[daemon] session inactivity timeout: ${SESSION_INACTIVITY_TIMEOUT_MS}ms`);
   // lane L1: say plainly whether the door is open to the network
   if (!["127.0.0.1", "localhost", "::1"].includes(WS_HOST)) {
@@ -208,6 +221,7 @@ async function main() {
       // (GeminiTailer owns the offsets), so a resumed session re-emits only
       // its idempotent session_start, never replayed history.
       geminiNormalizers.delete(agentId);
+      hermesNormalizers.delete(agentId); // lane L3: same property — the tailer owns the cursor
       if (agentId === sessionId) registry.clearSession(sessionId);
       const event = makeEvent({
         id: `${agentId}:session_end`,
@@ -263,9 +277,9 @@ async function main() {
   hookTailer.start();
   console.log(`[daemon] tailing hook log at ${hookTailer.logPath}`);
 
-  const tailer = new TranscriptTailer({ projectsRoot: PROJECTS_ROOT });
+  const tailer = new TranscriptTailer({ roots: CLAUDE_ROOTS }); // lane L3
 
-  tailer.on("line", ({ sessionId, subagent, line }) => {
+  tailer.on("line", ({ sessionId, subagent, harness, line }) => {
     const agentId = subagent?.agentId ?? sessionId;
     let normalizer = normalizers.get(agentId);
     if (!normalizer) {
@@ -273,6 +287,7 @@ async function main() {
         ? new SessionNormalizer(sessionId, {
             agentId: subagent.agentId,
             registry,
+            harness, // lane L3
             spawnToolUseId: subagent.toolUseId,
             // Workflow sub-agents (subagents/workflows/<runId>/agent-<id>.jsonl)
             // have no toolUseId in their meta.json — there is no tool_use block
@@ -285,7 +300,7 @@ async function main() {
             // session is structurally their parent, not a guess.
             parentId: subagent.toolUseId ? null : sessionId,
           })
-        : new SessionNormalizer(sessionId, { agentId: sessionId, parentId: null, registry });
+        : new SessionNormalizer(sessionId, { agentId: sessionId, parentId: null, registry, harness });
       normalizers.set(agentId, normalizer);
     }
 
@@ -376,6 +391,35 @@ async function main() {
 
   // lane L1: a revoked token also closes the sockets it already opened
   watchRevocations({ store: accessStore, wss: server.wss });
+  // lane L3: Hermes Agent — sessions live in ~/.hermes/state.db (SQLite), see docs/hermes-adapter.md
+  console.log(`[daemon] tailing hermes sessions in ${HERMES_DB_PATH}`);
+  /** @type {Map<string, HermesSessionNormalizer>} keyed by Hermes session id */
+  const hermesNormalizers = new Map();
+  const hermesTailer = new HermesTailer({
+    dbPath: HERMES_DB_PATH,
+    ...(process.env.HERMES_BACKFILL_MAX_AGE_MS
+      ? { backfillMaxAgeMs: Number(process.env.HERMES_BACKFILL_MAX_AGE_MS) }
+      : {}),
+  });
+  hermesTailer.on("message", ({ sessionId, session, message }) => {
+    let normalizer = hermesNormalizers.get(sessionId);
+    if (!normalizer) {
+      normalizer = new HermesSessionNormalizer(sessionId);
+      hermesNormalizers.set(sessionId, normalizer);
+    }
+    for (const event of normalizer.normalizeMessage(message, session)) {
+      server.broadcast(event);
+      endMonitor.touch(event);
+      logEvent(`[event] ${event.type}${event.tool ? `:${event.tool}` : ""} ${event.status ?? ""} (hermes:${event.agent}) ${event.detail}`);
+    }
+  });
+  hermesTailer.on("error", ({ filePath, error }) => {
+    console.error(`[hermes-tailer] error reading ${filePath}:`, error.message);
+  });
+  hermesTailer.on("unavailable", ({ reason }) => {
+    console.warn(`[hermes-tailer] disabled: ${reason}`);
+  });
+  hermesTailer.start();
 
   const shutdown = async () => {
     console.log("\n[daemon] shutting down");
@@ -386,6 +430,7 @@ async function main() {
     hookTailer.stop();
     codexTailer.stop();
     geminiTailer.stop();
+    hermesTailer.stop(); // lane L3
     rosterWatcher.stop();
     endMonitor.stop();
     telegramPoll.stop(); // aborts the in-flight getUpdates long-poll (Telegram allows only 1 consumer)

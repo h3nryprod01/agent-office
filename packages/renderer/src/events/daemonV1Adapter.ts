@@ -22,6 +22,8 @@ interface DaemonV1Event {
   agentId?: string;
   parentId?: string | null;
   harness?: string;
+  /** additive (lane L3): model vendor of a claude-worker agent */
+  lane?: string | null;
   cwd: string | null;
   /** additive (Round 4): repo derived from cwd by the daemon */
   repo?: string;
@@ -62,6 +64,7 @@ export function createDaemonV1Adapter(nowFn: () => number = Date.now) {
       sessionId: e.sessionId,
       agentId,
       parentId: e.parentId ?? null,
+      lane: e.lane ?? null,
     };
 
     const out: OfficeEvent[] = [];

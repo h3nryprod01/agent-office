@@ -52,24 +52,29 @@ const DEFAULT_BACKFILL_MAX_AGE_MS = 5 * 60 * 1000;
  * @property {number} spawnDepth     1 = spawned directly by the root session, 2+ = spawned by
  *                                   another sub-agent (from meta.json; defaults to 1 if absent)
  *
- * @fires TranscriptTailer#line  ({filePath, sessionId, subagent: SubagentContext|null, line: object})
+ * @fires TranscriptTailer#line  ({filePath, sessionId, subagent: SubagentContext|null, harness, line: object})
  * @fires TranscriptTailer#error ({filePath, error})
  */
 export class TranscriptTailer extends EventEmitter {
   /**
    * @param {Object} opts
-   * @param {string} opts.projectsRoot absolute path to ~/.claude/projects
+   * @param {string} [opts.projectsRoot] absolute path to ~/.claude/projects
+   * @param {{root: string, harness: string}[]} [opts.roots] several Claude-format roots
+   *   (main + worker config dirs), each tagged with the harness its agents report;
+   *   overrides `projectsRoot`
    * @param {number} [opts.pollIntervalMs]
    * @param {number} [opts.backfillMaxAgeMs] files idle longer than this when
    *   first seen start tailing at EOF instead of replaying their history
    */
   constructor({
     projectsRoot,
+    roots,
     pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
     backfillMaxAgeMs = DEFAULT_BACKFILL_MAX_AGE_MS,
   }) {
     super();
-    this.projectsRoot = projectsRoot;
+    this.roots = roots ?? [{ root: projectsRoot, harness: "claude-code" }];
+    this.projectsRoot = this.roots[0].root;
     this.pollIntervalMs = pollIntervalMs;
     this.backfillMaxAgeMs = backfillMaxAgeMs;
     /** @type {Map<string, number>} filePath -> bytes already read */
@@ -98,19 +103,21 @@ export class TranscriptTailer extends EventEmitter {
     if (this._ticking) return;
     this._ticking = true;
     try {
-      let files;
-      try {
-        files = await findTranscriptFiles(this.projectsRoot);
-      } catch (error) {
-        this.emit("error", { filePath: this.projectsRoot, error });
-        return;
-      }
-
-      for (const { filePath, subagent } of files) {
+      for (const { root, harness } of this.roots) {
+        let files;
         try {
-          await this._readNewBytes(filePath, subagent);
+          files = await findTranscriptFiles(root);
         } catch (error) {
-          this.emit("error", { filePath, error });
+          this.emit("error", { filePath: root, error });
+          continue; // one unreadable root must not blind the others
+        }
+
+        for (const { filePath, subagent } of files) {
+          try {
+            await this._readNewBytes(filePath, subagent, harness);
+          } catch (error) {
+            this.emit("error", { filePath, error });
+          }
         }
       }
     } finally {
@@ -121,8 +128,9 @@ export class TranscriptTailer extends EventEmitter {
   /**
    * @param {string} filePath
    * @param {SubagentContext|null} subagent
+   * @param {string} [harness] harness of the root this file was found under
    */
-  async _readNewBytes(filePath, subagent) {
+  async _readNewBytes(filePath, subagent, harness = "claude-code") {
     const stats = await stat(filePath);
 
     if (!this.offsets.has(filePath) && Date.now() - stats.mtimeMs > this.backfillMaxAgeMs) {
@@ -135,7 +143,7 @@ export class TranscriptTailer extends EventEmitter {
     if (stats.size < previousOffset) {
       // File shrank/was replaced (e.g. truncated) — restart from the top.
       this.offsets.set(filePath, 0);
-      return this._readNewBytes(filePath, subagent);
+      return this._readNewBytes(filePath, subagent, harness);
     }
     if (stats.size === previousOffset) return; // nothing new
 
@@ -151,7 +159,7 @@ export class TranscriptTailer extends EventEmitter {
       } catch {
         continue; // partial/corrupt line — skip rather than crash the tailer
       }
-      this.emit("line", { filePath, sessionId, subagent, line: parsed });
+      this.emit("line", { filePath, sessionId, subagent, harness, line: parsed });
     }
   }
 }
