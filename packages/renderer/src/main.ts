@@ -31,6 +31,8 @@ import { mountChatBox, type ChatBoxHandle } from "./ui/chatBox";
 import { mountProjectsOverview, type OverviewProject, type Role } from "./ui/projectsOverview"; // lane L5
 import { mountHiringHall, type HiringHallHandle, type RosterPayload } from "./ui/hiringHall";
 import { mountTemplates, type ApplyResult, type TemplateSummary } from "./ui/templates";
+import { mountDocs } from "./ui/docs"; // lane L7
+import { httpDocsApi, parseDocHash, resolveEntryView } from "./ui/docsModel"; // lane L7
 import { EventRecorder } from "./replay/recorder";
 import { createSfx } from "./audio/sfx";
 import type { EventSource } from "./events/EventSource";
@@ -198,6 +200,7 @@ async function boot(): Promise<void> {
     { key: "office", icon: "🏢", label: t("nav.office") },
     { key: "projects", icon: "🧭", label: t("nav.projects") }, // lane L5
     { key: "kanban", icon: "🗂", label: t("nav.board") },
+    { key: "docs", icon: "📄", label: t("nav.docs") }, // lane L7
     { key: "log", icon: "🕑", label: t("nav.log") },
     { key: "costs", icon: "💰", label: t("nav.costs") },
     { key: "settings", icon: "⚙", label: t("nav.settings") },
@@ -211,6 +214,16 @@ async function boot(): Promise<void> {
     // the box, null in mock → no-op). Does NOT auto-send.
     onAssignToPM: (item) =>
       chatHandle?.prefill(t("kanban.askPm", { title: item.title })),
+    // lane L7: a card created by "Request changes" links back to its document
+    onOpenDoc: (project, path) => {
+      setView("docs");
+      void docs.open(project, path);
+    },
+  });
+  // lane L7: Documents tab — browse, comment, approve, edit. Live mode only.
+  const docs = mountDocs(document.querySelector<HTMLElement>("#docs")!, {
+    ...(useWs ? { api: httpDocsApi() } : {}),
+    askPm: (text) => chatHandle?.prefill(text),
   });
   const activityLog = mountActivityLog(document.querySelector<HTMLElement>("#log")!, {
     ...(fetchRecentTranscript ? { fetchTranscript: fetchRecentTranscript } : {}),
@@ -235,7 +248,9 @@ async function boot(): Promise<void> {
         }
       : {}),
   });
-  const homeView = "office"; // refresh always lands on the office (2026-07-22)
+  // refresh lands on the office (2026-07-22) — except for non-coder templates (lane L7), which open
+  // to PM chat + Documents: their people never asked for a 3D office.
+  const homeView = useWs ? await resolveEntryView(httpDocsApi()) : "office";
   const navbar = mountNavbar(document.querySelector<HTMLElement>("#navbar")!, {
     items: navbarItems,
     active: homeView,
@@ -245,6 +260,7 @@ async function boot(): Promise<void> {
     document.body.dataset.view = key;
     navbar.select(key);
     if (key === "kanban") kanban.refresh();
+    if (key === "docs") void docs.refresh();
     if (key === "log") activityLog.refresh();
     if (key === "projects") projectsView.refresh();
     if (key === "costs") costs.expand();
@@ -287,6 +303,16 @@ async function boot(): Promise<void> {
   // happens never to be "costs" or "settings", and the day it is, boot dies on a
   // TDZ ReferenceError with nothing on screen to explain why.
   setView(homeView);
+
+  // lane L7: `#doc=<project>/<path>` deep links (kanban cards, messages) open that document
+  const openDocFromHash = (): void => {
+    const target = parseDocHash(location.hash);
+    if (!target) return;
+    setView("docs");
+    void docs.open(target.project, target.path);
+  };
+  addEventListener("hashchange", openDocFromHash);
+  openDocFromHash();
 
   // Filing cabinet: click the sprite in the
   // office (a tagged prop the 3D raycast resolves) → daemon's GET /outputs / POST /open.

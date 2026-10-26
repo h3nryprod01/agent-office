@@ -50,6 +50,8 @@ import { attachInterventionMetrics, createMetricsHttpHandler } from "./intervent
 import { createSessionOpenHandler } from "./session-open.js";
 import { createAssignmentsHttpHandler } from "./assignments.js"; // lane L6
 import { createMultiPm } from "./multi-pm.js"; // lane L5
+import { createDocsHttpHandler } from "./docs-workspace.js"; // lane L7
+import { createProjectWizardHandler } from "./project-wizard.js"; // lane L7
 
 const PROJECTS_ROOT =
   process.env.CLAUDE_PROJECTS_ROOT ?? path.join(os.homedir(), ".claude", "projects");
@@ -149,6 +151,10 @@ async function main() {
     metricsUrl: (slug) => `http://127.0.0.1:${WS_PORT}/metrics/intervention?project=${encodeURIComponent(slug)}`,
     ...(process.env.CHAT_CLAUDE_BIN ? { claudeBin: process.env.CHAT_CLAUDE_BIN } : {}),
   });
+  // lane L7: document workspace (/docs/*) + new-project wizard (/wizard/*). Pass L1's roleOf(req)
+  // as `{ roleOf }` to both once it exists; until then loopback = owner, any other source = refused.
+  const docsHttp = createDocsHttpHandler();
+  const wizardHttp = createProjectWizardHandler();
   // R13-INFRA: harness install/login probe for the onboarding wizard, and a
   // static handler serving the renderer build (1 process, 1 port).
   const harnessHttp = createHarnessHttpHandler();
@@ -188,6 +194,8 @@ async function main() {
       projectsHttp(req, res, url) ||
       policyHttp(req, res, url) || // lane L2
       assignmentsHttp(req, res, url) || // lane L6
+      docsHttp(req, res, url) || // lane L7
+      wizardHttp(req, res, url) || // lane L7
       harnessHttp(req, res, url) ||
       ttsHttp(req, res, url) ||
       radarHttp(req, res, url) || // lane L4

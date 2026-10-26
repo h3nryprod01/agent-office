@@ -31,7 +31,7 @@ export const DEFAULT_PROJECTS_DIR = path.join(
 const TITLE_MAX = 200;
 const PATCHABLE = ["title", "status", "assignee", "fromIdea", "links"];
 PATCHABLE.push("sopStep", "parentItemId"); // lane L6: which SOP step a member is on; the ancestry link
-const LINK_KEYS = ["pr", "plane", "obsidian", "branch"];
+const LINK_KEYS = ["pr", "plane", "obsidian", "branch", "doc"]; // lane L7: `doc` = project-relative path of a document in the docs workspace
 /** These two are rendered as clickable links — a `javascript:` value would be an injection. */
 const URL_LINK_KEYS = new Set(["pr", "plane"]);
 const LINK_MAX = 500;
@@ -94,6 +94,10 @@ function assertCwdInHome(cwd, homeDir) {
   if (real !== realHome && !real.startsWith(realHome + path.sep)) {
     throw invalid(`cwd must be inside ${realHome}`);
   }
+  // lane L7: ~/.claude, ~/.config, ~/.ssh … hold agent and tool settings; a project cannot live there
+  if (path.relative(realHome, real).split(path.sep)[0].startsWith(".")) {
+    throw invalid("cwd cannot be inside a hidden directory of your home folder");
+  }
   return real;
 }
 
@@ -115,7 +119,7 @@ function assertLinks(links) {
   if (links === null || typeof links !== "object" || Array.isArray(links)) {
     throw invalid("links must be an object");
   }
-  const out = { pr: null, plane: null, obsidian: null, branch: null };
+  const out = { pr: null, plane: null, obsidian: null, branch: null, doc: null };
   for (const [key, value] of Object.entries(links)) {
     if (!LINK_KEYS.includes(key)) throw invalid(`links: unknown field "${key}"`);
     if (value === null || value === undefined) continue;
