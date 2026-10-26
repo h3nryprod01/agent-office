@@ -219,9 +219,9 @@ describe("createMasker — review findings", () => {
     expect(out.repo).toBe("project-1");
   });
 
-  it("MCP server names in `tool` are aliased, built-in tool names kept", () => {
+  it("both parts of an MCP tool name are aliased, built-in tool names kept", () => {
     const m = createMasker();
-    expect((m.mask({ tool: "mcp__acme_crm__lookup" }) as { tool: string }).tool).toBe("mcp__server-1__lookup");
+    expect((m.mask({ tool: "mcp__acme_crm__lookup" }) as { tool: string }).tool).toBe("mcp__server-1__tool-1");
     expect((m.mask({ tool: "Bash" }) as { tool: string }).tool).toBe("Bash");
   });
 

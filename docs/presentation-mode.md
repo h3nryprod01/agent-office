@@ -47,7 +47,9 @@ already-masked replay.
 - Don't *operate* the office while presenting: titles are blurred, so "assign to PM" sends the blurred title, and approval cards show a
   blurred preview (approving still approves the real call).
 - A few vendor/tool words are deliberately left readable (`PUBLIC_WORDS` in `mask.ts`: Read, Bash, Claude, Codex, Hermes, DeepSeek…). If one of them is also a client's
-  project name, remove it from that list. `mcp__<server>__<tool>` has its server part aliased.
+  project name, remove it from that list. `mcp__<server>__<tool>` becomes `mcp__server-1__tool-1`.
+- Known gap: a single-word value under a structural key (`role`, `source`, `status`, `…Id`) is kept as is — e.g. a roster `role: "closer"`.
+  Multi-word values there are blurred.
 - Real names that happen to look like aliases (a repo literally called `project-1`) are treated as already masked.
 
 - It masks data, not pixels: a screenshot of a *non*-masked page is still unmasked. Use the switch **before** opening anything.

@@ -13,7 +13,7 @@
  * (`project-1`, `agent-3`) so the office still reads as a coherent story.
  */
 
-type Kind = "project" | "agent" | "branch" | "dir" | "file" | "link" | "server";
+type Kind = "project" | "agent" | "branch" | "dir" | "file" | "link" | "server" | "tool";
 
 const PREFIX: Record<Kind, string> = {
   project: "project",
@@ -23,6 +23,7 @@ const PREFIX: Record<Kind, string> = {
   file: "file",
   link: "link",
   server: "server",
+  tool: "tool",
 };
 
 /** Keys whose string value is a project / repo / office name. */
@@ -90,7 +91,7 @@ export function createMasker(): Masker {
   const forward = new Map<string, string>();
   /** alias → raw. Aliases are globally unique, so one table serves unmask(). */
   const reverse = new Map<string, string>();
-  const counters: Record<Kind, number> = { project: 0, agent: 0, branch: 0, dir: 0, file: 0, link: 0, server: 0 };
+  const counters: Record<Kind, number> = { project: 0, agent: 0, branch: 0, dir: 0, file: 0, link: 0, server: 0, tool: 0 };
   /** every raw project name seen so far, so path segments can reuse the project alias */
   const projectRaw = new Set<string>();
 
@@ -166,11 +167,11 @@ export function createMasker(): Masker {
       .join("");
   }
 
-  /** Built-in tool names are public; the server segment of `mcp__<server>__<tool>` often names a client. */
+  /** Built-in tool names are public; both parts of `mcp__<server>__<tool>` can name a client. */
   function maskTool(value: string): string {
     if (value.startsWith("mcp__")) {
       const [, server = "", ...rest] = value.split("__");
-      return ["mcp", alias("server", server), ...rest].join("__");
+      return `mcp__${alias("server", server)}__${alias("tool", rest.join("__"))}`;
     }
     return /^[A-Za-z][\w.-]{0,40}$/.test(value) ? value : maskText(value);
   }
