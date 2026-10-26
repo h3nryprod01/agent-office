@@ -141,6 +141,19 @@ test("store: a corrupt or hostile file fails closed (no tokens), never throws", 
   assert.deepEqual(store2.list(), [], "entries with an invalid role are dropped");
 });
 
+test("store: a file with some unreadable entries keeps the good tokens working but is never rewritten", () => {
+  const file = tmpFile();
+  const good = new AccessStore({ file });
+  const { token } = good.addToken({ label: "good", role: "viewer" });
+  const raw = JSON.parse(fs.readFileSync(file, "utf8"));
+  raw.tokens.push({ id: "x", label: "from-the-future", role: "superuser", hash: "A".repeat(64) });
+  fs.writeFileSync(file, JSON.stringify(raw));
+  const store = new AccessStore({ file });
+  assert.equal(store.verify(token).role, "viewer");
+  assert.throws(() => store.addToken({ label: "y", role: "viewer" }), /cannot read/);
+  assert.equal(JSON.parse(fs.readFileSync(file, "utf8")).tokens.length, 2, "nothing was dropped");
+});
+
 test("store: edits made by another process (the CLI) are picked up without a restart", () => {
   const file = tmpFile();
   const daemonSide = new AccessStore({ file });

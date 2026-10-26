@@ -72,6 +72,9 @@ function sanitize(raw) {
   if (!raw || typeof raw !== "object") return out;
   out.lan = raw.lan === true;
   if (!Array.isArray(raw.tokens)) return out;
+  out.corrupt = raw.tokens.some(
+    (t) => !t || typeof t !== "object" || !ROLES.includes(t.role) || typeof t.hash !== "string" || !HEX64.test(t.hash),
+  ); // entries we would drop on rewrite: valid ones keep working, but we refuse to save over the rest
   for (const t of raw.tokens) {
     if (!t || typeof t !== "object") continue;
     if (!ROLES.includes(t.role) || typeof t.hash !== "string" || !HEX64.test(t.hash)) continue;
@@ -116,7 +119,7 @@ export class AccessStore {
 
   #save(data) {
     // never overwrite a file we could not read: that would silently drop every token in it
-    if (data.corrupt) throw new Error(`${this.file} is unreadable; fix or move it aside first`);
+    if (data.corrupt) throw new Error(`${this.file} is unreadable or has entries this version cannot read; fix or move it aside first`);
     const { corrupt: _corrupt, ...clean } = data;
     data = clean;
     const dir = path.dirname(this.file);

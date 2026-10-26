@@ -4,7 +4,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runUpdate, restartCommand } from "../src/cli/update.js";
+import { runUpdate, restartCommand, needsShell } from "../src/cli/update.js";
 
 function harness({ platform = "linux", dirty = false, head = ["aaa111", "bbb222"], failOn = null, healthy = true } = {}) {
   const calls = [];
@@ -150,7 +150,9 @@ test("restart commands per platform", () => {
   assert.deepEqual(restartCommand("linux"), { cmd: "systemctl", args: ["--user", "restart", "agent-office-daemon"] });
   const win = restartCommand("win32");
   assert.equal(win.cmd, "powershell");
-  assert.match(win.args.join(" "), /Stop-ScheduledTask.*AgentOfficeDaemon.*Start-ScheduledTask/s);
+  const script = win.args.join(" ");
+  assert.match(script, /Stop-ScheduledTask.*AgentOfficeDaemon.*Start-ScheduledTask/s);
+  assert.match(script, /Stop-Process/, "the old node.exe is stopped explicitly, not assumed gone");
 });
 
 test("restart failure is reported with the manual command, after the new build is already in place", async () => {
@@ -197,4 +199,10 @@ test("swapDist: dist.next replaces dist atomically; a missing dist.next leaves d
   swapDist(dir);
   assert.equal(fs.readFileSync(path.join(dir, "dist", "index.html"), "utf8"), "new");
   assert.deepEqual(fs.readdirSync(dir).sort(), ["dist"]);
+});
+
+test("only npm goes through a shell on Windows (cmd.exe would eat the | in the PowerShell restart script)", () => {
+  assert.equal(needsShell("npm", "win32"), true);
+  for (const cmd of ["git", "powershell", "launchctl", "systemctl"]) assert.equal(needsShell(cmd, "win32"), false, cmd);
+  assert.equal(needsShell("npm", "linux"), false);
 });

@@ -24,19 +24,32 @@ export function restartCommand(platform = process.platform, uid = process.getuid
       args: [
         "-NoProfile",
         "-Command",
-        `Stop-ScheduledTask -TaskName ${task} -ErrorAction SilentlyContinue; Start-ScheduledTask -TaskName ${task}`,
+        // The task runs `cmd /c node …`; make sure the old node.exe is really gone (matched by
+        // its script path, so ao.mjs itself and other node programs are left alone) before the new one starts.
+        `Stop-ScheduledTask -TaskName ${task} -ErrorAction SilentlyContinue; ` +
+          `Get-CimInstance Win32_Process -Filter "Name='node.exe'" | ` +
+          `Where-Object { $_.CommandLine -like '*packages\\daemon\\src\\index.js*' } | ` +
+          `ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; ` +
+          `Start-Sleep -Seconds 1; Start-ScheduledTask -TaskName ${task}`,
       ],
     };
   }
   return { cmd: "systemctl", args: ["--user", "restart", SERVICE.linux] };
 }
 
+/**
+ * npm is npm.cmd on Windows, and a .cmd shim can only be spawned through a shell. Nothing
+ * else may use one: cmd.exe would swallow the `|` and quotes in the PowerShell restart script.
+ */
+export function needsShell(cmd, platform = process.platform) {
+  return platform === "win32" && cmd === "npm";
+}
+
 export function defaultRun(cmd, args, opts = {}) {
-  // npm is npm.cmd on Windows; a .cmd shim can only be spawned through a shell
   const res = spawnSync(cmd, args, {
     encoding: "utf8",
     cwd: opts.cwd,
-    shell: process.platform === "win32",
+    shell: needsShell(cmd),
     maxBuffer: 64 * 1024 * 1024,
     stdio: opts.inherit ? "inherit" : "pipe",
   });

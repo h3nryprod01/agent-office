@@ -95,13 +95,13 @@ async function main(argv) {
           console.log(
             r.status === 0
               ? "Service restarted with the restored data."
-              : `Could not restart the service. Restart it yourself: ${[cmd, ...args].join(" ")}` +
-                  (process.platform === "win32" ? "\n(Windows: if restore failed on a locked file, stop the AgentOfficeDaemon task first.)" : ""),
+              : `Could not restart the service. Restart it yourself: ${[cmd, ...args].join(" ")}`,
           );
         }
         return 0;
       } catch (error) {
         console.error(`restore failed (nothing was changed): ${error.message}`);
+        if (process.platform === "win32") console.error("If a file was locked: stop the AgentOfficeDaemon task (Stop-ScheduledTask) and run restore again.");
         return 1;
       }
     }

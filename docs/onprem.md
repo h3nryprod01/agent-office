@@ -311,9 +311,9 @@ Run `doctor` first. It covers most of this table.
   with real requests from a non-loopback address.
 * **Windows**: the daemon and its Scheduled Task were verified on a Windows 11 VM
   (see [windows-port.md](windows-port.md)). One thing to check on a real machine:
-  the task runs `cmd.exe /c node …`, and `lan on|off` / `update` restart it with
-  `Stop-ScheduledTask`; confirm that really ends the old `node.exe` (otherwise the new
-  one cannot take the port) with `Get-Process node` before and after. `start.ps1` and the new verbs parse with
+  the task runs `cmd.exe /c node …`, so `lan on|off` / `update` stop the task and then
+  explicitly stop any leftover `node.exe` running the daemon script before starting it
+  again; confirm with `Get-Process node` that exactly one daemon is running afterwards. `start.ps1` and the new verbs parse with
   zero errors and were dry-run under PowerShell 7 on macOS. **Not yet run on a real
   Windows machine**: `start.ps1` registering and starting the task end to end, the
   `update` restart through the Scheduled Task, `backup`/`restore` with Windows'
