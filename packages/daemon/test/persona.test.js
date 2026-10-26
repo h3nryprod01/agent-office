@@ -9,6 +9,7 @@ import {
   buildMemberPrompt,
   loadMemberKit,
   parseSop,
+  resolveAsset,
   validateCompany,
 } from "../src/persona.js";
 
@@ -130,7 +131,7 @@ test("loadMemberKit never throws: a missing SOP file is a problem, the persona s
 });
 
 test("asset paths: only flat sops/*.md or personas/*.md, no traversal, no symlink escape", () => {
-  const outside = makeDir({ "secret.md": "TOP SECRET" });
+  const outside = makeDir({ "secret.md": GOOD_SOP }); // a VALID SOP: only the path check can stop it
   const dir = makeDir({});
   mkdirSync(path.join(dir, "sops"));
   symlinkSync(path.join(outside, "secret.md"), path.join(dir, "sops", "leak.md"));
@@ -139,6 +140,7 @@ test("asset paths: only flat sops/*.md or personas/*.md, no traversal, no symlin
     assert.equal(kit.sop, null, sop);
     assert.ok(kit.problems.length > 0, `no problem reported for ${sop}`);
   }
+  assert.equal(resolveAsset(dir, "sops/leak.md"), null);
   rmSync(dir, { recursive: true });
   rmSync(outside, { recursive: true });
 });

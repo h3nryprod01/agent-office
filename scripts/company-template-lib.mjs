@@ -177,13 +177,15 @@ export function applyTemplate({ templatesDir, companyDir, homeDir, name }) {
   const rosterPath = path.join(companyDir, "roster.yaml");
   fs.mkdirSync(companyDir, { recursive: true });
 
+  // assets first: if copying them throws, the roster is still the old one and the two stay a matching pair
+  const assets = copyCompanyAssets(templateDir, companyDir);
+
   let backupPath = null;
   if (fs.existsSync(rosterPath)) {
     backupPath = backupPathFor(rosterPath);
     fs.copyFileSync(rosterPath, backupPath);
   }
   fs.copyFileSync(srcRoster, rosterPath);
-  const assets = copyCompanyAssets(templateDir, companyDir);
 
   return {
     assets,

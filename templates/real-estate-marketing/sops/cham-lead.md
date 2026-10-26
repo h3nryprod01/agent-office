@@ -9,18 +9,19 @@ inputs:
 steps:
   - Kiểm lead có trùng với lead cũ hoặc nằm trong danh sách từ chối nhận tin không; trùng thì gộp, từ chối thì dừng
   - Chấm nóng, ấm hoặc lạnh theo tiêu chí và ghi lý do vào một dòng
-  - Soạn tin phản hồi đầu tiên gồm chào, trả lời đúng câu khách hỏi bằng thông tin đã duyệt, và một câu hỏi tiếp theo; phản hồi trong 15 phút giờ làm việc là mục tiêu
+  - Soạn bản nháp tin phản hồi đầu tiên gồm chào, trả lời đúng câu khách hỏi bằng thông tin đã duyệt, và một câu hỏi tiếp theo; mục tiêu là bản nháp sẵn sàng để người thật gửi trong 15 phút giờ làm việc
   - Không báo giá, tình trạng còn hàng hay ưu đãi nếu chưa có xác nhận bằng văn bản từ người phụ trách
   - Ghi lead vào CRM với nguồn, mức độ, câu hỏi khách đã hỏi và bước tiếp theo
   - Lead nóng hoặc khách xin xem nhà, xin báo giá, muốn đàm phán thì chuyển ngay cho nhân viên kinh doanh kèm tóm tắt
-  - Lead ấm và lạnh vào chuỗi nuôi năm lần liên hệ trong 14 ngày; dừng ngay khi khách từ chối
-  - Không gửi tin quảng cáo trong khung 22:00 đến 07:00 và chỉ dùng số điện thoại cho mục đích khách đã đồng ý
+  - Lead ấm và lạnh vào chuỗi nuôi năm lần liên hệ trong 14 ngày, soạn sẵn từng tin để người thật gửi; dừng ngay khi khách từ chối
+  - Đánh dấu mọi tin nháp là không được gửi trong khung 22:00 đến 07:00, và chỉ dùng số điện thoại cho mục đích khách đã đồng ý
 done:
   - Mỗi lead có mức độ và lý do một dòng trong CRM
   - Lead nóng đã được chuyển cho nhân viên kinh doanh kèm tóm tắt
   - Không tin nhắn nào chứa giá hoặc ưu đãi chưa được xác nhận
   - Khách từ chối nhận tin đã được ghi vào danh sách và không bị liên hệ lại
-  - Không tin nào được gửi trong 22:00 đến 07:00
+  - Không tin nháp nào được hẹn gửi trong 22:00 đến 07:00
+  - Bạn không gửi tin nào cho khách; mọi tin do người thật gửi
 handoff:
   - human: nhân viên kinh doanh nhận lead nóng và mọi cuộc gọi
   - dieu-phoi: báo cáo lead theo kênh và tỉ lệ chuyển đổi hằng tuần
@@ -37,4 +38,4 @@ escalate:
 - Ấm: quan tâm thật nhưng chưa có thời điểm hoặc đang so sánh.
 - Lạnh: hỏi thông tin chung, chưa rõ nhu cầu.
 
-Mọi tin nhắn gửi khách đều được người thật duyệt mẫu trước; bạn dùng mẫu, không tự sáng tác điều khoản.
+Mọi tin nhắn gửi khách do người thật gửi, trên kênh người thật đã bật; bạn soạn từ mẫu đã được duyệt và không tự sáng tác điều khoản.

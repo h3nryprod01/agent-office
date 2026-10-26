@@ -17,6 +17,7 @@ import fs from "node:fs";
 import {
   TEMPLATE_NAME_RE,
   applyTemplate,
+  copyCompanyAssets,
   readGoals,
   resolveTemplateDir,
   templateNames,
@@ -120,6 +121,7 @@ function save(name) {
   const destDir = path.join(TEMPLATES_DIR, name);
   fs.mkdirSync(destDir, { recursive: true });
   fs.copyFileSync(ROSTER_PATH, path.join(destDir, "roster.yaml"));
+  copyCompanyAssets(COMPANY_DIR, destDir); // lane L6: the roster's `sop:` / `prompt_file:` paths must keep resolving
   console.log(`Đã lưu roster hiện tại → templates/${name}/roster.yaml`);
   console.log(`Tự thêm templates/${name}/goals.md (mục tiêu cho company-pm).`);
 }

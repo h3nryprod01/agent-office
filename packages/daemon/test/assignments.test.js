@@ -195,3 +195,17 @@ test("POST /assign still works when the SOP file is broken: persona prompt, prob
     fs.rmSync(fx.root, { recursive: true, force: true });
   }
 });
+
+test("POST /assign: a missing member is 400, an oversized body is 413", async () => {
+  const fx = sandbox();
+  try {
+    await withServer(fx, async (base) => {
+      assert.equal((await post(base, "/assign", { project: "demo-app", title: "x" })).status, 400);
+      const big = await post(base, "/assign", { project: "demo-app", member: "developer", title: "x", brief: "y".repeat(9000) });
+      assert.equal(big.status, 413);
+      assert.equal(readItems({ projectsDir: fx.projectsDir, slug: "demo-app" }).length, 0);
+    });
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});

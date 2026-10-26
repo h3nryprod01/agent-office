@@ -130,7 +130,10 @@ export function mdToHtml(md: string): string {
     }
     const para: string[] = [];
     for (; i < lines.length && lines[i].trim() !== "" && !/^(#|```|\s*[-*]\s|\|)/.test(lines[i]); i++) para.push(lines[i]);
-    i--;
+    // a line that looks like a block start but is not one (`#hashtag`, a lone `|`) would match nothing
+    // above and the stop test below at once; take it as a paragraph or this loop never advances
+    if (para.length === 0) para.push(line);
+    else i--;
     out.push(`<p>${inline(esc(para.join(" ")))}</p>`);
   }
   return out.join("\n");

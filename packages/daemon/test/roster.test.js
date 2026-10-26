@@ -220,3 +220,43 @@ test("parseRoster tolerates a half-filled persona", () => {
   assert.equal(a.persona.avatar, null);
   assert.equal("persona" in b, false); // junk persona is dropped, never thrown
 });
+
+// lane L6 (review fixes): shapes the block-item parser must read exactly as it always did.
+test("parseRoster: a nested map as the FIRST key does not leak into or rename the member", () => {
+  const [dev, other] = parseRoster(`departments:
+  d:
+    members:
+      - persona:
+          name: Linh
+          role: Developer
+        name: dev
+        role: "Builds"
+      - cv: { scan_verdict: SAFE }
+        name: other
+`).departments[0].members;
+  assert.equal(dev.name, "dev");
+  assert.equal(dev.role, "Builds");
+  assert.equal(dev.persona.name, "Linh");
+  assert.equal(other.name, "other");
+  assert.equal(other.cv.scan_verdict, "SAFE");
+});
+
+test("parseRoster: a junk `- - x` item and uneven indentation never drop what follows", () => {
+  const roster = parseRoster(`departments:
+  d:
+    members:
+      - name: a
+          role: "over-indented"
+        hired: 2026-01-01
+      - - x
+      - name: b
+  e:
+    members:
+      - name: c
+`);
+  const [a, b] = roster.departments[0].members;
+  assert.equal(a.role, "over-indented");
+  assert.equal(a.hired, "2026-01-01");
+  assert.equal(b.name, "b");
+  assert.equal(roster.departments[1].members[0].name, "c");
+});

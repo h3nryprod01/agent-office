@@ -269,7 +269,10 @@ function drainOutbox(dir, itemsFile, raw) {
     if (line.trim() === "") continue;
     try {
       const parsed = JSON.parse(line);
-      drained.push(makeItem({ ...parsed, now: parsed.createdAt ?? new Date().toISOString() }));
+      // lane L6: a chip's stray sopStep/parentItemId must not cost the whole item its place on the board
+      const sopStep = Number.isInteger(parsed.sopStep) && parsed.sopStep >= 1 && parsed.sopStep <= 50 ? parsed.sopStep : null;
+      const parentItemId = typeof parsed.parentItemId === "string" && parsed.parentItemId.length <= 100 ? parsed.parentItemId : null;
+      drained.push(makeItem({ ...parsed, sopStep, parentItemId, now: parsed.createdAt ?? new Date().toISOString() }));
     } catch (error) {
       console.warn(`[projects] outbox kept a malformed line (${error.message})`);
       corrupt.push(line);
@@ -328,7 +331,14 @@ export function updateItem({
   }
   if ("title" in changes) changes.title = assertTitle(changes.title);
   if ("sopStep" in changes) changes.sopStep = assertSopStep(changes.sopStep); // lane L6
-  if ("parentItemId" in changes) changes.parentItemId = assertParentItemId(changes.parentItemId); // lane L6
+  if ("parentItemId" in changes) {
+    // lane L6: no self-parent and no cycle — whoever walks the ancestry chain must be able to stop
+    changes.parentItemId = assertParentItemId(changes.parentItemId);
+    for (let up = changes.parentItemId, hops = 0; up && hops <= items.length; hops++) {
+      if (up === id) throw invalid("parentItemId would make the item its own ancestor");
+      up = items.find((i) => i.id === up)?.parentItemId ?? null;
+    }
+  }
   if ("status" in changes && !ITEM_STATUSES.includes(changes.status)) {
     throw invalid(`status must be one of ${ITEM_STATUSES.join("|")}`);
   }

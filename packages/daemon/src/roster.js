@@ -154,14 +154,25 @@ function parseList(lines, i) {
       continue;
     }
     // block map item: first pair on the `- ` line, more pairs on deeper lines.
-    // Re-aim the `- key: v` line as a plain map line (at the indent of its siblings) and
-    // let parseMap do the rest — that is what lets a pair like `persona:` own a nested map.
-    const next = lines[i + 1];
-    const pairIndent = next && next.indent > indent ? next.indent : indent + 2;
+    // Re-aim the `- key: v` line as a plain map line at the column where its text really starts
+    // (that is where the sibling keys sit) and let parseMap do the rest — that is what lets a
+    // pair like `persona:` own a nested map without its keys leaking into the member.
+    if (rest.startsWith("- ")) {
+      arr.push({}); // `- - x`: nothing we understand; skip the line, keep reading the list
+      i++;
+      continue;
+    }
+    const body = lines[i].text.slice(2);
+    const pairIndent = indent + 2 + (body.length - body.trimStart().length);
     lines[i] = { indent: pairIndent, text: rest };
     const [item, after] = parseMap(lines, i);
     i = after;
-    while (i < lines.length && lines[i].indent > indent && !lines[i].text.startsWith("- ")) i++; // stray over-indented line
+    // over/under-indented stray lines: keep their pairs flat, as this parser always did
+    while (i < lines.length && lines[i].indent > indent && !lines[i].text.startsWith("- ")) {
+      const { key, rest: value } = splitKey(lines[i].text);
+      if (key !== null) item[key] = value !== "" ? parseScalar(value) : null;
+      i++;
+    }
     arr.push(item);
   }
   return [arr, i];

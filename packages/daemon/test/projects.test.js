@@ -376,3 +376,21 @@ test("items record the SOP step and the parent item; both are patchable and vali
   );
   s.cleanup();
 });
+
+test("parentItemId refuses a self-parent and a cycle; a stray outbox sopStep does not lose the item", () => {
+  const s = sandbox();
+  s.make();
+  const a = addItem({ projectsDir: s.projectsDir, slug: "agent-office", title: "A", source: "human", now: NOW });
+  const b = addItem({ projectsDir: s.projectsDir, slug: "agent-office", title: "B", source: "agent", parentItemId: a.id, now: NOW });
+  const upd = (id, parentItemId) => updateItem({ projectsDir: s.projectsDir, slug: "agent-office", id, patch: { parentItemId } });
+  assert.throws(() => upd(a.id, a.id), (e) => e.code === "INVALID");
+  assert.throws(() => upd(a.id, b.id), (e) => e.code === "INVALID"); // A -> B -> A
+  assert.equal(upd(b.id, null).parentItemId, null);
+
+  const dir = path.join(s.projectsDir, "agent-office");
+  fs.appendFileSync(path.join(dir, "items-outbox.jsonl"), JSON.stringify({ title: "from a chip", source: "agent", sopStep: "3" }) + "\n");
+  const drained = readItems({ projectsDir: s.projectsDir, slug: "agent-office" }).find((i) => i.title === "from a chip");
+  assert.equal(drained.sopStep, null);
+  assert.equal(fs.existsSync(path.join(dir, "items-outbox.corrupt")), false);
+  s.cleanup();
+});

@@ -96,11 +96,20 @@ export function createAssignmentsHttpHandler({
         return true;
       }
       let body = "";
+      let tooBig = false;
       req.on("data", (chunk) => {
+        if (tooBig) return;
         body += chunk;
-        if (body.length > BODY_MAX) req.destroy();
+        if (body.length > BODY_MAX) {
+          tooBig = true;
+          body = "";
+        }
       });
       req.on("end", () => {
+        if (tooBig) {
+          respond(413, { error: `request body larger than ${BODY_MAX} bytes` });
+          return;
+        }
         let parsed;
         try {
           parsed = JSON.parse(body);
@@ -138,6 +147,7 @@ export function createAssignmentsHttpHandler({
 /** Everything /assign does, minus HTTP. Validates first so a refused request leaves no item behind. */
 export function assign({ projectsDir, project, member: memberName, title, brief = null, parentItemId = null }) {
   if (typeof project !== "string" || !PROJECT_SLUG_RE.test(project)) throw fail("INVALID", `invalid project: ${JSON.stringify(project)}`);
+  if (typeof memberName !== "string" || memberName === "") throw fail("INVALID", "member is required");
   readProject({ projectsDir, slug: project }); // 404 for an unknown project
   const baseDir = path.join(projectsDir, project);
   const member = findMember(baseDir, memberName);

@@ -14,7 +14,7 @@ steps:
   - When a report arrives, check the PR, the commits and the test output yourself before moving the item to done
   - Close the loop with the owner in the five-part format Did / Verified / Links / Blockers / Next
 done:
-  - Every open ticket has an assignee, a sopStep, a parentItemId and a file-area list
+  - Every open ticket has an assignee, a parentItemId and a file-area list, and a sopStep when its member has an SOP
   - No two open tickets overlap in files
   - Every item moved to done has a PR or commit you opened and a test run you saw
   - The owner has the five-part summary, with blockers stated first

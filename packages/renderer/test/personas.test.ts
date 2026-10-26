@@ -88,6 +88,15 @@ describe("mdToHtml", () => {
   });
 });
 
+describe("mdToHtml never stalls on a line that only looks like a block start", () => {
+  it("terminates on a #hashtag line and on a lone pipe, keeping the text", () => {
+    const html = mdToHtml("intro\n\n#BDS la tag\n\n|\n\nend");
+    expect(html).toContain("#BDS la tag");
+    expect(html).toContain("<p>|</p>");
+    expect(html).toContain("<p>end</p>");
+  });
+});
+
 describe("personaMeta", () => {
   it("says how many people arrive with a persona and an SOP", () => {
     expect(personaMeta({ personaCount: 9, sopCount: 11 })).toBe("9 personas · 11 SOPs");
