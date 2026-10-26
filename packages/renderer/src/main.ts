@@ -287,7 +287,7 @@ async function boot(): Promise<void> {
   const policyRoot = document.createElement("div"); // lane L2: filled by mountPolicyPanel once the tabs exist
   const settings = mountSettings(document.querySelector<HTMLElement>("#settings")!, {
     ...(useWs ? { extra: policyRoot } : {}),
-    daemonUrl: "127.0.0.1:8787",
+    daemonUrl: wsBase().replace(/^wss?:\/\//, ""), // the daemon this page actually talks to (on-prem: any host/port)
     ...(useWs
       ? {
           fetchHarnesses: (): Promise<HarnessStatus[]> =>
