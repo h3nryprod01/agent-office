@@ -20,11 +20,13 @@ function harness({ platform = "linux", dirty = false, head = ["aaa111", "bbb222"
   const logs = [];
   const backups = [];
   const swaps = [];
+  const fsOps = [];
   return {
     calls,
     logs,
     backups,
     swaps,
+    fsOps,
     opts: {
       repo: "/repo",
       home: "/home/x/.agent-office",
@@ -35,6 +37,11 @@ function harness({ platform = "linux", dirty = false, head = ["aaa111", "bbb222"
       backup: (a) => (backups.push(a), { archive: "/b/x.tar.gz" }),
       health: async () => healthy,
       swap: (dir) => swaps.push(dir),
+      fsx: {
+        exists: () => true,
+        rename: (a, b) => fsOps.push(`mv ${a} ${b}`),
+        rm: (p) => fsOps.push(`rm ${p}`),
+      },
       cleanup: () => {},
       log: (m) => logs.push(m),
       homeExists: () => true,
@@ -88,7 +95,7 @@ test("a failed pull stops cold and says nothing was changed", async () => {
   assert.ok(!h.calls.some((c) => c.line.startsWith("npm")));
 });
 
-test("build failure after the pull → previous version restored automatically, no swap, no restart", async () => {
+test("build failure after the pull → previous version restored automatically (offline), no swap, no restart", async () => {
   const h = harness({ failOn: "run build" });
   await assert.rejects(runUpdate(h.opts), (error) => {
     assert.match(error.message, /build failed/i);
@@ -96,32 +103,46 @@ test("build failure after the pull → previous version restored automatically, 
     return true;
   });
   const lines = h.calls.map((c) => c.line);
-  assert.ok(lines.includes("git reset --hard aaa111"), "back to the commit it started from (on the same branch, no detached HEAD)");
-  assert.equal(lines.filter((l) => l === "npm ci").length, 4, "node_modules reinstalled for the old version too");
+  assert.ok(lines.includes("git reset --keep aaa111"), "back to the starting commit, same branch, never discarding edits made meanwhile");
+  assert.equal(lines.filter((l) => l === "npm ci").length, 2, "no network needed to undo: node_modules comes back by rename");
+  assert.ok(h.fsOps.some((o) => o.startsWith("mv ") && o.includes("node_modules.prev /repo/packages/daemon/node_modules")), "daemon node_modules restored");
+  assert.ok(h.fsOps.some((o) => o.startsWith("mv ") && o.includes("node_modules.prev /repo/packages/renderer/node_modules")), "renderer node_modules restored");
   assert.deepEqual(h.swaps, [], "the served dist/ was never replaced");
   assert.ok(!lines.some((l) => l.includes("systemctl")), "never restart onto a broken build");
 });
 
-test("npm ci failing halfway also restores (npm ci empties node_modules first)", async () => {
+test("npm ci failing halfway (e.g. network down) restores the previous node_modules without any network", async () => {
   const h = harness();
   let ciCalls = 0;
   const run = h.opts.run;
-  h.opts.run = (cmd, args, o) => (cmd === "npm" && args[0] === "ci" && ++ciCalls === 2 ? { status: 1, stdout: "", stderr: "ENOSPC" } : run(cmd, args, o));
+  h.opts.run = (cmd, args, o) => (cmd === "npm" && args[0] === "ci" && ++ciCalls === 2 ? { status: 1, stdout: "", stderr: "ENOTFOUND" } : run(cmd, args, o));
   await assert.rejects(runUpdate(h.opts), /npm ci failed in packages\/renderer[\s\S]*restored/i);
-  assert.ok(h.calls.some((c) => c.line === "git reset --hard aaa111"));
+  assert.equal(ciCalls, 2, "no third npm ci attempt");
+  assert.ok(h.calls.some((c) => c.line === "git reset --keep aaa111"));
+  assert.ok(h.fsOps.some((o) => o.includes("node_modules.prev /repo/packages/renderer/node_modules")));
 });
 
-test("if even the restore fails, the error spells out the manual steps", async () => {
+test("if even the code reset fails, the error spells out the manual steps", async () => {
   const h = harness();
   const run = h.opts.run;
-  h.opts.run = (cmd, args, o) => (args[0] === "run" ? { status: 1, stdout: "", stderr: "x" } : args[0] === "reset" ? { status: 1, stdout: "", stderr: "x" } : run(cmd, args, o));
+  h.opts.run = (cmd, args, o) => (args[0] === "run" || args[0] === "reset" ? { status: 1, stdout: "", stderr: "x" } : run(cmd, args, o));
   await assert.rejects(runUpdate(h.opts), /git reset --hard aaa111[\s\S]*npm ci --prefix packages\/daemon/);
 });
 
-test("the new build is swapped in only after it succeeded, right before the restart", async () => {
+test("on success the kept node_modules.prev copies are deleted", async () => {
   const h = harness();
   await runUpdate(h.opts);
-  assert.deepEqual(h.swaps, ["/repo/packages/renderer"]);
+  assert.ok(h.fsOps.filter((o) => o.startsWith("rm ") && o.endsWith("node_modules.prev")).length >= 2);
+});
+
+test("the new build is swapped in only after it succeeded, and before the restart", async () => {
+  const h = harness();
+  const order = [];
+  const run = h.opts.run;
+  h.opts.run = (cmd, args, o) => (order.push(cmd === "systemctl" ? "restart" : null), run(cmd, args, o));
+  h.opts.swap = () => order.push("swap");
+  await runUpdate(h.opts);
+  assert.ok(order.indexOf("swap") !== -1 && order.indexOf("swap") < order.indexOf("restart"));
 });
 
 test("restart commands per platform", () => {

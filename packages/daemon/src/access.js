@@ -365,12 +365,12 @@ export function combineGuards(...guards) {
 export function watchRevocations({ store, wss, intervalMs = 3000 }) {
   const tokenIds = new WeakMap();
   wss.on("connection", (socket, req) => {
-    if (req[TOKEN_ID_KEY]) tokenIds.set(socket, req[TOKEN_ID_KEY]);
+    if (req[TOKEN_ID_KEY] !== undefined) tokenIds.set(socket, req[TOKEN_ID_KEY]);
   });
   const timer = setInterval(() => {
     for (const socket of wss.clients) {
       const id = tokenIds.get(socket);
-      if (id && !store.hasId(id)) socket.close(4401, "access revoked");
+      if (id !== undefined && !store.hasId(id)) socket.close(4401, "access revoked");
     }
   }, intervalMs);
   timer.unref();

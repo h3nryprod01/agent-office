@@ -20,3 +20,6 @@ demo/
 # Large media belongs in a GitHub Release, not in every clone
 *.mov
 *.mp4
+
+# `ao update` keeps the previous install here until the new one works
+node_modules.prev/

@@ -107,18 +107,23 @@ async function main(argv) {
     }
     case "lan":
     case "token":
-      return runAccessCommand(argv, {
-        store: new AccessStore(),
-        log: (m) => console.log(m),
-        port,
-        platform: process.platform,
-        addresses: lanAddresses,
-        restart: () => {
-          const { cmd, args } = restartCommand();
-          const r = defaultRun(cmd, args);
-          return { ok: r.status === 0, hint: [cmd, ...args].join(" ") };
-        },
-      });
+      try {
+        return runAccessCommand(argv, {
+          store: new AccessStore(),
+          log: (m) => console.log(m),
+          port,
+          platform: process.platform,
+          addresses: lanAddresses,
+          restart: () => {
+            const { cmd, args } = restartCommand();
+            const r = defaultRun(cmd, args);
+            return { ok: r.status === 0, hint: [cmd, ...args].join(" ") };
+          },
+        });
+      } catch (error) {
+        console.error(error.message); // e.g. "access.json is unreadable; fix or move it aside first"
+        return 1;
+      }
     default:
       console.log(HELP);
       return verb ? 2 : 0;
