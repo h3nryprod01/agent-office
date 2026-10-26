@@ -13,6 +13,7 @@ export interface KanbanItem {
   title: string;
   source: string; // "human" | "agent"
   status: string; // idea|doing|review|done|dropped
+  links?: { doc?: string | null }; // lane L7: project-relative path of the document this card is about
 }
 
 /** [status, column label] per sub-tab. mine = a person's ideas; agent = chip work. */
@@ -78,6 +79,8 @@ interface KanbanOpts {
   addItem?: (body: { project: string; title: string; source: string }) => Promise<unknown>;
   /** "Giao cho PM" clicked on an assignable idea — pre-fill the PM chat. */
   onAssignToPM?: (item: KanbanItem) => void;
+  /** lane L7: a card's 📄 link was clicked — open that document in the Documents tab. */
+  onOpenDoc?: (project: string, path: string) => void;
 }
 
 /**
@@ -101,6 +104,11 @@ export function mountKanban(root: HTMLElement, opts: KanbanOpts): KanbanHandle {
   render();
 
   root.addEventListener("click", (ev) => {
+    const docEl = (ev.target as HTMLElement).closest<HTMLElement>("[data-doc]");
+    if (docEl?.dataset.doc) {
+      opts.onOpenDoc?.(opts.project, docEl.dataset.doc);
+      return;
+    }
     const assignEl = (ev.target as HTMLElement).closest<HTMLElement>("[data-assign]");
     if (assignEl) {
       const found = items.find((it) => it.id === assignEl.dataset.assign);
@@ -203,10 +211,14 @@ function card(it: KanbanItem): string {
   const assign = assignableId(it)
     ? `<button class="kanban-assign" type="button" data-assign="${esc(it.id)}">Giao cho PM</button>`
     : "";
+  const doc = it.links?.doc
+    ? `<button class="kanban-doc" type="button" data-doc="${esc(it.links.doc)}" title="${esc(t("kanban.openDoc"))}">📄 ${esc(it.links.doc)}</button>`
+    : "";
   return (
     `<article class="kanban-card">` +
     `<span class="kanban-source" aria-hidden="true">${badge}</span>` +
     `<span class="kanban-title">${esc(it.title)}</span>` +
+    doc +
     assign +
     `</article>`
   );

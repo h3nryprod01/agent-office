@@ -25,7 +25,7 @@ export const DEFAULT_PROJECTS_DIR = path.join(os.homedir(), ".agent-office", "pr
 
 const TITLE_MAX = 200;
 const PATCHABLE = ["title", "status", "assignee", "fromIdea", "links"];
-const LINK_KEYS = ["pr", "plane", "obsidian", "branch"];
+const LINK_KEYS = ["pr", "plane", "obsidian", "branch", "doc"]; // lane L7: `doc` = project-relative path of a document in the docs workspace
 /** These two are rendered as clickable links — a `javascript:` value would be an injection. */
 const URL_LINK_KEYS = new Set(["pr", "plane"]);
 const LINK_MAX = 500;
@@ -109,7 +109,7 @@ function assertLinks(links) {
   if (links === null || typeof links !== "object" || Array.isArray(links)) {
     throw invalid("links must be an object");
   }
-  const out = { pr: null, plane: null, obsidian: null, branch: null };
+  const out = { pr: null, plane: null, obsidian: null, branch: null, doc: null };
   for (const [key, value] of Object.entries(links)) {
     if (!LINK_KEYS.includes(key)) throw invalid(`links: unknown field "${key}"`);
     if (value === null || value === undefined) continue;

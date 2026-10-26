@@ -33,6 +33,8 @@ import { VieNeuTts, createTtsHttpHandler } from "./tts.js";
 import { createHarnessHttpHandler } from "./harness-probe.js";
 import { createStaticHttpHandler } from "./static-serve.js";
 import { createOriginGuard } from "./origin-guard.js";
+import { createDocsHttpHandler } from "./docs-workspace.js"; // lane L7
+import { createProjectWizardHandler } from "./project-wizard.js"; // lane L7
 
 const PROJECTS_ROOT =
   process.env.CLAUDE_PROJECTS_ROOT ?? path.join(os.homedir(), ".claude", "projects");
@@ -103,6 +105,10 @@ async function main() {
   const templatesHttp = createTemplatesHttpHandler();
   // ~/.agent-office/projects/<slug>/ — the daemon is the only writer of an item.
   const projectsHttp = createProjectsHttpHandler();
+  // lane L7: document workspace (/docs/*) + new-project wizard (/wizard/*). Pass L1's roleOf(req)
+  // as `{ roleOf }` to both once it exists; until then loopback = owner, any other source = refused.
+  const docsHttp = createDocsHttpHandler();
+  const wizardHttp = createProjectWizardHandler();
   // R13-INFRA: harness install/login probe for the onboarding wizard, and a
   // static handler serving the renderer build (1 process, 1 port).
   const harnessHttp = createHarnessHttpHandler();
@@ -129,6 +135,8 @@ async function main() {
       rosterHttp(req, res, url) ||
       templatesHttp(req, res, url) ||
       projectsHttp(req, res, url) ||
+      docsHttp(req, res, url) || // lane L7
+      wizardHttp(req, res, url) || // lane L7
       harnessHttp(req, res, url) ||
       ttsHttp(req, res, url) ||
       staticHttp(req, res, url), // static-serve LAST: catch-all GET, must not shadow an API route
