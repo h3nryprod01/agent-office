@@ -65,3 +65,22 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
           # SC1091: sourced files that only exist on a user's machine
           shellcheck --severity=warning --exclude=SC1091 scripts/*.sh
+
+  # lane L1: the repo is public, so a leaked path / private IP / token is permanent.
+  leaks:
+    name: leak gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # Positive control first: "clean" means nothing from a scanner that cannot
+      # catch a planted leak. This fails the job if any rule has gone blind.
+      - run: node scripts/check-leaks.mjs --self-test
+      - run: node scripts/check-leaks.mjs
+      # Commit messages and added lines of the PR (the tree scan above only sees the end state)
+      - if: github.event_name == 'pull_request'
+        run: node scripts/check-leaks.mjs --range "origin/${{ github.base_ref }}...HEAD"
