@@ -150,6 +150,12 @@ describe("sopStepHtml", () => {
     expect(sopStepHtml({ id: "a", title: "t", sopStep: null })).toBe("");
   });
 
+  it("drops a step that is not a positive integer (registry is hand-edited JSON)", () => {
+    for (const bad of ["<img src=x onerror=alert(1)>", "2.5", -1, 0]) {
+      expect(sopStepHtml({ id: "a", title: "t", sopStep: bad as unknown as number })).toBe("");
+    }
+  });
+
   it("escapes the assignee and lands in the side panel section", () => {
     const html = workItemSectionHtml(agent({ sessionId: "s" }), [item({ id: "x", sessionId: "s", assignee: "<b>x</b>", sopStep: 2 })]);
     expect(html).toContain("SOP step 2");

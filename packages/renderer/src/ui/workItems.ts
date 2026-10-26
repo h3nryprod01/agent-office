@@ -152,9 +152,11 @@ export function workItemSectionHtml(
 
 /** lane L6: "linh · SOP step 3" — who holds the item and where they are in their procedure. Empty without a step. */
 export function sopStepHtml(item: WorkItem): string {
-  if (!item.sopStep) return "";
+  // the registry is a hand-edited JSON file: only a real positive integer may reach the markup
+  const n = Number(item.sopStep);
+  if (!Number.isInteger(n) || n < 1) return "";
   const who = item.assignee ? `${esc(item.assignee)} · ` : "";
-  return `<div class="wi-sop">${who}${t("work.sopStep", { n: item.sopStep })}</div>`;
+  return `<div class="wi-sop">${who}${t("work.sopStep", { n })}</div>`;
 }
 
 function esc(s: string): string {
