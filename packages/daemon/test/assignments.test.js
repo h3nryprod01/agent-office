@@ -1,4 +1,4 @@
-// lane L6: GET /members, GET /sop, POST /assign — persona + SOP over HTTP.
+// lane L6: GET /roster-members, GET /sop, POST /assign — persona + SOP over HTTP.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -81,12 +81,12 @@ async function withServer(fx, fn) {
 const post = (base, route, body) =>
   fetch(`${base}${route}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
-test("GET /members serves a template's or a project's roster with persona + sop", async () => {
+test("GET /roster-members serves a template's or a project's roster with persona + sop", async () => {
   const fx = sandbox();
   try {
     await withServer(fx, async (base) => {
       for (const q of ["source=template&name=coding", "source=project&name=demo-app"]) {
-        const res = await fetch(`${base}/members?${q}`);
+        const res = await fetch(`${base}/roster-members?${q}`);
         assert.equal(res.status, 200, q);
         const [dev, rev] = (await res.json()).departments[0].members;
         assert.equal(dev.persona.name, "Linh");
@@ -99,12 +99,12 @@ test("GET /members serves a template's or a project's roster with persona + sop"
   }
 });
 
-test("GET /members and /sop reject traversal and unknown sources", async () => {
+test("GET /roster-members and /sop reject traversal and unknown sources", async () => {
   const fx = sandbox();
   try {
     await withServer(fx, async (base) => {
       for (const q of ["source=template&name=../x", "source=project&name=..%2Fx", "source=nope", "source=template"]) {
-        assert.equal((await fetch(`${base}/members?${q}`)).status, 400, q);
+        assert.equal((await fetch(`${base}/roster-members?${q}`)).status, 400, q);
       }
       assert.equal((await fetch(`${base}/sop?source=template&name=coding&member=ghost`)).status, 404);
     });

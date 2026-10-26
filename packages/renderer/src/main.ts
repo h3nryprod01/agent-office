@@ -28,6 +28,7 @@ import { mountInterventionStats, type InterventionSummary } from "./ui/intervent
 import { mountOfficeTabs, TAB_ALL, type TabKey } from "./ui/officeTabs";
 import { mountTimelineBar, type ReplayView } from "./ui/timelineBar";
 import { mountChatBox, type ChatBoxHandle } from "./ui/chatBox";
+import { mountProjectsOverview, type OverviewProject, type Role } from "./ui/projectsOverview"; // lane L5
 import { mountHiringHall, type HiringHallHandle, type RosterPayload } from "./ui/hiringHall";
 import { mountTemplates, type ApplyResult, type TemplateSummary } from "./ui/templates";
 import { EventRecorder } from "./replay/recorder";
@@ -195,6 +196,7 @@ async function boot(): Promise<void> {
   // office, live or mock.
   const navbarItems: NavItem[] = [
     { key: "office", icon: "🏢", label: t("nav.office") },
+    { key: "projects", icon: "🧭", label: t("nav.projects") }, // lane L5
     { key: "kanban", icon: "🗂", label: t("nav.board") },
     { key: "log", icon: "🕑", label: t("nav.log") },
     { key: "costs", icon: "💰", label: t("nav.costs") },
@@ -214,6 +216,25 @@ async function boot(): Promise<void> {
     ...(fetchRecentTranscript ? { fetchTranscript: fetchRecentTranscript } : {}),
   });
   let policyPanel: PolicyPanelHandle | undefined; // lane L2: assigned once the office tabs exist (setView reads it)
+  // lane L5: every project's PM / approvals / members in one screen. Live mode only.
+  const jsonOrThrow = async (res: Response): Promise<any> => {
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
+    return body;
+  };
+  const postJson = (path: string, body: unknown): Promise<any> =>
+    fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow);
+  const projectsView = mountProjectsOverview(document.querySelector<HTMLElement>("#projects-overview")!, {
+    ...(useWs
+      ? {
+          fetchOverview: (): Promise<{ projects: OverviewProject[] }> => fetch("/overview").then(jsonOrThrow),
+          fetchChannels: () => fetch("/channels").then(jsonOrThrow),
+          makeCode: (project: string, role: Role) => postJson("/pairing", { project, role }),
+          removeMember: (project: string, id: string): Promise<void> => postJson("/members/remove", { project, id }),
+          onOpenPm: (slug: string) => chatHandle?.selectProject(slug),
+        }
+      : {}),
+  });
   const homeView = "office"; // refresh always lands on the office (2026-07-22)
   const navbar = mountNavbar(document.querySelector<HTMLElement>("#navbar")!, {
     items: navbarItems,
@@ -225,6 +246,7 @@ async function boot(): Promise<void> {
     navbar.select(key);
     if (key === "kanban") kanban.refresh();
     if (key === "log") activityLog.refresh();
+    if (key === "projects") projectsView.refresh();
     if (key === "costs") costs.expand();
     if (key === "settings") settings.refresh();
     if (key === "settings") policyPanel?.refresh(); // lane L2

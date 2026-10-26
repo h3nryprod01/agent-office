@@ -1,6 +1,6 @@
 // lane L6: persona + SOP over HTTP.
 //
-//   GET  /members?source=company|template|project[&name=]   a roster with persona/sop, same shape as GET /roster
+//   GET  /roster-members?source=company|template|project[&name=]   a roster with persona/sop, same shape as GET /roster
 //   GET  /sop?source=…[&name=]&member=<name>                  one member's parsed SOP
 //   POST /assign {project, member, title, brief?, parentItemId?}
 //        → creates the work item (assignee = member, sopStep = 1 when the member has an SOP)
@@ -64,7 +64,7 @@ export function createAssignmentsHttpHandler({
 
   return (req, res, url) => {
     const route = url.pathname;
-    if (route !== "/members" && route !== "/sop" && route !== "/assign") return false;
+    if (route !== "/roster-members" && route !== "/sop" && route !== "/assign") return false;
 
     if (req.method === "OPTIONS") {
       res.writeHead(204, CORS_HEADERS);
@@ -130,7 +130,7 @@ export function createAssignmentsHttpHandler({
     const q = url.searchParams;
     guard(() => {
       const baseDir = resolveBaseDir({ source: q.get("source"), name: q.get("name") }, dirs);
-      if (route === "/members") {
+      if (route === "/roster-members") {
         respond(200, readRoster(path.join(baseDir, "roster.yaml")));
         return;
       }

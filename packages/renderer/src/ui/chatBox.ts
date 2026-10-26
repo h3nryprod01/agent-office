@@ -20,6 +20,7 @@ import { t } from "../i18n";
 
 import { wireVoice } from "./voice";
 import { wsBase } from "../events/WebSocketEventSource";
+import { applyPmStatus, chatKeyFor, renderPmChips, type PmRow } from "./pmSwitcher";
 
 interface ChatMeta {
   role: "user" | "assistant" | "system";
@@ -53,6 +54,8 @@ export interface ChatBoxHandle {
   /** Pre-fill the input with a draft (e.g. "Giao cho PM" from a kanban idea) and
    *  focus it — does NOT send; the user reviews then hits Enter or Send. */
   prefill(text: string): void;
+  /** lane L5: talk to the PM of a project (slug) instead of the active tab's repo PM; null = repo PM. */
+  selectProject(slug: string | null): void;
 }
 
 const HTTP_BASE = "";
@@ -108,6 +111,22 @@ const STYLE = `
 #chat-box button.tts.on { background: #14532d; border-color: #22c55e; color: #dcfce7; }
 @keyframes chat-mic-pulse { 50% { opacity: 0.5; } }
 #chat-box .chat-note { margin-top: 5px; color: #475569; font-size: 10px; cursor: help; }
+/* lane L5: PM switcher — one chip per project PM above the log */
+#chat-box .chat-pms { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+#chat-box .chat-pms[hidden] { display: none; }
+#chat-box button.pm-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #1c2130; color: #94a3b8; border: 1px solid #2b3245;
+  font-weight: 400; padding: 2px 8px; font-size: 11px; border-radius: 999px;
+}
+#chat-box button.pm-chip.active { background: #3b2a08; color: #fde68a; border-color: #f59e0b; }
+#chat-box .pm-dot { width: 7px; height: 7px; border-radius: 50%; background: #475569; }
+#chat-box .pm-chip.pm-working .pm-dot { background: #f59e0b; animation: chat-mic-pulse 1s infinite; }
+#chat-box .pm-chip.pm-error .pm-dot { background: #ef4444; }
+#chat-box .pm-unread {
+  background: #ef4444; color: #fff; border-radius: 999px; padding: 0 5px;
+  font-size: 10px; font-weight: 700; line-height: 15px;
+}
 /* collapse (R10-b): tiny toggle at the top-right corner. Collapsed hides every
    child except this button — the box shrinks to a thin bar you can pop open. */
 #chat-box .chat-collapse {
@@ -117,6 +136,7 @@ const STYLE = `
   border-radius: 6px; font-size: 11px; line-height: 1; cursor: pointer;
 }
 #chat-box.collapsed { padding: 4px; }
+#chat-box.collapsed .chat-pms,
 #chat-box.collapsed .chat-logs,
 #chat-box.collapsed .chat-typing,
 #chat-box.collapsed .chat-row,
@@ -132,6 +152,7 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
   root.id = "chat-box";
   root.innerHTML = `
     <button type="button" class="chat-collapse" title="${t("chat.toggleTitle")}">▾</button>
+    <div class="chat-pms" hidden></div>
     <div class="chat-logs"></div>
     <div class="chat-typing" hidden><span>${t("chat.typing")}</span><button type="button" class="stop" title="${t("chat.stopTitle")}">${t("chat.stop")}</button></div>
     <div class="chat-row">
@@ -145,6 +166,7 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
   `;
   document.body.appendChild(root);
 
+  const pmsRoot = root.querySelector<HTMLElement>(".chat-pms")!;
   const logsRoot = root.querySelector<HTMLElement>(".chat-logs")!;
   const typing = root.querySelector<HTMLElement>(".chat-typing")!;
   const input = root.querySelector<HTMLInputElement>("input")!;
@@ -183,8 +205,12 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
   const lastPmSessionIds = new Map<string, string>();
   let activeRepo: string | null = null; // null = tab "All"
   let defaultRepo: string | null = null;
+  // lane L5: project PMs. activeProject null = the repo PM (everything above, unchanged).
+  let activeProject: string | null = null;
+  let pms: PmRow[] = [];
+  let repoWaiting = false;
 
-  const activeKey = () => activeRepo ?? defaultRepo ?? "";
+  const activeKey = () => (activeProject ? chatKeyFor(activeProject) : (activeRepo ?? defaultRepo ?? ""));
 
   const logFor = (key: string): HTMLElement => {
     let log = logs.get(key);
@@ -202,10 +228,64 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
     const key = activeKey();
     for (const [k, log] of logs) log.hidden = k !== key;
     const label = activeRepo ?? defaultRepo;
-    input.placeholder = label ? t("chat.placeholderRepo", { repo: label }) : t("chat.placeholder");
+    const project = activeProject ? pms.find((p) => p.slug === activeProject) : null;
+    input.placeholder = project
+      ? t("chat.placeholderProject", { project: project.name })
+      : label
+        ? t("chat.placeholderRepo", { repo: label })
+        : t("chat.placeholder");
+    handoverBtn.hidden = activeProject !== null; // the saved session of a project PM is not exposed
+    paintPms();
+    paintWaiting();
     const log = logs.get(key);
     if (log) log.scrollTop = log.scrollHeight;
   };
+
+  // lane L5 ── project PM chips ─────────────────────────────────────────────────────────
+  const paintPms = () => {
+    const html = renderPmChips(pms, activeProject, t("chat.pmTab"));
+    pmsRoot.hidden = html === "";
+    if (pmsRoot.dataset.sig !== html) {
+      pmsRoot.dataset.sig = html;
+      pmsRoot.innerHTML = html;
+    }
+  };
+  const refreshPms = async (): Promise<void> => {
+    try {
+      const res = await fetch(`${HTTP_BASE}/pms`);
+      if (!res.ok) return;
+      const body = await res.json();
+      if (Array.isArray(body?.pms)) {
+        pms = body.pms as PmRow[];
+        paintPms();
+        syncUi();
+      }
+    } catch {
+      // older daemon without /pms: the box simply stays a repo-PM chat
+    }
+  };
+  void refreshPms();
+  setInterval(() => void refreshPms(), 30_000); // WS pm_status keeps it live; this heals a missed frame
+  const markRead = (slug: string): void => {
+    pms = pms.map((p) => (p.slug === slug ? { ...p, unread: 0 } : p));
+    paintPms();
+    void fetch(`${HTTP_BASE}/pm/read`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: slug }),
+    }).catch(() => {});
+  };
+  const selectProject = (slug: string | null): void => {
+    activeProject = slug && pms.some((p) => p.slug === slug) ? slug : slug && pms.length === 0 ? slug : null;
+    if (activeProject) markRead(activeProject);
+    syncUi();
+  };
+  pmsRoot.addEventListener("click", (ev) => {
+    const chip = (ev.target as HTMLElement).closest<HTMLElement>("[data-pm]");
+    if (!chip) return;
+    selectProject(chip.dataset.pm || null);
+    input.focus();
+  });
 
   const ensureDefaultRepo = async (): Promise<void> => {
     if (defaultRepo) return;
@@ -237,9 +317,20 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
     log.scrollTop = log.scrollHeight;
   };
 
+  const paintWaiting = () => {
+    if (activeProject) {
+      // a project PM queues messages, so the button never locks; the dots show its real state
+      const pm = pms.find((p) => p.slug === activeProject);
+      typing.hidden = pm?.state !== "working";
+      button.disabled = false;
+      return;
+    }
+    typing.hidden = !repoWaiting;
+    button.disabled = repoWaiting;
+  };
   const setWaiting = (waiting: boolean) => {
-    typing.hidden = !waiting;
-    button.disabled = waiting;
+    repoWaiting = waiting;
+    paintWaiting();
   };
 
   const send = async () => {
@@ -247,6 +338,7 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
     if (!text || button.disabled) return;
     voice.cancelSpeech(); // new turn — stop reading the previous reply
     input.value = "";
+    if (activeProject) return void sendToProject(activeProject, text);
     setWaiting(true);
     await ensureDefaultRepo();
     try {
@@ -267,6 +359,23 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
     }
   };
 
+  // lane L5: a project PM takes messages any time (they queue); replies arrive as pm_message frames
+  const sendToProject = async (slug: string, text: string): Promise<void> => {
+    const key = chatKeyFor(slug);
+    try {
+      const res = await fetch(`${HTTP_BASE}/pm/send`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ project: slug, text }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) appendLine(key, "system", body?.error ?? t("chat.sendFailed", { status: res.status }));
+      else if (body?.queued) appendLine(key, "info", t("chat.queued"));
+    } catch {
+      appendLine(key, "system", t("chat.noDaemon", { url: location.host }));
+    }
+  };
+
   button.addEventListener("click", send);
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") send();
@@ -280,10 +389,10 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
   stopBtn.addEventListener("click", async () => {
     stopBtn.disabled = true;
     try {
-      await fetch(`${HTTP_BASE}/chat/stop`, {
+      await fetch(activeProject ? `${HTTP_BASE}/pm/stop` : `${HTTP_BASE}/chat/stop`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(activeRepo ? { repo: activeRepo } : {}),
+        body: JSON.stringify(activeProject ? { project: activeProject } : activeRepo ? { repo: activeRepo } : {}),
       });
     } catch {
       appendLine(activeKey(), "system", t("chat.stopFailed"));
@@ -333,7 +442,40 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
     ttsUrl: `${HTTP_BASE}/tts`,
   });
 
+  const onPmMessage = (frame: ChatFrame) => {
+    if (frame.id) {
+      if (seenFrameIds.has(frame.id)) return; // WS backlog replay dedup
+      seenFrameIds.add(frame.id);
+    }
+    const meta = frame.meta as ChatMeta & { project?: string };
+    if (!meta.project) return;
+    const key = chatKeyFor(meta.project);
+    if (meta.role === "assistant") {
+      appendLine(key, "assistant", meta.text);
+      if (meta.done && activeProject === meta.project) voice.speakerResetTurn();
+      if (meta.text && speakLive && activeProject === meta.project) voice.speak(meta.text);
+    } else if (meta.role === "user") {
+      appendLine(key, "user", meta.text);
+    } else {
+      appendLine(key, "system", meta.text);
+    }
+  };
+
   const onFrame = (frame: ChatFrame) => {
+    if (frame.type === "pm_status") {
+      pms = applyPmStatus(pms, frame);
+      // viewing a PM and it just answered → nothing is "unread" for the person looking
+      if (activeProject && !root.classList.contains("collapsed")) {
+        const pm = pms.find((p) => p.slug === activeProject);
+        if (pm && pm.unread > 0) markRead(activeProject);
+      }
+      syncUi();
+      return;
+    }
+    if (frame.type === "pm_message" && frame.meta) {
+      onPmMessage(frame);
+      return;
+    }
     if (frame.type !== "chat_message" || !frame.meta) return;
     if (frame.id) {
       if (seenFrameIds.has(frame.id)) return; // WS backlog replay dedup
@@ -373,6 +515,7 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
   // there or not — no backoff ceremony needed.
   const connect = () => {
     const ws = new WebSocket(WS_URL);
+    ws.onopen = () => void refreshPms(); // statuses are live-only: resync after (re)connecting
     ws.onmessage = (msg) => {
       try {
         onFrame(JSON.parse(String(msg.data)) as ChatFrame);
@@ -394,6 +537,13 @@ export function mountChatBox(hooks: ChatBoxHooks = {}): ChatBoxHandle {
     prefill(text: string) {
       input.value = text;
       input.focus();
+    },
+    selectProject(slug: string | null) {
+      selectProject(slug);
+      if (slug) {
+        paintCollapse(false); // asked to open a PM: show the box
+        input.focus();
+      }
     },
   };
 }

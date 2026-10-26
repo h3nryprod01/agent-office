@@ -143,7 +143,7 @@ member has no SOP) and `parentItemId`. Later `POST /items/update` with
 `{project, id, patch: {sopStep: 3}}` moves it. A broken SOP file never blocks an
 assignment: the persona prompt still goes out and the response lists `problems`.
 
-Also: `GET /members?source=company|template|project[&name=]` (a roster with
+Also: `GET /roster-members?source=company|template|project[&name=]` (a roster with
 persona/sop) and `GET /sop?source=…&member=<name>` (one parsed SOP). The Hiring
 Hall shows a card per persona with a **View SOP** button; the Templates panel
 shows the same cards before you apply anything.

@@ -211,7 +211,7 @@ export function mountTemplates(
     peopleOpen.add(name);
     renderList();
     if (people.has(name)) return;
-    fetch(`/members?${new URLSearchParams({ source: "template", name })}`)
+    fetch(`/roster-members?${new URLSearchParams({ source: "template", name })}`)
       .then(async (res) => {
         const body = (await res.json().catch(() => null)) as (RosterPayload & { error?: string }) | null;
         if (!res.ok || !body) throw new Error(body?.error ?? `HTTP ${res.status}`);

@@ -20,9 +20,7 @@ import { SessionEndMonitor } from "./session-end-monitor.js";
 import { makeEvent, getRepoRoot } from "./event-schema.js";
 import { EventBroadcastServer } from "./ws-server.js";
 import { ChatSessionManager, createChatHttpHandler } from "./chat-session.js";
-import { createZaloHttpHandler } from "./zalo.js";
 import { attachNotifier } from "./notifier.js";
-import { pollUpdates } from "./telegram.js";
 import { ApprovalBroker, createApprovalHttpHandler } from "./approvals.js";
 import { UsageCostIndex, createCostsHttpHandler } from "./usage-costs.js";
 import { OutputsIndex, createOutputsHttpHandler } from "./outputs.js";
@@ -51,6 +49,7 @@ import { attachRadar, createRadarHttpHandler } from "./radar.js";
 import { attachInterventionMetrics, createMetricsHttpHandler } from "./intervention-metrics.js";
 import { createSessionOpenHandler } from "./session-open.js";
 import { createAssignmentsHttpHandler } from "./assignments.js"; // lane L6
+import { createMultiPm } from "./multi-pm.js"; // lane L5
 
 const PROJECTS_ROOT =
   process.env.CLAUDE_PROJECTS_ROOT ?? path.join(os.homedir(), ".claude", "projects");
@@ -94,13 +93,12 @@ async function main() {
   // the office. In-memory only — restart = every pending falls back to "ask".
   const approvalBroker = new ApprovalBroker({
     broadcast: (event) => server.broadcast(event),
-    hasClients: () => server.clientCount > 0,
+    hasClients: () => server.clientCount > 0 || multiPm.hasApprovers(), // lane L5: a phone-only owner counts as watching
     makeEvent,
     isOverBudget: () => usageIndex.overBudgetNow(),
     ...(process.env.APPROVAL_TTL_MS ? { ttlMs: Number(process.env.APPROVAL_TTL_MS) } : {}),
   });
   const chatHttp = createChatHttpHandler(chatManager);
-  const zaloHttp = createZaloHttpHandler(chatManager);
   const approvalHttp = createApprovalHttpHandler(approvalBroker);
   // Cost dashboard (wi-cost-dashboard, wi-cost-multiharness): lazy usage
   // aggregation over the same three session trees the tailers watch — parsed
@@ -131,8 +129,26 @@ async function main() {
   const templatesHttp = createTemplatesHttpHandler();
   // ~/.agent-office/projects/<slug>/ — the daemon is the only writer of an item.
   const projectsHttp = createProjectsHttpHandler();
-  // lane L6: persona + SOP — /members, /sop, /assign. SOP files sit next to the company roster.
+  // lane L6: persona + SOP — /roster-members, /sop, /assign. SOP files sit next to the company roster.
   const assignmentsHttp = createAssignmentsHttpHandler({ companyDir: path.dirname(rosterPath) });
+  // lane L5: one PM per project, members + pairing codes, Telegram/Zalo channels, the
+  // end-of-day digest (multi-pm.js). Owns /pms /pm/* /overview /members /pairing /channels and
+  // the Zalo webhook. `server` is assigned below — every callback here runs after it exists.
+  // TODO(coordinator, lane L1): pass `roleOf: (req) => ...` once the platform lane's access
+  // control lands; until then every caller counts as owner, as before roles existed.
+  const multiPm = createMultiPm({
+    chatManager,
+    approvalBroker,
+    broadcast: (event) => server.broadcast(event),
+    // pm_status is live-only: never into the replay buffer (it would evict real sessions)
+    broadcastLive: (event) => {
+      const payload = JSON.stringify(event);
+      for (const client of server.wss?.clients ?? []) if (client.readyState === client.OPEN) client.send(payload);
+    },
+    // lane L4's radar, when present; a 404 simply drops the line from the digest
+    metricsUrl: (slug) => `http://127.0.0.1:${WS_PORT}/metrics/intervention?project=${encodeURIComponent(slug)}`,
+    ...(process.env.CHAT_CLAUDE_BIN ? { claudeBin: process.env.CHAT_CLAUDE_BIN } : {}),
+  });
   // R13-INFRA: harness install/login probe for the onboarding wizard, and a
   // static handler serving the renderer build (1 process, 1 port).
   const harnessHttp = createHarnessHttpHandler();
@@ -162,7 +178,7 @@ async function main() {
     ...(process.env.WORK_ITEMS_PATH ? { workItemsPath: process.env.WORK_ITEMS_PATH } : {}),
     extraHttp: (req, res, url) =>
       chatHttp(req, res, url) ||
-      zaloHttp(req, res, url) ||
+      multiPm.http(req, res, url) || // lane L5 (also serves POST /zalo/webhook)
       approvalHttp(req, res, url) ||
       costsHttp(req, res, url) ||
       scorecardHttp(req, res, url) || // lane L3
@@ -215,11 +231,16 @@ async function main() {
   sessionOpenHttp = createSessionOpenHandler({ resolveCwd: (id) => radar.agentCwd(id) });
   attachNotifier(server); // macOS notification khi agent kẹt >30s (AGENT_OFFICE_NOTIFY=0 để tắt)
   attachPolicyWatch(server, { store: policyStore }); // lane L2: warn when a forbidden harness/lane runs in a project
-  // Two-way Telegram: a silent no-op unless TELEGRAM_BOT_TOKEN +
-  // TELEGRAM_CHAT_ID are both set — see telegram.js's own config gate.
-  const telegramPoll = pollUpdates(chatManager);
+  // lane L5: Telegram is now a multi-project, multi-member channel (telegram-channel.js): a
+  // silent no-op without TELEGRAM_BOT_TOKEN; TELEGRAM_CHAT_ID stays the operator's own chat.
+  // attach() pushes approvals to people's chats; start() begins polling + the daily digest.
+  multiPm.attach(server);
+  multiPm.start();
   console.log(`[daemon] approve gateway: POST http://${WS_HOST}:${WS_PORT}/approval-request|/approval-response`);
   console.log(`[daemon] PM chat endpoint: POST http://${WS_HOST}:${WS_PORT}/chat (repo: ${repoRoot})`);
+  console.log(
+    `[daemon] project PMs: GET /pms, /overview · POST /pm/send (telegram: ${multiPm.channels.telegram.enabled ? "on" : "off"}, zalo: ${multiPm.channels.zalo.enabled ? "on" : "off"})`
+  );
   console.log(`[daemon] cost dashboard: GET http://${WS_HOST}:${WS_PORT}/costs?window=24h|7d|30d`);
   console.log(`[daemon] outputs (tủ hồ sơ): GET http://${WS_HOST}:${WS_PORT}/outputs, POST /open`);
   console.log(`[daemon] collision radar: GET http://${WS_HOST}:${WS_PORT}/radar, /radar/touching?path=; metrics: GET /metrics/intervention`);
@@ -473,7 +494,7 @@ async function main() {
     endMonitor.stop();
     radar.stop(); // lane L4
     interventionMetrics.stop(); // lane L4: flush the queued episodes
-    telegramPoll.stop(); // aborts the in-flight getUpdates long-poll (Telegram allows only 1 consumer)
+    multiPm.stop(); // aborts the in-flight getUpdates long-poll (Telegram allows only 1 consumer) + PM processes
     vieneuTts.dispose();
     chatManager.dispose(); // kill warm PM processes so they don't outlive the daemon
     await server.stop();

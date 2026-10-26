@@ -60,7 +60,7 @@ export async function sendMessage(text, { fetchFn = fetch, env = process.env } =
   }
 }
 
-function readOffset(offsetFile) {
+export function readOffset(offsetFile) {
   try {
     const parsed = JSON.parse(fs.readFileSync(offsetFile, "utf8"));
     return typeof parsed?.offset === "number" ? parsed.offset : 0;
@@ -69,7 +69,7 @@ function readOffset(offsetFile) {
   }
 }
 
-function writeOffset(offsetFile, offset) {
+export function writeOffset(offsetFile, offset) {
   try {
     fs.mkdirSync(path.dirname(offsetFile), { recursive: true });
     fs.writeFileSync(offsetFile, JSON.stringify({ offset }));
