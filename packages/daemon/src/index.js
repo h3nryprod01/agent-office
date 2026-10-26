@@ -205,7 +205,7 @@ async function main() {
     // must not trip /harnesses?probe= or POST /templates/apply). Same-origin app
     // works; AGENT_OFFICE_DEV=1 additionally allows the Vite dev origin.
     // lane L1: origin check first, then the token gate (loopback passes it untouched)
-    originGuard: combineGuards(createOriginGuard(), createAccessGuard({ store: accessStore })),
+    originGuard: combineGuards(createOriginGuard(), createAccessGuard({ store: accessStore, publicWebhookEnabled: () => multiPm.channels.zalo.enabled })),
   });
   const outputsIndex = new OutputsIndex({ repoRoot, workItemsPath: server.workItemsPath });
   outputsHttp = createOutputsHttpHandler(outputsIndex);

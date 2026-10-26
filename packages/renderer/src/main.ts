@@ -40,7 +40,7 @@ import type { EventSource } from "./events/EventSource";
 import { PolicyAlertsStore } from "./ui/policyAlerts";
 import { mountPolicyPanel, type AuditRow, type PolicyBody, type PolicyPanelHandle, type ProjectPolicy } from "./ui/policyPanel";
 // lane L9: presentation mode (data-layer masking)
-import { installPresentationMode, mountCleanHud, mountPresentationToggle } from "./presentation";
+import { installPresentationMode, isPresentationMode, mountCleanHud, mountPresentationToggle } from "./presentation";
 
 /** "" = the All tab's office; otherwise the repo name. */
 const ALL_KEY = "";
@@ -287,7 +287,8 @@ async function boot(): Promise<void> {
   const policyRoot = document.createElement("div"); // lane L2: filled by mountPolicyPanel once the tabs exist
   const settings = mountSettings(document.querySelector<HTMLElement>("#settings")!, {
     ...(useWs ? { extra: policyRoot } : {}),
-    daemonUrl: wsBase().replace(/^wss?:\/\//, ""), // the daemon this page actually talks to (on-prem: any host/port)
+    // the daemon this page actually talks to (on-prem: any host/port) — but not a LAN IP or tunnel domain on a projector
+    daemonUrl: isPresentationMode() ? "this-machine" : wsBase().replace(/^wss?:\/\//, ""),
     ...(useWs
       ? {
           fetchHarnesses: (): Promise<HarnessStatus[]> =>

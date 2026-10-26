@@ -38,7 +38,7 @@ const TOKEN_ID_KEY = "aoTokenId";
 const WEBHOOK_MAX_BYTES = 64 * 1024;
 
 /** Routes that act on the HOST machine's desktop; remote managers do not get them. */
-const OWNER_ONLY_PATHS = new Set(["/open"]);
+const OWNER_ONLY_PATHS = new Set(["/open", "/sessions/open-terminal"]);
 /** Zalo's servers call this and cannot carry a token; zalo.js checks the sender itself. Only while Zalo is configured. */
 const PUBLIC_POST_PATHS = new Set(["/zalo/webhook"]);
 /** Headers a proxy or tunnel adds; their presence means the peer address is not the real client. */
@@ -213,7 +213,14 @@ export function isLoopbackRequest(req) {
   // ITS name in Host (and the origin guard lets Origin == Host through). Only a loopback name
   // in Host is the person at this machine; anything else must bring a token like a LAN caller.
   const host = String(req.headers?.host ?? "").replace(/:\d+$/, "").replace(/^\[|\]$/g, "").toLowerCase();
-  return host === "" || host === "localhost" || host === "127.0.0.1" || host === "::1";
+  // *.localhost is resolved by the browser itself and 0.0.0.0 is what the daemon prints in LAN
+  // mode: no outside site can make a browser send either as Host, so neither is a rebinding door.
+  return host === "" || host === "localhost" || host.endsWith(".localhost") || host === "127.0.0.1" || host === "::1" || host === "0.0.0.0";
+}
+
+/** True when the guard verified an access token on this request (a LAN or tunnel caller, not loopback). */
+export function hasVerifiedToken(req) {
+  return Boolean(req?.[TOKEN_ID_KEY]);
 }
 
 /** "owner" | "manager" | "viewer" | null. Reads what the guard decided; safe default without a guard. */
@@ -256,8 +263,9 @@ const DENIED_PAGE =
 export function createAccessGuard({
   store,
   isLoopback = isLoopbackRequest,
-  // the webhook is only a public door while the Zalo bridge is actually configured
-  publicWebhookEnabled = () => Boolean(process.env.ZALO_OA_TOKEN && process.env.ZALO_ALLOWED_USER),
+  // the webhook is only a public door while the Zalo bridge is actually configured; index.js
+  // passes the live channel state (L5's zalo-channel.js: token + app id + OA secret, signed)
+  publicWebhookEnabled = () => Boolean(process.env.ZALO_OA_TOKEN && process.env.ZALO_APP_ID && process.env.ZALO_OA_SECRET),
 }) {
   const resolve = (req) => {
     if (isLoopback(req)) return "owner";

@@ -72,7 +72,14 @@ function safeStorage(): Storage | null {
 }
 
 /** Endpoints that act on the real machine; a talk must not trigger them. */
-const BLOCKED_POSTS = new Set(["/open"]);
+const BLOCKED_POSTS = new Set([
+  "/open",
+  "/sessions/open-terminal", // opens a real terminal at the real path, on the projector
+  // these send back text the page only holds masked (a document body, a quoted anchor): the
+  // aliases would be restored but the blurred words cannot, and the real file would be overwritten
+  "/docs/save",
+  "/docs/comment",
+]);
 
 /** Requests whose text must stay as masked as it is on screen: it is spoken aloud. */
 const NO_UNMASK_POSTS = new Set(["/tts"]);

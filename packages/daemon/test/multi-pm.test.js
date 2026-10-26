@@ -372,3 +372,20 @@ test("the digest and the router share one state file: neither run erases the oth
   assert.ok(Object.keys(state).some((k) => k.startsWith("dm:")), "the /use choice is still there");
   await w.close();
 });
+
+// coordinator (integration): once L1's guard sits in front, a caller that showed a valid token may reach
+// the daemon by any name (Tailscale MagicDNS, office.local, an HTTPS proxy); only token-less callers keep the Host check.
+test("a verified token holder on a non-loopback Host name is served; the same call without a token is refused", async () => {
+  const w = await boot({ roleOf: () => "manager" });
+  const call = (withToken) => {
+    const req = { method: "GET", url: "/overview", headers: { host: "office.local:8787" }, socket: { remoteAddress: "192.0.2.5" } };
+    if (withToken) req.aoTokenId = "tok-1"; // what L1's guard stamps on a request it authenticated
+    let status = 0;
+    const res = { writeHead: (s) => { status = s; }, setHeader() {}, end() {} };
+    w.multi.http(req, res, new URL("http://office.local:8787/overview"));
+    return status;
+  };
+  assert.equal(call(false), 403);
+  assert.equal(call(true), 200);
+  await w.close();
+});

@@ -542,3 +542,35 @@ test("a loopback connection with a foreign Host is not loopback (DNS rebinding)"
   assert.equal(roleOf(req("evil.example:8787")), null);
   assert.equal(roleOf(req("localhost:8787")), "owner");
 });
+
+test("loopback Host names a browser cannot be tricked into sending still count as local", async () => {
+  const { isLoopbackRequest } = await import("../src/access.js");
+  const req = (host) => ({ socket: { remoteAddress: "127.0.0.1" }, headers: { host } });
+  assert.equal(isLoopbackRequest(req("office.localhost:8787")), true);
+  assert.equal(isLoopbackRequest(req("0.0.0.0:8787")), true);
+  assert.equal(isLoopbackRequest(req("localhost.evil.example:8787")), false);
+});
+
+test("/sessions/open-terminal is owner-only, like /open (it opens a window on the host desktop)", () => {
+  const { guard, tokens } = setup({ m: "manager", o: "owner" });
+  const res = fakeRes();
+  assert.equal(guard.http(fakeReq({ method: "POST", url: "/sessions/open-terminal", headers: { authorization: `Bearer ${tokens.m}` } }), res), false);
+  assert.equal(res.status, 403);
+  assert.equal(guard.http(fakeReq({ method: "POST", url: "/sessions/open-terminal", headers: { authorization: `Bearer ${tokens.o}` } }), fakeRes()), true);
+});
+
+test("by default the Zalo webhook opens with L5's channel config (token + app id + OA secret)", () => {
+  const keys = ["ZALO_OA_TOKEN", "ZALO_APP_ID", "ZALO_OA_SECRET", "ZALO_ALLOWED_USER"];
+  const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  try {
+    for (const k of keys) delete process.env[k];
+    const store = new AccessStore({ file: tmpFile() });
+    const closed = createAccessGuard({ store });
+    assert.equal(closed.http(fakeReq({ method: "POST", url: "/zalo/webhook" }), fakeRes()), false);
+    Object.assign(process.env, { ZALO_OA_TOKEN: "t", ZALO_APP_ID: "a", ZALO_OA_SECRET: "s" });
+    const open = createAccessGuard({ store });
+    assert.equal(open.http(fakeReq({ method: "POST", url: "/zalo/webhook" }), fakeRes()), true);
+  } finally {
+    for (const k of keys) (saved[k] === undefined ? delete process.env[k] : (process.env[k] = saved[k]));
+  }
+});

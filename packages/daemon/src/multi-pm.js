@@ -7,9 +7,9 @@
 // lands the default is "owner": the daemon binds loopback and the origin guard already
 // refuses remote pages, which is the trust model the office had before roles existed.
 
-import os from "node:os";
 import path from "node:path";
 
+import { agentOfficeHome, hasVerifiedToken } from "./access.js";
 import { ChannelRouter } from "./channel-router.js";
 import { DigestService } from "./digest.js";
 import { JsonState } from "./json-state.js";
@@ -62,7 +62,7 @@ export function hostAllowed(hostHeader, allowList = "") {
  */
 export function createMultiPm({
   projectsDir = DEFAULT_PROJECTS_DIR,
-  stateDir = path.join(os.homedir(), ".agent-office"),
+  stateDir = agentOfficeHome(),
   env = process.env,
   chatManager = null,
   approvalBroker,
@@ -209,7 +209,9 @@ export function createMultiPm({
     // /members/remove) or returns project data: none may be reachable by a DNS-rebinding page
     // (it passes the origin guard — same "origin" as the Host it asked for). Rebinding needs a
     // hostname, so a request must arrive on loopback, an IP literal, or an allow-listed name.
-    if (req.method !== "OPTIONS" && !hostAllowed(req.headers?.host, env.AGENT_OFFICE_ALLOWED_HOSTS)) {
+    // A caller that showed a valid access token (L1) is who it says, whatever name it used to reach us
+    // (Tailscale MagicDNS, office.local, an HTTPS proxy): the Host check is only for token-less callers.
+    if (req.method !== "OPTIONS" && !hasVerifiedToken(req) && !hostAllowed(req.headers?.host, env.AGENT_OFFICE_ALLOWED_HOSTS)) {
       res.writeHead(403, { ...CORS_HEADERS, "content-type": "application/json" });
       res.end(JSON.stringify({ ok: false, error: "this request arrived on an unexpected host name" }));
       return true;

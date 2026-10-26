@@ -117,6 +117,6 @@ scrubbed of it and a failure is logged once per outage, not once per retry.
 `POST /pm/send {project, text}` · `POST /pm/read {project}` · `POST /pm/stop {project}` ·
 `POST /pairing {project, role}` / `GET /pairing?project=` · `POST /members/remove {project, id}`
 
-Writes are gated by `roleOf(req)` (platform lane); until that is wired every caller is `owner` (the daemon is loopback-only and the origin guard refuses remote pages — the trust model every other office route already has). Every route above also refuses a request whose `Host` is a DNS name (DNS-rebinding defence): loopback and IP addresses pass, anything else must be listed in `AGENT_OFFICE_ALLOWED_HOSTS` (comma separated).
+Writes are gated by `roleOf(req)` from the access guard (`access.js`): loopback is `owner`; a LAN or tunnel caller carries the role of its access token. A caller **without** a token whose `Host` is a DNS name is refused (DNS-rebinding defence): loopback and IP addresses pass, other names must be listed in `AGENT_OFFICE_ALLOWED_HOSTS` (comma separated). A verified token holder may use any name (Tailscale MagicDNS, `office.local`, an HTTPS proxy).
 New WS event types, both additive: `pm_message` (chat lines, replayed on reload) and
 `pm_status` (live only).

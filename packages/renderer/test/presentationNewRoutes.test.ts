@@ -53,3 +53,20 @@ describe("presentation mode masks the payloads of routes added by other lanes", 
     expect(SENSITIVE.filter((s) => raw.includes(s)).length).toBeGreaterThan(8);
   });
 });
+
+describe("presentation mode keeps policy maps round-trippable", () => {
+  it("modes survive, tool and role keys are aliased and come back on unmask", () => {
+    const m = createMasker();
+    const body = { approval: { mode: "auto", roles: { "billing specialist": "ask" }, tools: { "mcp__acme_crm__lookup": "deny", "Notebook*": "read-only", Bash: "auto" } } };
+    const masked = m.mask(body);
+    const out = JSON.stringify(masked);
+    expect(SENSITIVE.filter((s) => out.includes(s))).toEqual([]);
+    expect(Object.values(masked.approval.tools).sort()).toEqual(["auto", "deny", "read-only"]);
+    expect(Object.values(masked.approval.roles)).toEqual(["ask"]);
+    expect(JSON.parse(m.unmask(out))).toEqual(body);
+  });
+  it("metrics keyed by project name are masked", () => {
+    const out = JSON.stringify(createMasker().mask({ byProject: { "acme-web": { count: 3 } }, byDay: [{ day: "2026-10-27", byProject: { "globex-api": { count: 1 } } }] }));
+    expect(SENSITIVE.filter((s) => out.includes(s))).toEqual([]);
+  });
+});

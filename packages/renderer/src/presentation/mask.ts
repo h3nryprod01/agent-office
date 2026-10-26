@@ -32,10 +32,12 @@ const PROJECT_KEYS = new Set(["repo", "project", "projectslug", "projectname", "
 const AGENT_KEYS = new Set(["agent", "agentname", "assignee", "owner", "author", "label", "name"]);
 const BRANCH_KEYS = new Set(["branch", "gitbranch", "ref"]);
 /** Containers whose object KEYS are project names (`{ repos: { "acme-web": {...} } }`). */
-const PROJECT_MAP_KEYS = new Set(["repos", "projects", "offices"]);
+const PROJECT_MAP_KEYS = new Set(["repos", "projects", "offices", "byproject"]);
 /** Containers whose object KEYS are tool names or role names (the approval policy: `{ tools: { "mcp__crm__lookup": "deny" } }`). */
 const TOOL_MAP_KEYS = new Set(["tools"]);
 const ROLE_MAP_KEYS = new Set(["roles"]);
+/** The values of those maps are approval modes: public words the panel must read back intact. */
+const APPROVAL_MODES = new Set(["ask", "auto", "read-only", "deny"]);
 /** Keys whose value is removed outright. */
 const SECRET_KEY =
   /token|secret|passw|credential|cookie|apikey|api_key|privatekey|private_key|accesskey|access_key|sessionkey|signature|jwt|authorization|oauth/i;
@@ -214,12 +216,16 @@ export function createMasker(): Masker {
       const keyed = !inArray && PROJECT_MAP_KEYS.has(key.toLowerCase());
       if (keyed) for (const k of Object.keys(src)) maskProject(k); // register before values mention them
       const visited: Record<string, unknown> = {};
-      for (const k of orderedKeys(src)) visited[k] = walk(src[k], k, src);
-      const out: Record<string, unknown> = {};
       const lowerKey = key.toLowerCase();
+      const modeMap = !inArray && (TOOL_MAP_KEYS.has(lowerKey) || ROLE_MAP_KEYS.has(lowerKey));
+      for (const k of orderedKeys(src)) {
+        const v = src[k];
+        visited[k] = modeMap && typeof v === "string" && APPROVAL_MODES.has(v) ? v : walk(v, k, src);
+      }
+      const out: Record<string, unknown> = {};
       const keyOf = (k: string): string =>
         keyed ? maskProject(k)
-        : !inArray && TOOL_MAP_KEYS.has(lowerKey) ? maskTool(k)
+        : !inArray && TOOL_MAP_KEYS.has(lowerKey) ? (k.startsWith("mcp__") || /^[A-Za-z][\w.-]{0,40}$/.test(k) ? maskTool(k) : alias("tool", k))
         : !inArray && ROLE_MAP_KEYS.has(lowerKey) ? alias("agent", k)
         : k;
       for (const k of Object.keys(src)) out[keyOf(k)] = visited[k];

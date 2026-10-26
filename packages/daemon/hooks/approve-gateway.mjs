@@ -27,7 +27,7 @@
 
 import { readFileSync } from "node:fs";
 
-const PORT = process.env.AGENT_OFFICE_PORT ?? "8787";
+const PORT = process.env.AGENT_OFFICE_PORT ?? process.env.DAEMON_WS_PORT ?? "8787";
 const FETCH_TIMEOUT_MS = Number(process.env.APPROVE_GATEWAY_TIMEOUT_MS ?? 27_000);
 const URL_BASE = `http://127.0.0.1:${PORT}`;
 

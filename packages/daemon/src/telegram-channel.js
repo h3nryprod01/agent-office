@@ -13,13 +13,13 @@
 // outage instead of once per retry. Telegram allows one getUpdates consumer per bot, so
 // stop() aborts the in-flight request instead of letting it linger.
 
-import os from "node:os";
 import path from "node:path";
 
+import { agentOfficeHome } from "./access.js";
 import { nextOffset, readOffset, writeOffset } from "./telegram.js";
 
 const DEFAULT_API_BASE = "https://api.telegram.org";
-const DEFAULT_OFFSET_FILE = path.join(os.homedir(), ".agent-office", "telegram-offset.json");
+const DEFAULT_OFFSET_FILE = path.join(agentOfficeHome(), "telegram-offset.json"); // honours AGENT_OFFICE_HOME (on-prem service accounts)
 const MESSAGE_LIMIT = 4096;
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

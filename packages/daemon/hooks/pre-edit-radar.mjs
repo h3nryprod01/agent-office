@@ -15,7 +15,7 @@
 
 import { pathToFileURL } from "node:url";
 
-const PORT = process.env.AGENT_OFFICE_PORT ?? "8787";
+const PORT = process.env.AGENT_OFFICE_PORT ?? process.env.DAEMON_WS_PORT ?? "8787";
 const TIMEOUT_MS = 1500;
 
 /** @returns {Promise<object|null>} hook JSON output, or null for "say nothing" */

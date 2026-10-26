@@ -110,6 +110,14 @@ describe("masked fetch", () => {
     expect(res.status).toBe(403);
     expect(calls).toHaveLength(0);
   });
+
+  // coordinator: L7 docs and L4 terminal arrived after L9; their writes echo masked text or act on the host
+  it.each(["/docs/save", "/docs/comment", "/sessions/open-terminal"])("refuses POST %s while presenting", async (route) => {
+    const { win, calls } = setup(() => json({ ok: true }));
+    const res = await win.fetch(route, { method: "POST", body: JSON.stringify({ project: "project-1", path: "dir-1/file-2.md", content: "▒▒▒" }) });
+    expect(res.status).toBe(403);
+    expect(calls).toHaveLength(0);
+  });
 });
 
 describe("persistPresentationFlag", () => {
