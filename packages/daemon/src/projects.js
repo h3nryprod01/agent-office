@@ -21,7 +21,11 @@ import { DEFAULT_TEMPLATES_DIR } from "./templates.js";
 export const PROJECT_SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
 export const ITEM_SOURCES = ["human", "agent"];
 export const ITEM_STATUSES = ["idea", "doing", "review", "done", "dropped"];
-export const DEFAULT_PROJECTS_DIR = path.join(os.homedir(), ".agent-office", "projects");
+// lane L1: AGENT_OFFICE_HOME relocates the whole data folder (default ~/.agent-office)
+export const DEFAULT_PROJECTS_DIR = path.join(
+  process.env.AGENT_OFFICE_HOME ?? path.join(os.homedir(), ".agent-office"),
+  "projects",
+);
 
 const TITLE_MAX = 200;
 const PATCHABLE = ["title", "status", "assignee", "fromIdea", "links"];

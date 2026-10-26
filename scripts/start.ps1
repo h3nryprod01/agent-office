@@ -17,6 +17,9 @@
 #Requires -Version 5.1
 [CmdletBinding()]
 param(
+    # lane L1: `start.ps1 doctor|update|backup|restore|lan|token [options]` runs the ao CLI instead of starting
+    [Parameter(Position = 0)][string]$Command = "start",
+    [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest,
     # Must match install-daemon-service.ps1's default; that script registers the
     # task under this name.
     [string]$TaskName = "AgentOfficeDaemon"
@@ -29,6 +32,22 @@ $Repo = (Resolve-Path "$PSScriptRoot\..").Path
 # cấp quyền riêng, nên mở bằng IP thì quyền microphone đã cấp cho localhost
 # không áp dụng — nhận giọng nói chết im lặng.
 $Url = "http://localhost:8787"
+
+# lane L1: operations verbs, and a readiness check before anything is installed
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Write-Error "Node.js 20+ is required: winget install OpenJS.NodeJS.LTS"
+    exit 1
+}
+if ($Command -in @("doctor", "update", "backup", "restore", "lan", "token")) {
+    & node (Join-Path $Repo "scripts\ao.mjs") $Command @Rest
+    exit $LASTEXITCODE
+}
+if ($Command -ne "start") {
+    Write-Error "unknown command '$Command' - use: doctor, update, backup, restore, lan, token (or no argument to start)"
+    exit 2
+}
+& node (Join-Path $Repo "scripts\ao.mjs") doctor --preflight
+if ($LASTEXITCODE -ne 0) { exit 1 }
 
 function Test-Daemon {
     try {

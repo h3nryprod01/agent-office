@@ -33,6 +33,8 @@ import { VieNeuTts, createTtsHttpHandler } from "./tts.js";
 import { createHarnessHttpHandler } from "./harness-probe.js";
 import { createStaticHttpHandler } from "./static-serve.js";
 import { createOriginGuard } from "./origin-guard.js";
+// lane L1: LAN access control (token auth for non-loopback requests)
+import { AccessStore, createAccessGuard, combineGuards, resolveBindHost, watchRevocations } from "./access.js";
 
 const PROJECTS_ROOT =
   process.env.CLAUDE_PROJECTS_ROOT ?? path.join(os.homedir(), ".claude", "projects");
@@ -40,7 +42,9 @@ const CODEX_SESSIONS_ROOT =
   process.env.CODEX_SESSIONS_ROOT ?? path.join(os.homedir(), ".codex", "sessions");
 const GEMINI_TMP_ROOT = process.env.GEMINI_TMP_ROOT ?? path.join(os.homedir(), ".gemini", "tmp");
 const WS_PORT = Number(process.env.DAEMON_WS_PORT ?? 8787);
-const WS_HOST = process.env.DAEMON_WS_HOST ?? "127.0.0.1";
+// lane L1: ~/.agent-office/access.json decides the default bind (127.0.0.1 unless LAN mode is on)
+const accessStore = new AccessStore();
+const WS_HOST = resolveBindHost(accessStore);
 const SESSION_INACTIVITY_TIMEOUT_MS = Number(
   process.env.SESSION_INACTIVITY_TIMEOUT_MS ?? 5 * 60 * 1000
 );
@@ -135,7 +139,8 @@ async function main() {
     // reject cross-origin requests before any route runs (CSRF: a remote page
     // must not trip /harnesses?probe= or POST /templates/apply). Same-origin app
     // works; AGENT_OFFICE_DEV=1 additionally allows the Vite dev origin.
-    originGuard: createOriginGuard(),
+    // lane L1: origin check first, then the token gate (loopback passes it untouched)
+    originGuard: combineGuards(createOriginGuard(), createAccessGuard({ store: accessStore })),
   });
   const outputsIndex = new OutputsIndex({ repoRoot, workItemsPath: server.workItemsPath });
   outputsHttp = createOutputsHttpHandler(outputsIndex);
@@ -178,6 +183,12 @@ async function main() {
   console.log(`[daemon] serving work registry from ${server.workItemsPath}`);
   console.log(`[daemon] tailing transcripts under ${PROJECTS_ROOT}`);
   console.log(`[daemon] session inactivity timeout: ${SESSION_INACTIVITY_TIMEOUT_MS}ms`);
+  // lane L1: say plainly whether the door is open to the network
+  if (!["127.0.0.1", "localhost", "::1"].includes(WS_HOST)) {
+    console.log(
+      `[daemon] LAN access ON (${WS_HOST}): non-loopback requests need a token — ${accessStore.list().length} issued (node scripts/ao.mjs token list)`
+    );
+  }
 
   /** @type {Map<string, SessionNormalizer>} keyed by agentId (sessionId for root agents) */
   const normalizers = new Map();
@@ -362,6 +373,9 @@ async function main() {
   });
 
   geminiTailer.start();
+
+  // lane L1: a revoked token also closes the sockets it already opened
+  watchRevocations({ store: accessStore, wss: server.wss });
 
   const shutdown = async () => {
     console.log("\n[daemon] shutting down");
