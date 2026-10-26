@@ -16,6 +16,8 @@ export interface PendingApproval {
   tool: string;
   preview: string;
   expiresAt: number;
+  /** lane L2: present when the project's policy was involved (a forced ask says why). */
+  policy?: { project?: string; mode?: string; forced?: string | null; reasons?: string[] };
 }
 
 interface ApprovalRawEvent {
@@ -27,6 +29,7 @@ interface ApprovalRawEvent {
     preview?: string;
     expiresAt?: number;
     state?: string;
+    policy?: PendingApproval["policy"];
   } | null;
 }
 
@@ -49,6 +52,7 @@ export class ApprovalsStore {
         tool: e.tool ?? "unknown",
         preview: e.meta?.preview ?? "",
         expiresAt,
+        ...(e.meta?.policy ? { policy: e.meta.policy } : {}),
       });
     } else if (e.type === "approval_resolved") {
       this.items.delete(id);

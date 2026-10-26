@@ -36,25 +36,26 @@ const TOOL = {
   },
 };
 
-/** POST to the daemon's ApprovalBroker; returns "allow" | "deny" | "none". */
+/** POST to the daemon's ApprovalBroker; returns {decision: "allow"|"deny"|"none", message?}. */
 async function askOffice(toolName, input, fetchFn = fetch) {
   try {
     const res = await fetchFn(`${URL_BASE}/approval-request`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ tool: toolName, toolInput: input }),
+      // lane L2: cwd (claude's cwd = the PM's repo) resolves the project policy; role "pm" lets a project override it.
+      body: JSON.stringify({ tool: toolName, toolInput: input, cwd: process.cwd(), harness: "claude", role: "pm" }),
     });
     const body = await res.json();
-    return body?.decision ?? "none";
+    return { decision: body?.decision ?? "none", message: typeof body?.message === "string" ? body.message : undefined };
   } catch {
-    return "none";
+    return { decision: "none" };
   }
 }
 
 /**
  * Handle one JSON-RPC message. Returns the response object to write, or null
- * (notifications / no-id). `approve(toolName, input) => Promise<decision>` is
- * injectable for tests.
+ * (notifications / no-id). `approve(toolName, input) => Promise<decision | {decision, message}>`
+ * is injectable for tests.
  * @param {any} msg
  * @param {(toolName: string, input: object) => Promise<string>} [approve]
  * @returns {Promise<object|null>}
@@ -80,13 +81,15 @@ export async function handleMessage(msg, approve = askOffice) {
     if (name !== "approval_prompt") {
       return { jsonrpc: "2.0", id, error: { code: -32601, message: `unknown tool: ${name}` } };
     }
-    const decision = await approve(args?.tool_name, args?.input);
+    const answer = await approve(args?.tool_name, args?.input);
+    const decision = typeof answer === "string" ? answer : answer?.decision;
+    const policyMessage = typeof answer === "object" && typeof answer?.message === "string" ? answer.message : null;
     // Claude's permission-prompt-tool contract: the tool result text is a JSON
     // {behavior:"allow", updatedInput} or {behavior:"deny", message}.
     const payload =
       decision === "allow"
         ? { behavior: "allow", updatedInput: args?.input ?? {} }
-        : { behavior: "deny", message: "Denied, or no office was open to approve it (Agent Office)." };
+        : { behavior: "deny", message: policyMessage ?? "Denied, or no office was open to approve it (Agent Office)." };
     return { jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(payload) }] } };
   }
   if (id == null) return null; // notification — no response

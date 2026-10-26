@@ -31,6 +31,9 @@ import { mountTemplates, type ApplyResult, type TemplateSummary } from "./ui/tem
 import { EventRecorder } from "./replay/recorder";
 import { createSfx } from "./audio/sfx";
 import type { EventSource } from "./events/EventSource";
+// lane L2: approval modes + data rules
+import { PolicyAlertsStore } from "./ui/policyAlerts";
+import { mountPolicyPanel, type AuditRow, type PolicyBody, type PolicyPanelHandle, type ProjectPolicy } from "./ui/policyPanel";
 
 /** "" = the All tab's office; otherwise the repo name. */
 const ALL_KEY = "";
@@ -106,9 +109,11 @@ async function boot(): Promise<void> {
   // hiringHall is mounted further down, before source.start() fires.
   let hiringHall: HiringHallHandle | null = null;
   const approvals = useWs ? new ApprovalsStore() : undefined;
+  const policyAlerts = useWs ? new PolicyAlertsStore() : undefined; // lane L2: data-rule warnings
   const source: EventSource = useWs
     ? new WebSocketEventSource(undefined, undefined, (raw) => {
         approvals!.onRaw(raw);
+        policyAlerts!.onRaw(raw);
         hiringHall?.onRaw(raw);
       })
     : new MockEventSource(buildScenario(stress));
@@ -202,6 +207,7 @@ async function boot(): Promise<void> {
   const activityLog = mountActivityLog(document.querySelector<HTMLElement>("#log")!, {
     ...(fetchRecentTranscript ? { fetchTranscript: fetchRecentTranscript } : {}),
   });
+  let policyPanel: PolicyPanelHandle | undefined; // lane L2: assigned once the office tabs exist (setView reads it)
   const homeView = "office"; // refresh always lands on the office (2026-07-22)
   const navbar = mountNavbar(document.querySelector<HTMLElement>("#navbar")!, {
     items: navbarItems,
@@ -215,6 +221,7 @@ async function boot(): Promise<void> {
     if (key === "log") activityLog.refresh();
     if (key === "costs") costs.expand();
     if (key === "settings") settings.refresh();
+    if (key === "settings") policyPanel?.refresh(); // lane L2
   }
 
   // Spend dashboard — the agent company's payroll, in effect.
@@ -230,7 +237,9 @@ async function boot(): Promise<void> {
 
   // Settings: a real status screen — daemon connection + which agent CLIs
   // the app sees. Harness list is live-only; the WS reports connection changes.
+  const policyRoot = document.createElement("div"); // lane L2: filled by mountPolicyPanel once the tabs exist
   const settings = mountSettings(document.querySelector<HTMLElement>("#settings")!, {
+    ...(useWs ? { extra: policyRoot } : {}),
     daemonUrl: "127.0.0.1:8787",
     ...(useWs
       ? {
@@ -307,6 +316,29 @@ async function boot(): Promise<void> {
     hiringHall?.setRepo(repo);
   });
 
+  // lane L2: approval modes + data rules (Settings block) and the mode badge on each office tab.
+  // The tab badges are refreshed quietly every 30s so a mode changed elsewhere shows up.
+  if (useWs) {
+    // a 403 (opened over the LAN before L1's access rules exist) must reject, not hand back an error body
+    const json = <T,>(r: Response): Promise<T> => (r.ok ? (r.json() as Promise<T>) : Promise.reject(new Error(`HTTP ${r.status}`)));
+    policyPanel = mountPolicyPanel(policyRoot, {
+      fetchPolicies: () => fetch("/policy").then((r) => json<{ projects: ProjectPolicy[] }>(r)).then((b) => b.projects),
+      savePolicy: (slug: string, policy: PolicyBody) =>
+        fetch("/policy", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ project: slug, policy }),
+        }).then((r) => ({ ok: r.ok, status: r.status })),
+      fetchAudit: (slug: string | null) =>
+        fetch(`/policy/audit?limit=50${slug ? `&project=${encodeURIComponent(slug)}` : ""}`)
+          .then((r) => json<{ items: AuditRow[] }>(r))
+          .then((b) => b.items),
+      onModes: (modes) => tabs.setPolicyModes(modes),
+    });
+    void policyPanel.refreshModes();
+    setInterval(() => void policyPanel?.refreshModes(), 30_000);
+  }
+
   // Hiring Hall (wi-hiring-hall): click the reception desk → recruitment
   // panel (the roster comes from the daemon; the form asks the PM to hire via
   // POST /chat and the company-hire skill). New roster members walk in
@@ -360,6 +392,7 @@ async function boot(): Promise<void> {
     document.querySelector<HTMLElement>("#queue-panel")!,
     focusAgent,
     approvals,
+    policyAlerts, // lane L2
   );
 
   // THE ONE THING: ❗ out of the 3D window → OS notification (native toast on

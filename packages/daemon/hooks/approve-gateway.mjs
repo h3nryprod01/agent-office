@@ -17,8 +17,9 @@
 //          NOTHING and exit 0 → Claude Code shows its normal dialog.
 //
 // Safety invariants (per task spec, non-negotiable):
-//   - never prints "allow" unless the daemon explicitly returned "allow"
-//     (which requires a human click in the office);
+//   - never prints "allow" unless the daemon explicitly returned "allow" — a human
+//     click in the office, OR (lane L2) the project's own `auto`/`read-only` policy,
+//     which the daemon applies only after its danger list found nothing to ask about;
 //   - every error path is silence + exit 0 = the user's normal prompt;
 //   - timeout layering: daemon TTL 25s < fetch abort 27s < hook timeout 30s,
 //     so the terminal dialog is delayed at most ~27s when an office is open
@@ -30,15 +31,25 @@ const PORT = process.env.AGENT_OFFICE_PORT ?? "8787";
 const FETCH_TIMEOUT_MS = Number(process.env.APPROVE_GATEWAY_TIMEOUT_MS ?? 27_000);
 const URL_BASE = `http://127.0.0.1:${PORT}`;
 
-/** Truncate any long strings inside tool_input so the wire payload stays
- * small (Write content can be hundreds of KB — the office only needs a
- * preview, and the daemon truncates again on its side). */
+// lane L2: the daemon's policy engine classifies the command and the path, so
+// those keys travel in full (up to INSPECT_MAX); bulky bodies (Write content,
+// Edit old/new strings) stay at the 500-char preview size.
+const INSPECT_KEYS = new Set(["command", "file_path", "notebook_path", "path", "pattern"]);
+const INSPECT_MAX = 8000;
+const PREVIEW_MAX = 500;
+
+/** Truncate long strings so the wire payload stays small. A string that did not
+ * fit in INSPECT_MAX sets `_truncated`: the daemon cannot judge what it cannot
+ * see, so it treats such a call as dangerous instead of waving it through. */
 function truncatedInput(toolInput) {
   if (!toolInput || typeof toolInput !== "object") return {};
   const out = {};
   for (const [key, value] of Object.entries(toolInput)) {
-    if (typeof value === "string") out[key] = value.slice(0, 500);
-    else if (typeof value === "number" || typeof value === "boolean") out[key] = value;
+    const max = INSPECT_KEYS.has(key) ? INSPECT_MAX : PREVIEW_MAX;
+    if (typeof value === "string") {
+      out[key] = value.slice(0, max);
+      if (INSPECT_KEYS.has(key) && value.length > max) out._truncated = true;
+    } else if (typeof value === "number" || typeof value === "boolean") out[key] = value;
     // nested objects/arrays dropped: preview only needs the primitives
   }
   return out;
@@ -62,6 +73,11 @@ async function main() {
       toolInput: truncatedInput(payload.tool_input),
       cwd: payload.cwd ?? null,
       permissionMode: payload.permission_mode ?? null,
+      // lane L2: who is asking. The launcher of a non-default harness/lane (worker wrapper) sets these;
+      // an ordinary Claude Code session sends none and counts as harness "claude".
+      harness: process.env.AGENT_OFFICE_HARNESS ?? "claude",
+      lane: process.env.AGENT_OFFICE_LANE ?? undefined,
+      role: process.env.AGENT_OFFICE_ROLE ?? undefined,
     }),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
@@ -71,11 +87,14 @@ async function main() {
   const decision = result?.decision;
   if (decision !== "allow" && decision !== "deny") return;
 
+  // `message` (deny only, policy-made): the model sees it as the reason the call was refused —
+  // verified with a real `claude -p` run, see test/fixtures/permission-request-decisions.json.
+  const message = decision === "deny" && typeof result.message === "string" ? result.message.slice(0, 500) : undefined;
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
         hookEventName: "PermissionRequest",
-        decision: { behavior: decision },
+        decision: { behavior: decision, ...(message ? { message } : {}) },
       },
     })
   );
