@@ -1954,3 +1954,65 @@ body[data-view="log"] .activity-log {
 }
 .set-lang:hover { border-color: #3d4b6e; }
 .set-lang.active { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+
+/* lane L9: presentation mode badge */
+#present-badge {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 50;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid rgba(16, 185, 129, 0.6);
+  color: #6ee7b7;
+  font: 600 11px/1.4 system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+/* lane L9: ?clean=1 — full-bleed office + HUD for recording the launch timelapse */
+body[data-clean="on"] #navbar,
+body[data-clean="on"] #queue-panel,
+body[data-clean="on"] #board,
+body[data-clean="on"] #orgchart,
+body[data-clean="on"] #building,
+body[data-clean="on"] #costs,
+body[data-clean="on"] #hiring-hall,
+body[data-clean="on"] #templates,
+body[data-clean="on"] #controls,
+body[data-clean="on"] #timeline-bar,
+body[data-clean="on"] #chat-box {
+  display: none !important;
+}
+#clean-hud {
+  position: fixed;
+  left: 16px;
+  bottom: 14px;
+  z-index: 40;
+  display: flex;
+  gap: 14px;
+  align-items: baseline;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(8, 12, 22, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #cbd5e1;
+  font: 500 14px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  pointer-events: none;
+}
+#clean-hud b {
+  color: #f8fafc;
+  font-size: 18px;
+}
+#clean-caption {
+  position: fixed;
+  left: 16px;
+  top: 14px;
+  z-index: 40;
+  max-width: 560px;
+  color: #e2e8f0;
+  font: 600 16px/1.35 system-ui, sans-serif;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}

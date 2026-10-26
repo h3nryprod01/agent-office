@@ -333,4 +333,13 @@ export const vi: Record<string, string> = {
   "wall.scrumBoard": "BẢNG VIỆC",
   "chat.note": "\u24d8 chat kh\u00f4ng duy\u1ec7t \u0111\u01b0\u1ee3c permission \u2014 x\u1eed l\u00fd \u1edf app g\u1ed1c \u00b7 m\u1ed7i tin = 1 turn Claude th\u1eadt",
   "org.counts": "{total} agent · {working} làm · {blocked} kẹt · {done} xong",
+  // lane L9: presentation mode
+  "present.on": "🎭 Đang trình chiếu",
+  "present.off": "🎭 Trình chiếu",
+  "present.title": "Chế độ trình chiếu: che tên dự án, đường dẫn, branch và nội dung chat bằng bí danh (tải lại trang)",
+  "present.badge": "CHẾ ĐỘ TRÌNH CHIẾU — tên đã được che",
+  "hud.clock": "Đồng hồ ngày +{h}h {m}p",
+  "hud.agents": "{n} agent",
+  "hud.working": "{n} đang làm",
+  "hud.caption": "Một ngày làm việc thật, 3 giờ trong 60 giây — Sonnet lập kế hoạch, worker làm, Opus review. Mọi tên đã được che.",
 };

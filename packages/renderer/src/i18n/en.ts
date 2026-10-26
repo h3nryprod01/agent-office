@@ -339,4 +339,13 @@ export const en = {
   "wall.scrumBoard": "WORK BOARD",
   "chat.note": "\u24d8 this chat cannot approve permissions \u2014 do that in the agent's own app \u00b7 each message is one real Claude turn",
   "org.counts": "{total} agents · {working} working · {blocked} blocked · {done} done",
+  // lane L9: presentation mode
+  "present.on": "🎭 Presenting",
+  "present.off": "🎭 Present",
+  "present.title": "Presentation mode: hide project names, paths, branches and chat text behind aliases (reloads the page)",
+  "present.badge": "PRESENTATION MODE — names are masked",
+  "hud.clock": "Day clock +{h}h {m}m",
+  "hud.agents": "{n} agents",
+  "hud.working": "{n} working",
+  "hud.caption": "One real day, 3 hours in 60 seconds — Sonnet plans, workers build, Opus reviews. Every name masked.",
 };
