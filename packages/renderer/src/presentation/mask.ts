@@ -41,6 +41,8 @@ const APPROVAL_MODES = new Set(["ask", "auto", "read-only", "deny"]);
 /** Agent CLIs and model vendors are product names, public; any other harness or lane value is aliased. */
 const PUBLIC_HARNESSES = new Set(["claude", "claude-code", "codex", "gemini", "claude-worker", "hermes", "deepseek", "mimo", "glm", "kimi"]);
 const HARNESS_LIST_KEYS = new Set(["allowedharnesses", "allowedlanes"]);
+/** The templates this repo ships are public product names (and pick the office room); a user-saved one may name a client. */
+const PUBLIC_TEMPLATES = new Set(["coding", "content-studio", "real-estate-marketing"]);
 /**
  * Built-in tool names a policy may key on. Anything else in a policy's tool map (a custom tool, a
  * prefix like `Notebook*`) can carry a client's name, so it is aliased — reversibly, for saving.
@@ -211,6 +213,7 @@ export function createMasker(): Masker {
       if (value.startsWith("tool-") && isAlias(value)) return value;
       return PUBLIC_HARNESSES.has(value) ? value : alias("tool", value);
     }
+    if (lower === "template" && PUBLIC_TEMPLATES.has(value)) return value;
     if (isSecretKey(key) || SECRET_VALUE.test(value)) return "••••";
     if (isAlias(value)) return value;
     if (PROJECT_KEYS.has(lower) || /repo$/i.test(key) || (lower === "name" && "slug" in siblings)) return maskProject(value);

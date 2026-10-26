@@ -118,3 +118,11 @@ describe("masking harness/lane values twice keeps the same alias (replays saved 
     expect(m.unmask(twice.harness)).toBe("acme-h");
   });
 });
+
+describe("shipped template names stay readable (they pick the office room); custom ones do not", () => {
+  it("keeps real-estate-marketing, masks a client-named template", () => {
+    const out = createMasker().mask([{ slug: "acme-web", template: "real-estate-marketing" }, { slug: "globex", template: "acme-custom" }]);
+    expect(out[0].template).toBe("real-estate-marketing");
+    expect(JSON.stringify(out)).not.toContain("acme");
+  });
+});

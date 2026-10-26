@@ -3,6 +3,7 @@ import { INITIAL_STATE, type OfficeState } from "./sim/model";
 import { reduce } from "./sim/reducer";
 import { filterStateByRepo } from "./sim/selectors";
 import { createOffice3D, type Office3DHandle } from "./render3d/Office3D";
+import { roomStyleForTemplate, type RoomStyle } from "./render3d/rooms";
 import { initialQuality, watchQuality } from "./render3d/quality";
 import { scrumSummary, type WallBoardData } from "./ui/wallBoardData";
 import { MockEventSource } from "./events/MockEventSource";
@@ -368,10 +369,43 @@ async function boot(): Promise<void> {
 
   // chatbox talks to the PM of the active tab — wired below (mounted later)
   let chatHandle: ChatBoxHandle | null = null;
+  // lane L8 wiring: each office tab gets the room of its project's template (dev floor, content
+  // studio, sales floor). Repo names come from /policy (the names the tabs use), templates from
+  // /projects. The "All" tab uses the shared style when every project agrees, else the dev floor.
+  // An explicit ?room= stays a manual override.
+  const roomByRepo = new Map<string, RoomStyle>();
+  let activeRepo: string | null = null;
+  const applyRoom = (): void => {
+    if (!office3d || new URLSearchParams(location.search).has("room")) return;
+    const styles = [...new Set(roomByRepo.values())];
+    const style = activeRepo ? roomByRepo.get(activeRepo) : styles.length === 1 ? styles[0] : undefined;
+    const next = style ?? "dev";
+    if (office3d.roomStyle() !== next) office3d.setRoomStyle(next);
+  };
+  const refreshRooms = async (): Promise<void> => {
+    try {
+      const [projects, policies] = await Promise.all([
+        fetch("/projects").then((r) => (r.ok ? r.json() : [])) as Promise<{ slug: string; template?: string }[]>,
+        fetch("/policy").then((r) => (r.ok ? r.json() : { projects: [] })) as Promise<{ projects: { slug: string; repo: string }[] }>,
+      ]);
+      const templateOf = new Map(projects.map((p) => [p.slug, p.template ?? null]));
+      roomByRepo.clear();
+      for (const p of policies.projects ?? []) roomByRepo.set(p.repo, roomStyleForTemplate(templateOf.get(p.slug)));
+      applyRoom();
+    } catch {
+      // the office still works on the default floor
+    }
+  };
+  if (useWs) {
+    void refreshRooms();
+    setInterval(() => void refreshRooms(), 60_000);
+  }
   const tabs = mountOfficeTabs(document.querySelector<HTMLElement>("#office-tabs")!, (tab) => {
     const repo = tab.kind === "repo" ? tab.repo : null;
     chatHandle?.setRepo(repo);
     hiringHall?.setRepo(repo);
+    activeRepo = repo; // lane L8 wiring
+    applyRoom();
   });
 
   // lane L2: approval modes + data rules (Settings block) and the mode badge on each office tab.
