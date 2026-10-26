@@ -127,3 +127,31 @@ describe("parseCsv", () => {
     ]);
   });
 });
+
+describe("hardening", () => {
+  it("a heading line with a long run of spaces does not backtrack (was seconds)", () => {
+    const started = performance.now();
+    renderMarkdown(`# a${" ".repeat(20000)}b`);
+    renderMarkdown(`${"- ".repeat(5000)}x`);
+    renderMarkdown(`| a | b |\n${"-".repeat(20000)} x`);
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
+  it("closing hashes are still stripped from a heading", () => {
+    expect(renderMarkdown("## Plan ##").blocks[0]!.heading).toBe("Plan");
+    expect(renderMarkdown("## C# is fine").blocks[0]!.heading).toBe("C# is fine");
+    expect(renderMarkdown("# ").blocks).toHaveLength(1); // "# " alone is not a heading → a paragraph
+  });
+
+  it("remote images are never loaded: they become a link", () => {
+    const { html } = renderMarkdown("![pixel](http://127.0.0.1:8787/harnesses?probe=x)", { resolveImage: () => "/x" });
+    expect(html).not.toContain("<img");
+    expect(html).toContain('href="http://127.0.0.1:8787/harnesses?probe=x"');
+  });
+
+  it("a NUL in the source cannot forge a stash marker", () => {
+    const html = renderInline("`<b>x</b>` \u00000\u0000");
+    expect(html.match(/<code>/g)).toHaveLength(1);
+    expect(html).not.toContain("\u0000");
+  });
+});

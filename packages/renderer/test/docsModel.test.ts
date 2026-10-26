@@ -75,6 +75,13 @@ describe("comment anchoring", () => {
     expect(blocks.filter((b) => anchorMatches(c, b)).map((b) => b.index)).toEqual([1]);
   });
 
+  it("a heading longer than the 120-character quote still matches its own block", () => {
+    const long = "H".repeat(150);
+    const { blocks: b } = renderMarkdown(`# ${long}\n\ntext`);
+    const c = comment({ heading: long, quote: null });
+    expect(b.filter((x) => anchorMatches(c, x)).map((x) => x.index)).toEqual([0]);
+  });
+
   it("a whole-document comment matches no block and is not an orphan", () => {
     const c = comment({ heading: null, quote: null });
     expect(blocks.some((b) => anchorMatches(c, b))).toBe(false);

@@ -209,3 +209,22 @@ test("POST /wizard/create: no cwd → <home>/AgentOffice/<slug> is created and u
   });
   s.cleanup();
 });
+
+test("POST /wizard/create: an existing project is refused BEFORE any folder is made; a hidden folder is refused", async () => {
+  const s = sandbox();
+  fs.mkdirSync(path.join(s.projectsDir, "taken"), { recursive: true });
+  const hidden = path.join(s.homeDir, ".claude");
+  fs.mkdirSync(hidden);
+  await withWizard(s, {}, async ({ post }) => {
+    assert.equal((await post({ name: "Taken", template: "plain" })).status, 409);
+    assert.equal(fs.existsSync(path.join(s.homeDir, "AgentOffice", "taken")), false);
+    assert.equal((await post({ name: "Sneaky", template: "plain", cwd: hidden })).status, 403);
+  });
+  assert.equal(fs.existsSync(path.join(s.projectsDir, "sneaky")), false);
+  s.cleanup();
+});
+
+test("fillGoals: an answer that contains another blank is not substituted a second time", () => {
+  const out = fillGoals("a `<PRODUCT>` b `<AREA>`", { PRODUCT: "x <AREA> y", AREA: "Old Town" }, []);
+  assert.match(out, /a `x <AREA> y` b `Old Town`/);
+});

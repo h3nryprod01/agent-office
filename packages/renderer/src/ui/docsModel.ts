@@ -162,7 +162,7 @@ export function kindCounts(files: DocFile[]): Record<KindFilter, number> {
 export function anchorMatches(comment: DocComment, block: MdBlock): boolean {
   const { heading, quote } = comment.anchor;
   if (quote) return block.quote === quote && (block.heading ?? null) === (heading ?? null);
-  if (heading) return block.quote === heading && block.heading === heading;
+  if (heading) return block.level !== undefined && block.heading === heading;
   return false;
 }
 

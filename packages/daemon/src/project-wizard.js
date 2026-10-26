@@ -17,7 +17,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { TEMPLATE_NAME_RE, readGoals, templateNames } from "../../../scripts/company-template-lib.mjs";
-import { loopbackRole } from "./docs-workspace.js";
+import { assertVisibleRoot, loopbackRole, readJsonBody } from "./docs-workspace.js";
 import { DEFAULT_PROJECTS_DIR, createProject, slugify } from "./projects.js";
 import { DEFAULT_TEMPLATES_DIR } from "./templates.js";
 
@@ -27,7 +27,7 @@ const DEFINITION_ROW_RE = /^\|\s*`?<([^>]+)>`?\s*\|\s*([^|]*)\|\s*([^|]*)/u;
 const VALUE_MAX = 200;
 const NOTES_MAX_LINES = 20;
 const CAN_CREATE = new Set(["owner", "manager"]);
-const STATUS_BY_CODE = { INVALID: 400, EXISTS: 409, NOT_FOUND: 404, FORBIDDEN: 403 };
+const STATUS_BY_CODE = { INVALID: 400, EXISTS: 409, NOT_FOUND: 404, FORBIDDEN: 403, TOO_LARGE: 413 };
 
 function fail(code, message) {
   const err = new Error(message);
@@ -74,13 +74,12 @@ export function parseGoalsFields(goals) {
  */
 export function fillGoals(goals, values, notes) {
   const answered = Object.entries(values).filter(([, v]) => v !== "");
+  const byKey = new Map(answered);
+  // one pass over all keys: an answer that itself contains "<OTHER>" must not be substituted again
+  const blank = new RegExp(`<(${[...byKey.keys()].map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})>`, "gu");
   const body = goals
     .split("\n")
-    .map((line) =>
-      DEFINITION_ROW_RE.test(line)
-        ? line
-        : answered.reduce((text, [key, value]) => text.split(`<${key}>`).join(value), line),
-    )
+    .map((line) => (byKey.size === 0 || DEFINITION_ROW_RE.test(line) ? line : line.replace(blank, (_m, key) => byKey.get(key))))
     .join("\n");
   const sections = [];
   if (answered.length > 0) sections.push(`## Brief\n\n${answered.map(([k, v]) => `- ${k}: ${v}`).join("\n")}`);
@@ -165,19 +164,9 @@ export function createProjectWizardHandler({
       return true;
     }
 
-    let body = "";
-    req.on("data", (chunk) => {
-      body += chunk;
-      if (body.length > 16 * 1024) req.destroy();
-    });
-    req.on("end", () => {
+    readJsonBody(req, 16 * 1024, (bodyError, parsed) => {
       run(() => {
-        let parsed;
-        try {
-          parsed = JSON.parse(body);
-        } catch {
-          throw invalid("body must be JSON");
-        }
+        if (bodyError) throw bodyError;
         // Named fields only — see POST /projects: a body must never carry its own homeDir/projectsDir.
         const { name, template } = parsed ?? {};
         const slug = slugify(name);
@@ -185,13 +174,21 @@ export function createProjectWizardHandler({
         const goals = readGoals(dir) ?? "";
         const answers = cleanAnswers(parsed.fields, parseGoalsFields(goals).map((f) => f.key));
         const notes = cleanNotes(parsed.notes);
+        if (fs.existsSync(path.join(projectsDir, slug))) throw fail("EXISTS", `project "${slug}" already exists`);
 
-        // Default folder: only created after every input above has been accepted. It sits under
-        // homeDir by construction (slug is [a-z0-9-]), so createProject's inside-home check still holds.
         let cwd = parsed.cwd;
         if (cwd === undefined || cwd === null || cwd === "") {
+          // Created only after every check above passed. Under homeDir by construction (slug is
+          // [a-z0-9-]), so createProject's inside-home check still holds.
           cwd = path.join(homeDir, "AgentOffice", slug);
           fs.mkdirSync(cwd, { recursive: true });
+        } else if (typeof cwd === "string") {
+          try {
+            assertVisibleRoot(fs.realpathSync(cwd), fs.realpathSync(homeDir));
+          } catch (error) {
+            if (error.code === "FORBIDDEN") throw error;
+            // not resolvable: createProject reports it
+          }
         }
         const project = createProject({ projectsDir, templatesDir, homeDir, name, template, cwd });
         if (Object.keys(answers).length > 0 || notes.length > 0) {

@@ -132,6 +132,19 @@ function assertRelPath(rel) {
   return segments;
 }
 
+/**
+ * A project folder inside a dot-directory (~/.claude, ~/.config/…) would make agent instruction
+ * and settings files editable from the documents tab, so it is refused here and in the wizard.
+ * Both arguments must already be realpath'd.
+ */
+export function assertVisibleRoot(realRoot, realHome) {
+  const segments = path.relative(realHome, realRoot).split(path.sep);
+  if (segments[0] === ".." || path.isAbsolute(segments[0])) return; // outside home: not this check's business
+  if (segments.some((seg) => seg.startsWith("."))) {
+    throw forbidden("a project folder cannot be inside a hidden directory");
+  }
+}
+
 /** The project's cwd, realpath'd and re-checked to sit inside `homeDir`. */
 function projectRoot({ projectsDir, homeDir, slug }) {
   if (typeof slug !== "string" || !PROJECT_SLUG_RE.test(slug)) throw invalid("invalid project");
@@ -147,6 +160,7 @@ function projectRoot({ projectsDir, homeDir, slug }) {
   if (!fs.statSync(root).isDirectory() || !isInside(home, root) || root === home) {
     throw forbidden("the project folder is outside the home directory");
   }
+  assertVisibleRoot(root, home);
   return { project, root };
 }
 
@@ -203,7 +217,20 @@ function readMeta(projectsDir, slug) {
 }
 
 const emptyDoc = () => ({ status: "draft", statusAt: null, comments: [], reviews: [], history: [] });
-const docOf = (meta, rel) => ({ ...emptyDoc(), ...(meta.docs[rel] ?? {}) });
+
+/** docs-meta.json is a file on disk: whatever shape it has, callers get a well-formed record. */
+function docOf(meta, rel) {
+  const raw = meta.docs[rel];
+  if (raw === null || typeof raw !== "object") return emptyDoc();
+  const list = (v) => (Array.isArray(v) ? v.filter((x) => x !== null && typeof x === "object") : []);
+  return {
+    ...raw,
+    status: DOC_STATUSES.includes(raw.status) ? raw.status : "draft",
+    comments: list(raw.comments),
+    reviews: list(raw.reviews),
+    history: list(raw.history).filter((h) => SNAPSHOT_ID_RE.test(h.id)),
+  };
+}
 
 /** Read-modify-write one document's metadata. `fn` returns the NEW doc record (never mutates). */
 function updateDoc(projectsDir, slug, rel, fn) {
@@ -257,8 +284,9 @@ function git(root, args) {
   return new Promise((resolve) => {
     execFile(
       "git",
-      ["-C", root, "--no-pager", ...args],
-      { timeout: 5000, maxBuffer: MAX_TEXT_BYTES + 1024, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } },
+      // a project folder can arrive with its own .git/config: switch off what could run a program
+      ["-C", root, "--no-pager", "-c", "core.fsmonitor=false", "-c", "log.showSignature=false", "-c", "core.pager=cat", ...args],
+      { timeout: 5000, maxBuffer: MAX_TEXT_BYTES + 1024, env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_CONFIG_NOSYSTEM: "1" } },
       (error, stdout) => resolve(error ? null : stdout),
     );
   });
@@ -282,7 +310,7 @@ async function listVersions({ root, rel, st, doc }) {
 async function readVersion({ root, rel, real, doc, projectsDir, slug, id }) {
   if (id === "current") return fsp.readFile(real, "utf8");
   if (GIT_REV_RE.test(id)) {
-    const text = await git(root, ["show", `${id}:./${rel}`]);
+    const text = await git(root, ["show", "--no-textconv", `${id}:./${rel}`]);
     if (text === null) throw fail("NOT_FOUND", "no such version");
     return text;
   }
@@ -307,14 +335,24 @@ function snapshot({ projectsDir, slug, rel, previous, role, history }) {
   fs.writeFileSync(snapshotFile(projectsDir, slug, rel, id), previous);
   const next = [...history, { id, at: new Date().toISOString(), by: role, size: Buffer.byteLength(previous) }];
   const dropped = next.slice(0, Math.max(0, next.length - MAX_HISTORY));
-  for (const old of dropped) fs.rmSync(snapshotFile(projectsDir, slug, rel, old.id), { force: true });
-  return next.slice(dropped.length);
+  return { history: next.slice(dropped.length), dropped };
 }
 
 // ---- operations ------------------------------------------------------------------------------
 
-function publicDoc(doc) {
-  return { status: doc.status, statusAt: doc.statusAt, comments: doc.comments, reviews: doc.reviews };
+/**
+ * "approved" only while the file is still what was approved. An agent (or editor) that rewrites it on
+ * disk without going through /docs/save leaves the stored status behind, so compare mtime + size.
+ */
+function effectiveStatus(doc, st) {
+  if (doc.status !== "approved") return doc.status;
+  const same = doc.approvedMtime === Math.trunc(st.mtimeMs) && doc.approvedSize === st.size;
+  return same ? "approved" : "draft";
+}
+
+function publicDoc(doc, st) {
+  const status = effectiveStatus(doc, st);
+  return { status, changedSinceApproval: doc.status === "approved" && status !== "approved", statusAt: doc.statusAt, comments: doc.comments, reviews: doc.reviews };
 }
 
 function singleLine(text) {
@@ -345,7 +383,8 @@ const ACTIONS = {
     if (typeof body.content !== "string") throw invalid("content must be a string");
     if (body.content.includes("\0")) throw invalid("content must be text");
     if (Buffer.byteLength(body.content) > MAX_SAVE_BYTES) throw fail("TOO_LARGE", "document is too large to save");
-    if (typeof body.baseMtime === "number" && Math.trunc(body.baseMtime) !== Math.trunc(st.mtimeMs)) {
+    if (typeof body.baseMtime !== "number") throw invalid("baseMtime is required (the mtime you opened)");
+    if (Math.trunc(body.baseMtime) !== Math.trunc(st.mtimeMs)) {
       throw fail("CONFLICT", "the file changed on disk since you opened it", { mtime: st.mtimeMs });
     }
     const previous = fs.readFileSync(real, "utf8");
@@ -357,7 +396,7 @@ const ACTIONS = {
     let doc;
     try {
       fs.writeFileSync(tmp, body.content, { mode: st.mode & 0o777, flag: "wx" });
-      const history = snapshot({ projectsDir, slug, rel, previous, role, history: docOf(readMeta(projectsDir, slug), rel).history });
+      const { history, dropped } = snapshot({ projectsDir, slug, rel, previous, role, history: docOf(readMeta(projectsDir, slug), rel).history });
       fs.renameSync(tmp, real);
       doc = updateDoc(projectsDir, slug, rel, (d) => ({
         ...d,
@@ -366,6 +405,8 @@ const ACTIONS = {
         status: d.status === "approved" ? "draft" : d.status,
         statusAt: d.status === "approved" ? new Date().toISOString() : d.statusAt,
       }));
+      // old snapshots go only once the new text and the metadata are safely written
+      for (const old of dropped) fs.rmSync(snapshotFile(projectsDir, slug, rel, old.id), { force: true });
     } finally {
       fs.rmSync(tmp, { force: true });
     }
@@ -414,7 +455,8 @@ const ACTIONS = {
   },
 
   "/docs/review"({ projectsDir, root, slug }, role, body) {
-    const { rel } = resolveDoc(root, body.path);
+    const resolved = resolveDoc(root, body.path);
+    const { rel } = resolved;
     if (body.decision !== "approve" && body.decision !== "changes") throw invalid('decision must be "approve" or "changes"');
     const note = body.decision === "changes" ? cleanText(body.note, NOTE_MAX, "note") : optionalText(body.note, NOTE_MAX);
     const at = new Date().toISOString();
@@ -425,7 +467,14 @@ const ACTIONS = {
         : null;
     const review = { id: `r-${randomUUID().slice(0, 8)}`, decision: body.decision, note, by: role, at, itemId: item?.id ?? null };
     const status = body.decision === "approve" ? "approved" : "draft";
-    updateDoc(projectsDir, slug, rel, (d) => ({ ...d, status, statusAt: at, reviews: [...d.reviews, review] }));
+    const { st } = resolved;
+    updateDoc(projectsDir, slug, rel, (d) => ({
+      ...d,
+      status,
+      statusAt: at,
+      reviews: [...d.reviews, review],
+      ...(status === "approved" ? { approvedMtime: Math.trunc(st.mtimeMs), approvedSize: st.size } : {}),
+    }));
     return [200, { ok: true, status, review, item }];
   },
 };
@@ -434,21 +483,25 @@ const ACTIONS = {
 
 const GET_ROUTES = ["/docs", "/docs/doc", "/docs/file", "/docs/versions", "/docs/version"];
 
-function readBody(req, limit, done) {
-  let body = "";
+/** Collect the raw bytes first and decode once: a multibyte character split across chunks must survive. */
+export function readJsonBody(req, limit, done) {
+  const chunks = [];
+  let size = 0;
   let tooBig = false;
   req.on("data", (chunk) => {
     if (tooBig) return;
-    body += chunk;
-    if (body.length > limit) {
+    size += chunk.length;
+    if (size > limit) {
       tooBig = true;
-      body = "";
+      chunks.length = 0;
+      return;
     }
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   });
   req.on("end", () => {
     if (tooBig) return done(fail("TOO_LARGE", "request body is too large"));
     try {
-      done(null, JSON.parse(body));
+      done(null, JSON.parse(Buffer.concat(chunks).toString("utf8")));
     } catch {
       done(invalid("body must be JSON"));
     }
@@ -501,7 +554,7 @@ export function createDocsHttpHandler({
         json(403, { error: "your role is read-only" });
         return true;
       }
-      readBody(req, 2.5 * 1024 * 1024, (bodyError, body) => {
+      readJsonBody(req, 2.5 * 1024 * 1024, (bodyError, body) => {
         try {
           if (bodyError) throw bodyError;
           const slug = body?.project;
@@ -526,7 +579,10 @@ async function handleGet({ url, role, projectsDir, homeDir, res, json }) {
 
   if (url.pathname === "/docs") {
     const meta = readMeta(projectsDir, slug);
-    const files = (await listFiles(root)).map((f) => ({ ...f, status: docOf(meta, f.path).status }));
+    const files = (await listFiles(root)).map((f) => ({
+      ...f,
+      status: effectiveStatus(docOf(meta, f.path), { mtimeMs: f.mtime, size: f.size }),
+    }));
     return json(200, { files, role });
   }
 
@@ -551,7 +607,7 @@ async function handleGet({ url, role, projectsDir, homeDir, res, json }) {
   const doc = docOf(readMeta(projectsDir, slug), rel);
 
   if (url.pathname === "/docs/doc") {
-    const info = { path: rel, name: path.basename(rel), kind, size: st.size, mtime: st.mtimeMs, role, ...publicDoc(doc) };
+    const info = { path: rel, name: path.basename(rel), kind, size: st.size, mtime: st.mtimeMs, role, ...publicDoc(doc, st) };
     if (TEXT_KINDS.has(kind)) {
       if (st.size > MAX_TEXT_BYTES) throw fail("TOO_LARGE", "document is too large to display");
       info.content = await fsp.readFile(real, "utf8");

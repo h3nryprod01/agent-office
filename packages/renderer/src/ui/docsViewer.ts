@@ -59,6 +59,10 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
   let notice: Notice = null;
   let busy = false;
   let draft: Draft = { comment: "", changes: "", edit: "" };
+  /** Bumped by every show(): an answer that arrives for an earlier document is dropped. */
+  let seq = 0;
+  /** The text of an edit that lost a save conflict, kept readable so it can be merged by hand. */
+  let lostEdit: string | null = null;
 
   const canWrite = (): boolean => detail !== null && detail.role !== "viewer";
 
@@ -67,17 +71,31 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
     root.innerHTML = `<p class="docs-pick">${esc(t("docs.pick"))}</p>`;
   }
 
+  /** Fetch the current document's detail; a response for a document that is no longer shown is ignored. */
+  async function fetchDetail(): Promise<boolean> {
+    const token = seq;
+    const next = await api.doc(project, path);
+    if (token !== seq) return false;
+    detail = next;
+    return true;
+  }
+
   async function load(): Promise<void> {
+    const token = seq;
     try {
-      detail = await api.doc(project, path);
+      await fetchDetail();
     } catch (error) {
+      if (token !== seq) return;
       detail = null;
       notice = { kind: "err", text: t("docs.error", { error: messageOf(error) }) };
     }
-    render();
+    if (token === seq) render();
   }
 
   async function show(nextProject: string, nextPath: string): Promise<void> {
+    seq += 1;
+    busy = false;
+    detail = null; // nothing can be clicked while the new document loads
     project = nextProject;
     path = nextPath;
     editing = false;
@@ -87,6 +105,7 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
     older = null;
     pending = null;
     notice = null;
+    lostEdit = null;
     draft = { comment: "", changes: "", edit: "" };
     root.innerHTML = `<p class="docs-pick">${esc(t("docs.loading"))}</p>`;
     await load();
@@ -96,16 +115,18 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
   async function act(fn: () => Promise<void>): Promise<void> {
     if (busy) return;
     busy = true;
+    const token = seq;
     try {
       await fn();
     } catch (error) {
+      if (token !== seq) return;
       const conflict = error instanceof DocsHttpError && error.status === 409;
       notice = conflict
         ? { kind: "err", text: t("docs.edit.conflict"), reload: true }
         : { kind: "err", text: t("docs.error", { error: messageOf(error) }) };
       render();
     } finally {
-      busy = false;
+      if (token === seq) busy = false;
     }
   }
 
@@ -132,7 +153,7 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
       noticeHtml() +
       historyHtml() +
       `<div class="docs-main">` +
-      `<div class="docs-content-col">${older ? olderBannerHtml() : ""}${contentHtml(d)}</div>` +
+      `<div class="docs-content-col">${older ? olderBannerHtml() : ""}${lostEditHtml()}${contentHtml(d)}</div>` +
       commentsHtml(d) +
       `</div>`;
     decorateBlocks(d);
@@ -151,7 +172,10 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
       const res = await fetch(api.rawUrl(project, forPath));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
-      if (path === forPath && frame.isConnected) frame.srcdoc = text;
+      // The frame has no scripts, but a page can still make the browser GET things (images, meta refresh):
+      // a CSP meta as the first element shuts every network load, leaving inline styles and data: images.
+      const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">`;
+      if (path === forPath && frame.isConnected) frame.srcdoc = csp + text;
     } catch (error) {
       // not render(): that would call this again and loop on a persistent failure
       const text = t("docs.error", { error: messageOf(error) });
@@ -230,6 +254,14 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
     return (
       `<p class="docs-notice warn">${esc(t("docs.history.viewing", { when: fmtDateTime(older!.at) }))} ` +
       `<button type="button" data-act="back-current">${esc(t("docs.history.back"))}</button></p>`
+    );
+  }
+
+  function lostEditHtml(): string {
+    if (lostEdit === null) return "";
+    return (
+      `<details class="docs-lost" open><summary>${esc(t("docs.edit.lost"))}</summary>` +
+      `<textarea readonly rows="8">${esc(lostEdit)}</textarea></details>`
     );
   }
 
@@ -358,7 +390,7 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
       const block = blocks[Number(blockEl.dataset.block)];
       if (block) {
         const isHeading = blockEl.classList.contains("md-heading");
-        pending = isHeading ? { heading: block.quote, quote: null } : { heading: block.heading, quote: block.quote || null };
+        pending = isHeading ? { heading: block.heading, quote: null } : { heading: block.heading, quote: block.quote || null };
         render();
         const box = root.querySelector<HTMLTextAreaElement>('[data-field="comment"]');
         box?.scrollIntoView({ block: "center" });
@@ -382,6 +414,7 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
         deps.onBack();
         break;
       case "reload":
+        if (editing) lostEdit = draft.edit;
         notice = null;
         editing = false;
         void load();
@@ -400,9 +433,10 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
         void act(async () => {
           await api.save(project, path, draft.edit, detail!.mtime);
           editing = false;
+          lostEdit = null;
           notice = { kind: "ok", text: t("docs.edit.saved") };
           versions = null;
-          detail = await api.doc(project, path);
+          await fetchDetail();
           render();
           deps.onChanged();
         });
@@ -411,12 +445,15 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
         historyOpen = !historyOpen;
         render();
         if (historyOpen && !versions) {
+          const token = seq;
           void api.versions(project, path).then(
             (v) => {
+              if (token !== seq) return;
               versions = v;
               render();
             },
             (error) => {
+              if (token !== seq) return;
               historyOpen = false;
               notice = { kind: "err", text: t("docs.error", { error: messageOf(error) }) };
               render();
@@ -473,7 +510,7 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
           const out = await api.review(project, path, "changes", draft.changes);
           changesOpen = false;
           draft = { ...draft, changes: "" };
-          detail = await api.doc(project, path);
+          await fetchDetail();
           notice = { kind: "ok", text: t("docs.changes.sent", { title: out.item?.title ?? "" }) };
           render();
           deps.onChanged();
@@ -485,7 +522,7 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
           draft = { ...draft, comment: "" };
           pending = null;
           notice = null;
-          detail = await api.doc(project, path);
+          await fetchDetail();
           render();
         });
         break;
@@ -496,7 +533,7 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
       case "resolve":
         void act(async () => {
           await api.resolve(project, path, id, btn.dataset.to === "1");
-          detail = await api.doc(project, path);
+          await fetchDetail();
           render();
         });
         break;

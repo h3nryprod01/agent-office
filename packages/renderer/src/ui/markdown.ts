@@ -12,12 +12,14 @@ export interface MdBlock {
   heading: string | null;
   /** First ~120 characters of the block's own text — narrows a comment to one paragraph. */
   quote: string;
+  /** 1–6 for a heading block (its full text is `heading`), absent for everything else. */
+  level?: number;
 }
 
 export interface MdOptions {
   /** Add a comment button to every block and heading. */
   commentable?: boolean;
-  /** Map an image `src` from the document to a servable URL; null → the image is dropped. */
+  /** Map a relative image `src` to a servable URL; null → the image is dropped. Remote images are never loaded. */
   resolveImage?: (src: string) => string | null;
   /** Map a relative link to a workspace document path; null → rendered as plain text. */
   resolveDocLink?: (href: string) => string | null;
@@ -37,7 +39,8 @@ export function esc(s: string): string {
 const QUOTE_MAX = 120;
 
 /** Inline markup: code spans, images, links, bold, italic, strikethrough — on already-plain text. */
-export function renderInline(text: string, opts: MdOptions = {}): string {
+export function renderInline(rawText: string, opts: MdOptions = {}): string {
+  const text = rawText.replace(/\u0000/g, ""); // NUL delimits the stash below: source text may not carry one
   const stash: string[] = [];
   const hold = (html: string): string => `\u0000${stash.push(html) - 1}\u0000`;
 
@@ -45,7 +48,12 @@ export function renderInline(text: string, opts: MdOptions = {}): string {
   let s = text.replace(/`([^`]+)`/g, (_m, code: string) => hold(`<code>${esc(code)}</code>`));
 
   s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, (_m, alt: string, src: string) => {
-    const url = /^https?:\/\//i.test(src) ? src : opts.resolveImage?.(src) ?? null;
+    // A remote image would make the reader's browser fetch a URL the document chose (a tracking pixel,
+    // or a GET on a localhost port): show it as a link instead, and only load images from the workspace.
+    if (/^https?:\/\//i.test(src)) {
+      return hold(`<a href="${esc(src)}" target="_blank" rel="noopener noreferrer">${esc(alt || src)}</a>`);
+    }
+    const url = opts.resolveImage?.(src) ?? null;
     return hold(url ? `<img src="${esc(url)}" alt="${esc(alt)}" loading="lazy">` : esc(alt));
   });
 
@@ -79,8 +87,24 @@ export function plainText(md: string): string {
     .trim();
 }
 
-const HEADING = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
+const HEADING_OPEN = /^(#{1,6})\s+(.*)$/;
 const FENCE = /^(```|~~~)/;
+/** `## Title ##` → ["##", "Title"]; linear time (the closing-hashes strip is a loop, not a lazy regex). */
+function matchHeading(line: string): [string, string] | null {
+  const m = line.match(HEADING_OPEN);
+  if (!m) return null;
+  let text = m[2]!.trimEnd();
+  let i = text.length;
+  while (i > 0 && text[i - 1] === "#") i--;
+  if (i < text.length && (i === 0 || /\s/.test(text[i - 1]!))) text = text.slice(0, i).trimEnd();
+  return [m[1]!, text];
+}
+
+/** HR / table separators are short by nature; skipping the regexes on long lines keeps them from backtracking. */
+const SHORT = 200;
+const isHr = (line: string): boolean => line.length <= SHORT && HR.test(line);
+const isTableSep = (line: string): boolean => line.length <= SHORT && TABLE_SEP.test(line);
+
 const HR = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/;
 const LIST_ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
 const TABLE_SEP = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
@@ -95,14 +119,19 @@ function splitRow(line: string): string[] {
 }
 
 export function renderMarkdown(src: string, opts: MdOptions = {}): MdResult {
-  const lines = src.replace(/\r\n?/g, "\n").split("\n");
+  const lines = src.replace(/\u0000/g, "").replace(/\r\n?/g, "\n").split("\n");
   const blocks: MdBlock[] = [];
   const out: string[] = [];
   let heading: string | null = null;
   const label = esc(opts.commentLabel ?? "Comment");
 
-  const wrap = (tag: string, inner: string, text: string, cls = ""): void => {
-    const block: MdBlock = { index: blocks.length, heading, quote: plainText(text).slice(0, QUOTE_MAX) };
+  const wrap = (tag: string, inner: string, text: string, cls = "", level?: number): void => {
+    const block: MdBlock = {
+      index: blocks.length,
+      heading,
+      quote: plainText(text).slice(0, QUOTE_MAX),
+      ...(level ? { level } : {}),
+    };
     blocks.push(block);
     const button = opts.commentable
       ? `<button type="button" class="md-cmt" data-n="0" aria-label="${label}" title="${label}">💬</button>`
@@ -127,17 +156,17 @@ export function renderMarkdown(src: string, opts: MdOptions = {}): MdResult {
       continue;
     }
 
-    const h = line.match(HEADING);
+    const h = matchHeading(line);
     if (h) {
-      const level = h[1]!.length;
-      const text = plainText(h[2]!);
+      const level = h[0].length;
+      const text = plainText(h[1]);
       heading = text;
-      wrap(`h${level}`, renderInline(h[2]!, opts), text, "md-heading");
+      wrap(`h${level}`, renderInline(h[1], opts), text, "md-heading", level);
       i++;
       continue;
     }
 
-    if (HR.test(line)) {
+    if (isHr(line)) {
       out.push("<hr>");
       i++;
       continue;
@@ -150,7 +179,7 @@ export function renderMarkdown(src: string, opts: MdOptions = {}): MdResult {
       continue;
     }
 
-    if (line.includes("|") && i + 1 < lines.length && TABLE_SEP.test(lines[i + 1]!)) {
+    if (line.includes("|") && i + 1 < lines.length && isTableSep(lines[i + 1]!)) {
       const head = splitRow(line);
       i += 2;
       const rows: string[][] = [];
@@ -187,10 +216,10 @@ export function renderMarkdown(src: string, opts: MdOptions = {}): MdResult {
       i < lines.length &&
       lines[i]!.trim() !== "" &&
       !FENCE.test(lines[i]!) &&
-      !HEADING.test(lines[i]!) &&
+      !HEADING_OPEN.test(lines[i]!) &&
       !lines[i]!.startsWith(">") &&
       !LIST_ITEM.test(lines[i]!) &&
-      !HR.test(lines[i]!)
+      !isHr(lines[i]!)
     ) {
       para.push(lines[i++]!);
     }

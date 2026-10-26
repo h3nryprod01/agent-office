@@ -400,6 +400,7 @@ export const en = {
   "docs.history.back": "Back to the current file",
   "docs.history.noText": "This type of file has no readable history.",
   "docs.edit.conflict": "The file changed on disk after you opened it. Reload to see the latest, then redo your edit.",
+  "docs.edit.lost": "Your unsaved edit (copy it, then redo it on the latest text)",
   "docs.edit.reload": "Reload",
   "docs.edit.saved": "Saved",
   "docs.error": "Something went wrong: {error}",

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { createServer } from "node:http";
+import http, { createServer } from "node:http";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -97,8 +97,9 @@ test("a planted symlink at a guessable temp name cannot redirect a save", async 
   fs.writeFileSync(victim, "keep me");
   // the old scheme wrote to `<file>.ao-tmp-<pid>`; plant links at that name
   fs.symlinkSync(victim, path.join(s.cwd, `README.md.ao-tmp-${process.pid}`));
-  await withDocs(s, {}, async ({ post }) => {
-    assert.equal((await post("/docs/save", { path: "README.md", content: "# new\n" })).status, 200);
+  await withDocs(s, {}, async ({ get, post }) => {
+    const { mtime } = await (await get("/docs/doc", { path: "README.md" })).json();
+    assert.equal((await post("/docs/save", { path: "README.md", content: "# new\n", baseMtime: mtime })).status, 200);
   });
   assert.equal(fs.readFileSync(victim, "utf8"), "keep me");
   assert.equal(fs.readFileSync(path.join(s.cwd, "README.md"), "utf8"), "# new\n");
@@ -413,7 +414,8 @@ test("status: draft → review → approve; unknown values rejected; save after 
     const listed = (await (await get("/docs")).json()).files.find((f) => f.path === "README.md");
     assert.equal(listed.status, "approved");
 
-    await post("/docs/save", { path: "README.md", content: "# changed after approval\n" });
+    const { mtime } = await (await get("/docs/doc", { path: "README.md" })).json();
+    await post("/docs/save", { path: "README.md", content: "# changed after approval\n", baseMtime: mtime });
     doc = await (await get("/docs/doc", { path: "README.md" })).json();
     assert.equal(doc.status, "draft");
   });
@@ -524,5 +526,119 @@ test("versions: a file with no history still shows its current mtime entry", asy
     assert.equal(res.versions.length, 1);
     assert.equal(res.versions[0].current, true);
   });
+  s.cleanup();
+});
+
+// ---- review follow-ups ---------------------------------------------------------------------
+
+/** Raw query strings: URLSearchParams would re-encode %2e / %2f and the server would never see them. */
+test("traversal via raw percent-encoded query strings is refused", async () => {
+  const s = sandbox();
+  await withDocs(s, {}, async ({ base }) => {
+    for (const raw of ["..%2Fsecret.md", "%2e%2e%2Fsecret.md", "%2e%2e/secret.md", "reports%2F..%2F..%2Fsecret.md", "%2Fetc%2Fhosts"]) {
+      for (const route of ["/docs/doc", "/docs/file"]) {
+        const res = await fetch(`${base}${route}?project=acme-web&path=${raw}`);
+        assert.ok([400, 403].includes(res.status), `${route} ${raw} → ${res.status}`);
+        assert.doesNotMatch(await res.text(), /SECRET/);
+      }
+    }
+  });
+  s.cleanup();
+});
+
+test("a directory symlink pointing into .git is refused", async () => {
+  const s = sandbox();
+  fs.symlinkSync(path.join(s.cwd, ".git"), path.join(s.cwd, "gitlink"));
+  await withDocs(s, {}, async ({ get }) => {
+    assert.equal((await get("/docs/doc", { path: "gitlink/notes.md" })).status, 403);
+  });
+  s.cleanup();
+});
+
+test("a project folder inside a hidden directory (e.g. ~/.claude) is refused", async () => {
+  const s = sandbox();
+  const hidden = path.join(s.homeDir, ".claude");
+  fs.mkdirSync(hidden);
+  fs.writeFileSync(path.join(hidden, "CLAUDE.md"), "# agent instructions\n");
+  const file = path.join(s.projectsDir, "acme-web", "project.json");
+  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, "utf8")), cwd: hidden }));
+  await withDocs(s, {}, async ({ get, post }) => {
+    assert.equal((await get("/docs")).status, 403);
+    assert.equal((await post("/docs/save", { path: "CLAUDE.md", content: "pwned", baseMtime: 0 })).status, 403);
+  });
+  assert.equal(fs.readFileSync(path.join(hidden, "CLAUDE.md"), "utf8"), "# agent instructions\n");
+  s.cleanup();
+});
+
+test("save: a multibyte character split across request chunks survives", async () => {
+  const s = sandbox();
+  await withDocs(s, {}, async ({ base, get }) => {
+    const { mtime } = await (await get("/docs/doc", { path: "README.md" })).json();
+    const text = `# Tiếng Việt\n\n${"Xin chào thế giới. ".repeat(3000)}\n`;
+    const bytes = Buffer.from(JSON.stringify({ project: "acme-web", path: "README.md", content: text, baseMtime: mtime }));
+    // cut inside a 3-byte character
+    const cut = bytes.indexOf(Buffer.from("ế")) + 1;
+    await new Promise((resolve, reject) => {
+      const req = http.request(`${base}/docs/save`, { method: "POST", headers: { "content-type": "application/json" } }, (res) => {
+        res.resume();
+        res.on("end", () => (res.statusCode === 200 ? resolve() : reject(new Error(`status ${res.statusCode}`))));
+      });
+      req.on("error", reject);
+      req.write(bytes.subarray(0, cut));
+      setTimeout(() => req.end(bytes.subarray(cut)), 30);
+    });
+  });
+  assert.match(fs.readFileSync(path.join(s.cwd, "README.md"), "utf8"), /^# Tiếng Việt/);
+  assert.doesNotMatch(fs.readFileSync(path.join(s.cwd, "README.md"), "utf8"), /\uFFFD/);
+  s.cleanup();
+});
+
+test("save: baseMtime is required", async () => {
+  const s = sandbox();
+  await withDocs(s, {}, async ({ post }) => {
+    assert.equal((await post("/docs/save", { path: "README.md", content: "# x\n" })).status, 400);
+  });
+  assert.match(fs.readFileSync(path.join(s.cwd, "README.md"), "utf8"), /Intro paragraph/);
+  s.cleanup();
+});
+
+test("approval does not survive a rewrite of the file behind the app's back", async () => {
+  const s = sandbox();
+  await withDocs(s, {}, async ({ get, post }) => {
+    assert.equal((await post("/docs/review", { path: "README.md", decision: "approve" })).status, 200);
+    assert.equal((await (await get("/docs/doc", { path: "README.md" })).json()).status, "approved");
+    fs.writeFileSync(path.join(s.cwd, "README.md"), "# an agent rewrote this after approval, with more text\n");
+    const doc = await (await get("/docs/doc", { path: "README.md" })).json();
+    assert.equal(doc.status, "draft");
+    assert.equal(doc.changedSinceApproval, true);
+    const listed = (await (await get("/docs")).json()).files.find((f) => f.path === "README.md");
+    assert.equal(listed.status, "draft");
+  });
+  s.cleanup();
+});
+
+test("a tampered docs-meta.json cannot delete files, 500 the list, or smuggle a status", async () => {
+  const s = sandbox();
+  const victim = path.join(s.homeDir, "victim.txt");
+  fs.writeFileSync(victim, "keep");
+  fs.writeFileSync(
+    path.join(s.projectsDir, "acme-web", "docs-meta.json"),
+    JSON.stringify({
+      version: 1,
+      docs: {
+        "README.md": { status: 'x" onmouseover="1', comments: "nope", reviews: null, history: [{ id: "../../../victim" }] },
+      },
+    }),
+  );
+  await withDocs(s, {}, async ({ get, post }) => {
+    const list = await get("/docs");
+    assert.equal(list.status, 200);
+    const doc = await (await get("/docs/doc", { path: "README.md" })).json();
+    assert.equal(doc.status, "draft");
+    assert.deepEqual(doc.comments, []);
+    const { mtime } = doc;
+    assert.equal((await post("/docs/save", { path: "README.md", content: "# a\n", baseMtime: mtime })).status, 200);
+  });
+  assert.equal(fs.readFileSync(victim, "utf8"), "keep");
   s.cleanup();
 });

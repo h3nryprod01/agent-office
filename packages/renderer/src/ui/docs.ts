@@ -109,28 +109,34 @@ export function mountDocs(root: HTMLElement, opts: DocsOpts): DocsHandle {
       renderList();
       return;
     }
+    const asked = project;
+    let next: DocFile[] = [];
+    let failure = "";
     try {
-      files = (await live.list(project)).files;
-      error = "";
+      next = (await live.list(asked)).files;
     } catch (e) {
-      files = [];
-      error = e instanceof Error ? e.message : String(e);
+      failure = e instanceof Error ? e.message : String(e);
     }
+    if (asked !== project) return; // the user switched projects while this was in flight
+    files = next;
+    error = failure;
     renderList();
   }
 
   /** Switch to `slug` (after the wizard created it, or the picker changed). */
-  async function adopt(slug: string, created: boolean): Promise<void> {
+  async function adopt(slug: string, created: boolean): Promise<boolean> {
+    if (created || !projects.some((p) => p.slug === slug)) await loadProjects();
+    const info = projects.find((p) => p.slug === slug);
+    if (!info) return false; // an unknown slug (stale link) must not become the active project
     project = slug;
     selected = null;
     root.classList.remove("has-doc");
     viewer.clear();
     setActiveProject(slug);
-    if (created || !projects.some((p) => p.slug === slug)) await loadProjects();
     renderHead();
     await loadFiles();
-    const info = projects.find((p) => p.slug === slug);
-    if (info) opts.onProject?.(info, created);
+    opts.onProject?.(info, created);
+    return true;
   }
 
   // ---- rendering -----------------------------------------------------------------------------
@@ -252,8 +258,12 @@ export function mountDocs(root: HTMLElement, opts: DocsOpts): DocsHandle {
     },
     async open(slug: string, path: string): Promise<void> {
       if (!projects.some((p) => p.slug === slug)) await loadProjects();
-      if (project !== slug) await adopt(slug, false);
-      else if (files.length === 0) await loadFiles();
+      if (project !== slug) {
+        if (!(await adopt(slug, false))) {
+          await loadFiles();
+          return;
+        }
+      } else if (files.length === 0) await loadFiles();
       await openDoc(path);
     },
   };

@@ -394,6 +394,7 @@ export const vi: Record<string, string> = {
   "docs.history.back": "Về tệp hiện tại",
   "docs.history.noText": "Loại tệp này không có lịch sử đọc được.",
   "docs.edit.conflict": "Tệp đã bị đổi trên đĩa sau khi bạn mở. Tải lại để xem bản mới nhất rồi sửa lại.",
+  "docs.edit.lost": "Bản sửa chưa lưu của bạn (hãy sao chép, rồi sửa lại trên bản mới nhất)",
   "docs.edit.reload": "Tải lại",
   "docs.edit.saved": "Đã lưu",
   "docs.error": "Có lỗi: {error}",
