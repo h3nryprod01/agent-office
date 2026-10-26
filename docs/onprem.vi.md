@@ -305,9 +305,9 @@ Chạy `doctor` trước. Nó bao quát phần lớn bảng này.
   thật từ địa chỉ không phải loopback.
 * **Windows**: daemon và Scheduled Task đã được kiểm chứng trên máy ảo Windows 11 (xem
   [windows-port.md](windows-port.md)). Một điều cần xác nhận trên máy thật: task chạy
-  `cmd.exe /c node …`, và `lan on|off` / `update` khởi động lại nó bằng
-  `Stop-ScheduledTask`; hãy kiểm tra bằng `Get-Process node` trước và sau để chắc
-  `node.exe` cũ thật sự bị tắt (nếu không, bản mới không chiếm được cổng). `start.ps1` và các lệnh mới đã parse không lỗi và
+  `cmd.exe /c node …`, nên `lan on|off` / `update` dừng task rồi chủ động tắt mọi
+  `node.exe` còn sót đang chạy script daemon trước khi chạy lại; hãy kiểm tra bằng
+  `Get-Process node` rằng sau đó chỉ có đúng một daemon. `start.ps1` và các lệnh mới đã parse không lỗi và
   chạy thử (dry-run) dưới PowerShell 7 trên macOS. **Chưa chạy trên máy Windows thật**:
   `start.ps1` đăng ký và khởi động task từ đầu đến cuối, `update` khởi động lại qua
   Scheduled Task, `backup`/`restore` với `tar.exe` có sẵn của Windows, hộp thoại tường

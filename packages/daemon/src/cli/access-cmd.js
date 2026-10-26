@@ -64,6 +64,7 @@ export function runAccessCommand(argv, ctx) {
     if (action === "status") {
       const tokens = store.list();
       log(`LAN access (as configured in access.json; the daemon applies it at its next start): ${store.lanEnabled() ? "ON (bind 0.0.0.0, token required for other machines)" : "off (this machine only)"}`);
+      if (store.skippedCount()) log(`Note: ${store.skippedCount()} entr${store.skippedCount() === 1 ? "y" : "ies"} in access.json could not be read by this version; kept as they are, never used.`);
       log(`Tokens: ${tokens.length}${tokens.length ? ` (${tokens.map((t) => `${t.label}:${t.role}`).join(", ")})` : ""}`);
       return 0;
     }

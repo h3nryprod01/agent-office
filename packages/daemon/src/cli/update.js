@@ -2,9 +2,10 @@
 //   clean-tree check → backup of the agent-office home → git pull --ff-only →
 //   npm ci (daemon, renderer) → renderer build → restart the service → health check.
 // It refuses rather than guesses: a dirty tree, a non-fast-forward pull and a
-// failed build all stop BEFORE the running daemon is touched, and the error
-// carries the exact commands to go back. No automatic rollback — a half-guessed
-// rollback on a customer's machine is worse than a clear instruction.
+// failed build all stop BEFORE the running daemon is touched. If the install or
+// build fails after the pull, the previous version is put back: code reset to the
+// starting commit, and node_modules renamed back (kept as node_modules.prev during
+// the update), so the restore needs no network — the usual reason an install fails.
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -14,7 +15,7 @@ import { createBackup } from "./backup.js";
 const SERVICE = { darwin: "com.agentoffice.daemon", linux: "agent-office-daemon", win32: "AgentOfficeDaemon" };
 
 /** The command that restarts the installed background service on this platform. */
-export function restartCommand(platform = process.platform, uid = process.getuid?.() ?? 501) {
+export function restartCommand(platform = process.platform, uid = process.getuid?.() ?? 501, repo = "") {
   if (platform === "darwin") return { cmd: "launchctl", args: ["kickstart", "-k", `gui/${uid}/${SERVICE.darwin}`] };
   if (platform === "win32") {
     const task = SERVICE.win32;
@@ -23,19 +24,40 @@ export function restartCommand(platform = process.platform, uid = process.getuid
       args: [
         "-NoProfile",
         "-Command",
-        `Stop-ScheduledTask -TaskName ${task} -ErrorAction SilentlyContinue; Start-ScheduledTask -TaskName ${task}`,
+        // The task runs `cmd /c node …`; make sure the old node.exe is really gone before the new
+        // one starts. Matched by THIS checkout's script path (.Contains: no wildcard surprises), so
+        // ao.mjs, other node programs and daemons from other clones are left alone.
+        `Stop-ScheduledTask -TaskName ${task} -ErrorAction SilentlyContinue; ` +
+          `Get-CimInstance Win32_Process -Filter "Name='node.exe'" | ` +
+          `Where-Object { $_.CommandLine -and $_.CommandLine.Contains('${(repo ? `${repo}\\packages\\daemon\\src\\index.js` : "packages\\daemon\\src\\index.js").replace(/'/g, "''")}') } | ` +
+          `ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; ` +
+          // a task still showing Running would silently ignore the start
+          `foreach ($i in 1..10) { if ((Get-ScheduledTask -TaskName ${task}).State -ne 'Running') { break }; Start-Sleep -Milliseconds 500 }; ` +
+          `Start-ScheduledTask -TaskName ${task}`,
       ],
     };
   }
   return { cmd: "systemctl", args: ["--user", "restart", SERVICE.linux] };
 }
 
+/**
+ * npm is npm.cmd on Windows, and a .cmd shim can only be spawned through a shell. Nothing
+ * else may use one: cmd.exe would swallow the `|` and quotes in the PowerShell restart script.
+ */
+export function needsShell(cmd, platform = process.platform) {
+  return platform === "win32" && cmd === "npm";
+}
+
+/** A command as one pasteable line (the PowerShell script is a single quoted argument). */
+export function commandLine({ cmd, args }) {
+  return [cmd, ...args.map((a) => (/[\s|;"']/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a))].join(" ");
+}
+
 export function defaultRun(cmd, args, opts = {}) {
-  // npm is npm.cmd on Windows; a .cmd shim can only be spawned through a shell
   const res = spawnSync(cmd, args, {
     encoding: "utf8",
     cwd: opts.cwd,
-    shell: process.platform === "win32",
+    shell: needsShell(cmd),
     maxBuffer: 64 * 1024 * 1024,
     stdio: opts.inherit ? "inherit" : "pipe",
   });
@@ -75,8 +97,19 @@ export function swapDist(rendererDir) {
     if (fs.existsSync(old)) fs.renameSync(old, dist);
     throw error;
   }
-  fs.rmSync(old, { recursive: true, force: true });
+  try {
+    fs.rmSync(old, { recursive: true, force: true });
+  } catch {
+    // the swap itself succeeded; a locked leftover (Windows) must not fail the update
+  }
 }
+
+/** node_modules ⇄ node_modules.prev, so a failed `npm ci` can be undone offline. */
+const realFs = {
+  exists: (p) => fs.existsSync(p),
+  rename: (a, b) => fs.renameSync(a, b),
+  rm: (p) => fs.rmSync(p, { recursive: true, force: true }),
+};
 
 /**
  * @returns {Promise<{status: "updated" | "up-to-date" | "dry-run", from?: string, to?: string}>}
@@ -92,14 +125,15 @@ export async function runUpdate({
   backup = createBackup,
   health = waitForDaemon,
   swap = swapDist,
+  fsx = realFs,
   cleanup = (dir) => fs.rmSync(path.join(dir, "dist.next"), { recursive: true, force: true }),
   homeExists = (p) => fs.existsSync(p),
   log = console.log,
 }) {
   const daemonDir = path.join(repo, "packages", "daemon");
   const rendererDir = path.join(repo, "packages", "renderer");
-  const restart = restartCommand(platform, uid);
-  const restartLine = [restart.cmd, ...restart.args].join(" ");
+  const restart = restartCommand(platform, uid, repo);
+  const restartLine = commandLine(restart);
 
   if (dryRun) {
     log("Dry run — nothing will be executed. `update` would:");
@@ -144,26 +178,38 @@ export async function runUpdate({
   }
   log(`Updated ${from.slice(0, 7)} -> ${to.slice(0, 7)}`);
 
-  // The tree was verified clean, so resetting to `from` loses nothing. The daemon was
-  // not restarted, but `npm ci` empties node_modules before installing: leaving a
-  // half-install behind would kill the next restart (crash, reboot, KeepAlive).
+  const modules = (dir) => path.join(dir, "node_modules");
+  const prev = (dir) => path.join(dir, "node_modules.prev");
+  const installed = []; // dirs whose node_modules we moved aside
+
+  // The tree was verified clean. `--keep` refuses (instead of discarding) if the user
+  // edited a tracked file meanwhile. node_modules comes back by rename, not by npm ci.
   const restorePrevious = (why) => {
     cleanup(rendererDir);
-    const steps = [
-      ["git", ["reset", "--hard", from], repo],
-      ["npm", ["ci"], daemonDir],
-      ["npm", ["ci"], rendererDir],
-    ];
-    const failed = steps.find(([cmd, args, cwd]) => run(cmd, args, { cwd }).status !== 0);
-    if (!failed) return `${why}\nThe previous version (${from.slice(0, 7)}) has been restored and the running daemon was not touched.`;
+    try {
+      for (const dir of installed) {
+        if (!fsx.exists(prev(dir))) continue; // there was no install before: nothing to put back
+        fsx.rm(modules(dir));
+        fsx.rename(prev(dir), modules(dir));
+      }
+    } catch (error) {
+      why += `\n(could not move the previous files back: ${error.message})`;
+    }
+    const ok = run("git", ["reset", "--keep", from], { cwd: repo }).status === 0;
+    if (ok) return `${why}\nThe previous version (${from.slice(0, 7)}) has been restored and the running daemon was not touched.`;
     return (
-      `${why}\nRestoring the previous version failed too. By hand, in ${repo}:\n` +
+      `${why}\nRestoring the previous version did not complete. By hand, in ${repo}:\n` +
       `  git reset --hard ${from}\n  npm ci --prefix packages/daemon\n  npm ci --prefix packages/renderer\n  node scripts/ao.mjs doctor\n` +
       "Your data is in the backup listed above."
     );
   };
   for (const [dir, label] of [[daemonDir, "daemon"], [rendererDir, "renderer"]]) {
     log(`Installing ${label} dependencies...`);
+    if (fsx.exists(modules(dir))) {
+      fsx.rm(prev(dir));
+      fsx.rename(modules(dir), prev(dir));
+    }
+    installed.push(dir);
     const r = run("npm", ["ci"], { cwd: dir });
     if (r.status !== 0) throw new UpdateError(restorePrevious(`npm ci failed in packages/${label}.\n${r.stderr.trim().slice(-600)}`));
   }
@@ -176,6 +222,7 @@ export async function runUpdate({
   } catch (error) {
     throw new UpdateError(restorePrevious(`could not put the new build in place (${error.message}).`));
   }
+  for (const dir of installed) fsx.rm(prev(dir)); // the new install works: the old one can go
 
   log("Restarting the service...");
   const restarted = run(restart.cmd, restart.args);

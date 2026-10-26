@@ -58,7 +58,8 @@ function entropy(s) {
 const RULES = [
   {
     name: "home-path",
-    re: /(?:\/(?:Users|home)\/|[A-Za-z]:\\{1,2}Users\\{1,2})([A-Za-z0-9][A-Za-z0-9._-]*)/gi,
+    // Windows paths are case-insensitive (c:\users\…); a lowercase "/users/" URL route is not a home path
+    re: /(?:\/(?:Users|home)\/|[A-Za-z]:\\{1,2}[Uu][Ss][Ee][Rr][Ss]\\{1,2})([A-Za-z0-9][A-Za-z0-9._-]*)/g,
     // 1-2 character names (`/Users/u`, `C:\\Users\\k`) are the fixtures' stand-ins, not accounts
     accept: (m) => m[1].length > 2 && !PLACEHOLDER_USERS.has(m[1].toLowerCase()),
   },
@@ -200,8 +201,12 @@ function listFiles(root) {
 }
 
 /** A path can leak too (a client's name as a folder). Reported without echoing the path. */
-function scanName(name, denylist) {
-  return scanText(name, "(a file name)", denylist).map((f) => ({ ...f, line: 0, detail: f.detail ?? "(in the path itself)" }));
+function scanName(name, denylist, where = "") {
+  return scanText(name, "(a file name)", denylist).map((f) => ({
+    ...f,
+    line: 0,
+    detail: `${f.detail ? `${f.detail} ` : ""}(in the path itself${where})`,
+  }));
 }
 
 /** Whole-tree scan: tracked + untracked-not-ignored files (or a plain walk outside git). */
@@ -221,7 +226,7 @@ export function scanTree(root, denylist = []) {
  * up as "+++ b/x" and must not be mistaken for a file header (that would let a commit
  * hide what follows it).
  */
-function scanDiff(text, denylist, out, names) {
+function scanDiff(text, denylist, out) {
   let file = "(unparsed path)";
   let lineNo = 0;
   let oldLeft = 0;
@@ -241,7 +246,6 @@ function scanDiff(text, denylist, out, names) {
       } // "\\ No newline at end of file" consumes nothing
     } else if (raw.startsWith("+++ ")) {
       file = raw.startsWith("+++ b/") ? raw.slice(6) : "(unparsed path)";
-      if (names && file !== "(unparsed path)") out.push(...scanName(file, denylist));
     } else if (raw.startsWith("@@")) {
       const m = /^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(raw);
       if (!m) continue;
@@ -272,8 +276,19 @@ export function scanRange(root, range, denylist = []) {
     ]);
     if (diff.status !== 0) throw new Error(`git diff-tree ${short} failed: ${diff.stderr.trim()}`);
     const added = [];
-    scanDiff(diff.stdout, denylist, added, true);
+    scanDiff(diff.stdout, denylist, added);
     findings.push(...added.map((f) => ({ ...f, detail: f.detail ?? `(commit ${short})` })));
+    // names come from their own listing: an empty file has no +++ header and a
+    // non-ASCII name arrives quoted/escaped in the patch
+    const names = git(root, ["diff-tree", "-r", "-m", "--root", "--name-only", "-z", "--no-renames", sha]);
+    if (names.status === 0) {
+      const seen = new Set();
+      for (const name of names.stdout.split("\0").filter(Boolean)) {
+        if (seen.has(name) || name === sha) continue;
+        seen.add(name);
+        findings.push(...scanName(name, denylist, `, commit ${short}`));
+      }
+    }
   }
   return findings;
 }

@@ -86,4 +86,11 @@ jobs:
       - if: github.event_name == 'pull_request'
         run: node scripts/check-leaks.mjs --range "origin/${{ github.base_ref }}..HEAD"
       - if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
-        run: node scripts/check-leaks.mjs --range "${{ github.event.before }}..${{ github.sha }}"
+        run: |
+          # after a force-push the old tip is not in the clone: say so instead of failing on it
+          if git cat-file -e "${{ github.event.before }}^{commit}" 2>/dev/null; then
+            node scripts/check-leaks.mjs --range "${{ github.event.before }}..${{ github.sha }}"
+          else
+            # fall back to everything this ref adds over the default branch
+            node scripts/check-leaks.mjs --range "origin/${{ github.event.repository.default_branch }}..${{ github.sha }}"
+          fi

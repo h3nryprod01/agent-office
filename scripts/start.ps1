@@ -43,7 +43,7 @@ if ($Command -in @("doctor", "update", "backup", "restore", "lan", "token")) {
     exit $LASTEXITCODE
 }
 if ($Command -ne "start") {
-    Write-Error "unknown command '$Command' - use: doctor, update, backup, restore, lan, token (or no argument to start)"
+    [Console]::Error.WriteLine("unknown command '$Command' - use: doctor, update, backup, restore, lan, token (or no argument to start)")
     exit 2
 }
 & node (Join-Path $Repo "scripts\ao.mjs") doctor --preflight

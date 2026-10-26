@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { agentOfficeHome, AccessStore } from "../packages/daemon/src/access.js";
 import { runChecks, formatReport, exitCode } from "../packages/daemon/src/cli/doctor.js";
 import { createBackup, restoreBackup, defaultBackupDir } from "../packages/daemon/src/cli/backup.js";
-import { runUpdate, restartCommand, defaultRun } from "../packages/daemon/src/cli/update.js";
+import { runUpdate, restartCommand, commandLine, defaultRun } from "../packages/daemon/src/cli/update.js";
 import { runAccessCommand, lanAddresses } from "../packages/daemon/src/cli/access-cmd.js";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -90,35 +90,40 @@ async function main(argv) {
         if (flag(rest, "--no-restart")) {
           console.log("Not restarting (--no-restart): restart the daemon to load the restored data.");
         } else {
-          const { cmd, args } = restartCommand();
-          const r = defaultRun(cmd, args);
+          const restart = restartCommand(process.platform, undefined, repo);
+          const r = defaultRun(restart.cmd, restart.args);
           console.log(
             r.status === 0
               ? "Service restarted with the restored data."
-              : `Could not restart the service. Restart it yourself: ${[cmd, ...args].join(" ")}` +
-                  (process.platform === "win32" ? "\n(Windows: if restore failed on a locked file, stop the AgentOfficeDaemon task first.)" : ""),
+              : `Could not restart the service. Restart it yourself: ${commandLine(restart)}`,
           );
         }
         return 0;
       } catch (error) {
         console.error(`restore failed (nothing was changed): ${error.message}`);
+        if (process.platform === "win32") console.error("If a file was locked: stop the AgentOfficeDaemon task (Stop-ScheduledTask) and run restore again.");
         return 1;
       }
     }
     case "lan":
     case "token":
-      return runAccessCommand(argv, {
-        store: new AccessStore(),
-        log: (m) => console.log(m),
-        port,
-        platform: process.platform,
-        addresses: lanAddresses,
-        restart: () => {
-          const { cmd, args } = restartCommand();
-          const r = defaultRun(cmd, args);
-          return { ok: r.status === 0, hint: [cmd, ...args].join(" ") };
-        },
-      });
+      try {
+        return runAccessCommand(argv, {
+          store: new AccessStore(),
+          log: (m) => console.log(m),
+          port,
+          platform: process.platform,
+          addresses: lanAddresses,
+          restart: () => {
+            const restart = restartCommand(process.platform, undefined, repo);
+            const r = defaultRun(restart.cmd, restart.args);
+            return { ok: r.status === 0, hint: commandLine(restart) };
+          },
+        });
+      } catch (error) {
+        console.error(error.message); // e.g. "access.json is unreadable; fix or move it aside first"
+        return 1;
+      }
     default:
       console.log(HELP);
       return verb ? 2 : 0;

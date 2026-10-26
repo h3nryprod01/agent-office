@@ -245,6 +245,34 @@ test("--range: author identity and file names are scanned too", () => {
   assert.match(res.stdout, /\(a file name\)/);
 });
 
+test("--range: names of EMPTY files and non-ASCII (quoted) paths are caught too", () => {
+  const { root, git } = gitRepo("range-names");
+  git("config", "core.quotepath", "true");
+  fs.writeFileSync(path.join(root, "a.txt"), "hello\n");
+  git("add", ".");
+  git("commit", "-qm", "init");
+  const base = git("rev-parse", "HEAD").stdout.trim();
+  fs.mkdirSync(path.join(root, "acmesecretco"));
+  fs.writeFileSync(path.join(root, "acmesecretco", ".keep"), ""); // empty: no ---/+++ header in the patch
+  fs.mkdirSync(path.join(root, "khách-nguyenbank"));
+  fs.writeFileSync(path.join(root, "khách-nguyenbank", "a.txt"), "x\n"); // quoted in the patch
+  git("add", ".");
+  git("commit", "-qm", "add");
+  git("rm", "-rq", "acmesecretco", "khách-nguyenbank");
+  git("commit", "-qm", "and remove");
+  const deny = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "ao-deny-")), "d.txt");
+  fs.writeFileSync(deny, "acmesecretco\nnguyenbank\n");
+  const res = spawnSync(process.execPath, [SCRIPT, "--root", root, "--range", `${base}..HEAD`, "--denylist", deny], { encoding: "utf8" });
+  assert.equal(res.status, 1);
+  assert.equal((res.stdout.match(/\(a file name\)/g) ?? []).length, 4, res.stdout); // 2 names x (added, removed)
+  assert.ok(!/acmesecretco|nguyenbank/i.test(res.stdout));
+});
+
+test("a lowercase /users/ URL route is not a home path, a lowercase Windows path is", () => {
+  assert.deepEqual(scanText('fetch("/api/users/settings")\n', "x.js"), []);
+  assert.ok(scanText(`path = "${["c:", "users", "someperson", "x"].join("\\")}"\n`, "x.js").some((f) => f.rule === "home-path"));
+});
+
 test("output never echoes the line: a secret NEXT to a match is not printed either", () => {
   const neighbour = ["wJalrXUtnFEMI", "K7MDENGbPxRfiCYEXAMPLEKEY"].join("/");
   const root = tmpTree({ "cfg.ini": `aws_access_key_id=${AWS} aws_secret_access_key=${neighbour}\n` });
