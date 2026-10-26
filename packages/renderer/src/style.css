@@ -1961,6 +1961,7 @@ body[data-view="log"] .activity-log {
 .costs .lane-table th { font-size: 10px; font-weight: 500; color: #94a3b8; text-align: right; padding: 2px 4px; white-space: nowrap; }
 .costs .lane-table .cost-label { max-width: none; overflow: visible; }
 .costs .lane-note { font-size: 10px; line-height: 1.4; margin: 4px 0 0; }
+
 /* ── lane L2: approval modes + data rules ──────────────────────── */
 .policy-badge {
   display: inline-block;
@@ -2023,6 +2024,7 @@ body[data-view="log"] .activity-log {
 .queue-panel .dismiss:hover { color: #fff; }
 .queue-panel .why { grid-column: 1 / -1; color: #fcd34d; font-size: 11px; }
 .queue-panel li.policy-alert .what { white-space: normal; }
+
 /* ── lane L4: collision radar rows, time-to-intervene card, session actions ── */
 
 .queue-panel li.radar {
@@ -2125,6 +2127,8 @@ body:not([data-view="office"]) .iv-panel {
   color: #93c5fd;
   font-size: 12px;
   align-self: center;
+}
+
 /* ── lane L6: persona cards + SOP view (Hiring Hall and Templates panel) ── */
 .persona-card {
   display: flex;
@@ -2261,6 +2265,7 @@ body:not([data-view="office"]) .iv-panel {
   font-size: 11px;
   color: #f59e0b;
 }
+
 /* ── lane L5: all-projects overview (ui/projectsOverview.ts) ─────────────────────────── */
 #projects-overview {
   display: none;
@@ -2322,6 +2327,7 @@ body[data-view="projects"] #projects-overview {
 .po-code-label { color: #94a3b8; font-size: 11px; }
 .po-code code { display: inline-block; margin: 4px 0; padding: 4px 10px; background: #0b0e15; color: #fde68a; border-radius: 6px; font-size: 16px; letter-spacing: 0.08em; user-select: all; }
 .po-code p { margin: 0; color: #94a3b8; font-size: 11px; }
+
 /* ═══════════════════════════════════════════════════════════════════════
    lane L7: Documents tab, new-project wizard, and the phone-width layout.
    ═══════════════════════════════════════════════════════════════════════ */
@@ -3177,6 +3183,8 @@ body[data-view="docs"] #docs {
     border-radius: 0;
     border: none;
   }
+}
+
 /* lane L9: presentation mode badge */
 #present-badge {
   position: fixed;

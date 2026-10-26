@@ -324,7 +324,7 @@ test("hostAllowed: loopback and IP literals pass; a rebinding-style host name do
   assert.equal(hostAllowed("127.0.0.1:8787"), true);
   assert.equal(hostAllowed("localhost:8787"), true);
   assert.equal(hostAllowed("[::1]:8787"), true);
-  assert.equal(hostAllowed("192.168.1.20:8787"), true);
+  assert.equal(hostAllowed("192.168.1.20:8787"), true); // leak-ok: invented fixture value
   assert.equal(hostAllowed("evil.example.com:8787"), false);
   assert.equal(hostAllowed("evil.example.com"), false);
   assert.equal(hostAllowed(undefined), false);

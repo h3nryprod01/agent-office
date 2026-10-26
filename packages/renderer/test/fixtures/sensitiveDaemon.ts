@@ -4,7 +4,7 @@
  * stand in for a client and a project.
  */
 // no dot in the user name on purpose: a dotted one hid a long-path bug once
-export const HOME = "/Users/jane";
+export const HOME = "/Users/jane"; // leak-ok: invented fixture value
 export const CWD = `${HOME}/Projects/acme-web`;
 export const WORKTREE = `${CWD}/.claude/worktrees/fix-checkout-3f9a2c`;
 

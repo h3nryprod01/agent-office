@@ -44,7 +44,7 @@ describe("masked fetch", () => {
   });
 
   it("keeps status and masks error bodies too", async () => {
-    const { win } = setup(() => json({ error: "cannot open /Users/jane/secret.txt" }, { status: 500 }));
+    const { win } = setup(() => json({ error: "cannot open /Users/jane/secret.txt" }, { status: 500 })); // leak-ok: invented fixture value
     const res = await win.fetch("/x");
     expect(res.status).toBe(500);
     expect(JSON.stringify(await res.json())).not.toContain("jane");
@@ -85,7 +85,7 @@ describe("masked fetch", () => {
   it("masks ndjson, text/html, missing content types and text/plain JSON; leaves audio alone", async () => {
     const bodies: Record<string, Response> = {
       "/nd": new Response('{"text":"call Maria"}\n{"text":"call Maria again"}\n', { headers: { "content-type": "application/x-ndjson" } }),
-      "/html": new Response("<p>Maria at /Users/jane/acme</p>", { headers: { "content-type": "text/html" } }),
+      "/html": new Response("<p>Maria at /Users/jane/acme</p>", { headers: { "content-type": "text/html" } }), // leak-ok: invented fixture value
       "/none": new Response("Maria"),
       "/tp": new Response(JSON.stringify({ repo: "acme-web" }), { headers: { "content-type": "text/plain" } }),
       "/wav": new Response(new Uint8Array([9]), { headers: { "content-type": "audio/wav" } }),

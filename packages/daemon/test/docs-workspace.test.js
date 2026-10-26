@@ -89,7 +89,7 @@ test("loopbackRole: loopback socket + loopback Host = owner, anything else = nul
   assert.equal(loopbackRole(req("127.0.0.1")), "owner");
   assert.equal(loopbackRole(req("::1", "[::1]:8787")), "owner");
   assert.equal(loopbackRole(req("::ffff:127.0.0.1", "localhost:8797")), "owner");
-  assert.equal(loopbackRole(req("192.168.1.20")), null);
+  assert.equal(loopbackRole(req("192.168.1.20")), null); // leak-ok: invented fixture value
   assert.equal(loopbackRole({ socket: {}, headers: {} }), null);
   // DNS rebinding: the socket is loopback but the page's own hostname is in Host
   assert.equal(loopbackRole(req("127.0.0.1", "evil.example.com:8787")), null);

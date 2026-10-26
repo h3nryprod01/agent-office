@@ -124,7 +124,7 @@ export function createMasker(): Masker {
     return ext ? alias("file", seg, ext) : alias("dir", seg);
   }
 
-  /** `/Users/jane/Projects/acme/src/a.ts` → `~/dir-1/project-1/src/file-2.ts` */
+  /** `/Users/jane/Projects/acme/src/a.ts` → `~/dir-1/project-1/src/file-2.ts` */ // leak-ok: invented fixture value
   function maskPath(raw: string): string {
     if (raw.startsWith("~/") && raw.split("/").every((s) => s === "~" || isAlias(s) || PUBLIC_SEGMENTS.has(s.toLowerCase()))) {
       return raw;

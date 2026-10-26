@@ -9,7 +9,7 @@ const file = JSON.stringify({
   exportedAt: 0,
   events: [
     { v: 0, id: "e2", type: "agent_message", timestamp: 2, sessionId: "s", agentId: "s", parentId: null, text: "refund Maria Gonzalez" },
-    { v: 0, id: "e1", type: "session_started", timestamp: 1, sessionId: "s", agentId: "s", parentId: null, cwd: "/Users/jane.doe/Projects/acme-web", label: "acme-agent", repo: "acme-web" },
+    { v: 0, id: "e1", type: "session_started", timestamp: 1, sessionId: "s", agentId: "s", parentId: null, cwd: "/Users/jane.doe/Projects/acme-web", label: "acme-agent", repo: "acme-web" }, // leak-ok: invented fixture value
   ],
 });
 

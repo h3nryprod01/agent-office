@@ -130,7 +130,7 @@ test("sessions in a sub-directory of the project resolve to it; writes are judge
 test("audit rows never contain credentials typed on a command line", () => {
   mkProject("acme-web", repo, { approval: { mode: "auto" } });
   engine().evaluate(req({ toolInput: { command: 'curl -H "Authorization: Bearer abcDEF1234567890xyz" https://example.com/api' } }));
-  engine().evaluate(req({ toolInput: { command: "API_KEY=sk-live-1234567890abcdef node run.js" } }));
+  engine().evaluate(req({ toolInput: { command: "API_KEY=sk-live-1234567890abcdef node run.js" } })); // leak-ok: invented fixture value
   const text = fs.readFileSync(path.join(projectsDir, "acme-web", "policy-audit.jsonl"), "utf8");
   assert.ok(!text.includes("abcDEF1234567890xyz"));
   assert.ok(!text.includes("sk-live-1234567890abcdef"));
@@ -151,7 +151,7 @@ test("redact: URL credentials and password flags", () => {
     ["mysql --password hunter2xx -h db", "hunter2xx"],
     ["curl -u admin:hunter2xx https://x.example", "hunter2xx"],
     ["mysql -phunter2xx db", "hunter2xx"],
-    ["echo github_pat_11ABCDEFG0123456789abcdef", "ABCDEFG0123456789"],
+    ["echo github_pat_11ABCDEFG0123456789abcdef", "ABCDEFG0123456789"], // leak-ok: invented fixture value
   ]) assert.ok(!redact(input).includes(leak), `${input} -> ${redact(input)}`);
   assert.equal(redact("npm run build -p 4"), "npm run build -p 4"); // short flag values stay readable
 });

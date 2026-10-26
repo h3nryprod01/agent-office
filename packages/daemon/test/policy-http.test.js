@@ -156,7 +156,7 @@ test("loopbackRole: owner for a plain loopback socket, nobody for anything else 
   assert.equal(loopbackRole(req("127.0.0.1")), "owner");
   assert.equal(loopbackRole(req("::1")), "owner");
   assert.equal(loopbackRole(req("::ffff:127.0.0.1")), "owner");
-  assert.equal(loopbackRole(req("192.168.1.20")), null);
+  assert.equal(loopbackRole(req("192.168.1.20")), null); // leak-ok: invented fixture value
   assert.equal(loopbackRole(req("127.0.0.1", { "x-forwarded-for": "8.8.8.8" })), null);
   assert.equal(loopbackRole({ headers: {} }), null);
 });

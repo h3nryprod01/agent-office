@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createMasker } from "../src/presentation/mask";
 
 // Fake-but-realistic sensitive values. Nothing here is a real project.
-const HOME = "/Users/jane.doe";
+const HOME = "/Users/jane.doe"; // leak-ok: invented fixture value
 const CWD = `${HOME}/Projects/acme-web`;
 const WT = `${CWD}/.claude/worktrees/fix-checkout-3f9a2c`;
 
@@ -179,11 +179,11 @@ describe("createMasker — secrets never ride a 'safe' key", () => {
       m.mask({
         openaiKey: "k-live-1234567890abcdef",
         sessionKey: "abcdefghijklmnopqrstuvwxyz012345",
-        key: "ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+        key: "ghp_abcdefghijklmnopqrstuvwxyz0123456789", // leak-ok: invented fixture value
         note: "Bearer abcdefghijklmnop",
         authHeader: "Basic dXNlcjpwYXNz",
         refreshToken: "r1",
-        jwt: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig_abc-123",
+        jwt: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig_abc-123", // leak-ok: invented fixture value
       }),
     );
     for (const needle of ["1234567890abcdef", "abcdefghijklmnop", "ghp_", "dXNlcjpwYXNz", "r1", "eyJ"]) {
@@ -210,7 +210,7 @@ describe("createMasker — review findings", () => {
   it("long paths, branches and repo names stay aliases, not ••••", () => {
     const m = createMasker();
     const out = m.mask({
-      cwd: "/Users/jane/Projects/agent-office-public",
+      cwd: "/Users/jane/Projects/agent-office-public", // leak-ok: invented fixture value
       branch: "feature/a-very-long-branch-name-for-the-acme-merger",
       repo: "acmeclientwebsite-with-a-long-name-0123456789",
     }) as Record<string, string>;
