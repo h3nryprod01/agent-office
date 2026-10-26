@@ -387,6 +387,7 @@ async function boot(): Promise<void> {
   // An explicit ?room= stays a manual override.
   const roomByRepo = new Map<string, RoomStyle>();
   const slugByRepo = new Map<string, string>(); // and the project the Board shows for that tab
+  let boardSeeded = false;
   let activeRepo: string | null = null;
   const applyRoom = (): void => {
     if (!office3d || new URLSearchParams(location.search).has("room")) return;
@@ -410,9 +411,13 @@ async function boot(): Promise<void> {
       }
       applyRoom();
       // the Board starts on the only project there is, when there is just one
-      // the Board opens on the remembered project if it still exists, else the only one there is
-      const start = pickProject(projects, getActiveProject());
-      if (start) kanban.setProject(start.slug);
+      // the Board opens on the remembered project if it still exists, else the first one — ONCE: after
+      // that the office tabs drive it, and the 60s refresh must not pull it back
+      if (!boardSeeded) {
+        boardSeeded = true;
+        const start = pickProject(projects, getActiveProject());
+        if (start) kanban.setProject(start.slug);
+      }
     } catch {
       // the office still works on the default floor
     }
