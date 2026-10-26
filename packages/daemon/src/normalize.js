@@ -19,6 +19,7 @@
 
 import { makeEvent } from "./event-schema.js";
 import { laneOfModel } from "./worker-lanes.js";
+import { touchedPaths } from "./touched-paths.js";
 
 // wi-office-life: this was 140 (one status-line length) — the side panel's
 // "Hoạt động gần nhất" and Transcript both show `detail` verbatim, so 140
@@ -190,6 +191,8 @@ export class SessionNormalizer {
       if (block.type === "tool_use") {
         this.pendingToolUse.set(block.id, { toolName: block.name, cwd });
         this.registry?.registerToolUse(this.sessionId, block.id, this.agentId);
+        // lane L4: files this call writes, for the collision radar (additive meta field)
+        const paths = touchedPaths({ tool: block.name, input: block.input, cwd });
         events.push(
           makeEvent({
             id: `${block.id}:start`,
@@ -202,7 +205,7 @@ export class SessionNormalizer {
             tool: block.name,
             status: "start",
             detail: describeToolInput(block.name, block.input),
-            meta: { toolUseId: block.id },
+            meta: { toolUseId: block.id, ...(paths.length ? { paths } : {}) },
           })
         );
       } else if (block.type === "text" && block.text) {

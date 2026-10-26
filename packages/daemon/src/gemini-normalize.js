@@ -25,6 +25,7 @@
 // file, so parentId is always null — every Gemini character is a root agent.
 
 import { makeEvent } from "./event-schema.js";
+import { touchedPaths } from "./touched-paths.js";
 
 const MAX_DETAIL_LENGTH = 140;
 
@@ -186,6 +187,8 @@ export class GeminiSessionNormalizer {
     for (const call of toolCalls.slice(toolCallOffset)) {
       if (!call || typeof call.id !== "string") continue;
       const endTs = call.timestamp ? Date.parse(call.timestamp) : ts;
+      // lane L4: files this call writes, for the collision radar (additive meta field)
+      const paths = touchedPaths({ tool: call.name, input: call.args, cwd: this.cwd });
       events.push(
         makeEvent({
           ...this._base(ts),
@@ -194,7 +197,7 @@ export class GeminiSessionNormalizer {
           tool: call.name,
           status: "start",
           detail: describeToolCall(call.name, call.args),
-          meta: { callId: call.id },
+          meta: { callId: call.id, ...(paths.length ? { paths } : {}) },
         }),
         makeEvent({
           ...this._base(endTs),

@@ -27,6 +27,7 @@
 // registry/toolUseId indirection.
 
 import { makeEvent } from "./event-schema.js";
+import { touchedPaths } from "./touched-paths.js";
 
 const MAX_DETAIL_LENGTH = 140;
 const EXIT_CODE_RE = /(?:Process exited with code|Exit code:)\s*(\d+)/;
@@ -184,6 +185,8 @@ export class CodexSessionNormalizer {
     if (kind === "function_call" || kind === "custom_tool_call") {
       const args = kind === "function_call" ? payload.arguments : payload.input;
       this.pendingCalls.set(payload.call_id, payload.name);
+      // lane L4: files this call writes, for the collision radar (additive meta field)
+      const paths = touchedPaths({ tool: payload.name, input: args, cwd: this.cwd });
       return [
         makeEvent({
           ...this._base(ts),
@@ -192,7 +195,7 @@ export class CodexSessionNormalizer {
           tool: payload.name,
           status: "start",
           detail: describeToolCall(payload.name, args),
-          meta: { callId: payload.call_id },
+          meta: { callId: payload.call_id, ...(paths.length ? { paths } : {}) },
         }),
       ];
     }

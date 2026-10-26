@@ -23,6 +23,8 @@ import { mountNotifier } from "./ui/notify";
 import { mountOrgChart } from "./ui/orgchart";
 import { mountBuildingView } from "./ui/buildingView";
 import { ApprovalsStore } from "./ui/approvals";
+import { RadarStore } from "./ui/radar"; // lane L4
+import { mountInterventionStats, type InterventionSummary } from "./ui/interventionStats"; // lane L4
 import { mountOfficeTabs, TAB_ALL, type TabKey } from "./ui/officeTabs";
 import { mountTimelineBar, type ReplayView } from "./ui/timelineBar";
 import { mountChatBox, type ChatBoxHandle } from "./ui/chatBox";
@@ -110,14 +112,18 @@ async function boot(): Promise<void> {
   let hiringHall: HiringHallHandle | null = null;
   const approvals = useWs ? new ApprovalsStore() : undefined;
   const policyAlerts = useWs ? new PolicyAlertsStore() : undefined; // lane L2: data-rule warnings
+  const radar = useWs ? new RadarStore() : undefined; // lane L4: collision alerts, same raw tap
   const source: EventSource = useWs
     ? new WebSocketEventSource(undefined, undefined, (raw) => {
         approvals!.onRaw(raw);
         policyAlerts!.onRaw(raw);
+        radar!.onRaw(raw); // lane L4
         hiringHall?.onRaw(raw);
       })
     : new MockEventSource(buildScenario(stress));
   approvals?.backfill();
+  radar?.backfill(); // lane L4
+  if (radar) setInterval(() => void radar.backfill(), 30_000); // lane L4: drops alerts whose "resolved" frame this page missed
 
   source.subscribe((event) => {
     recorder.record(event);
@@ -393,7 +399,17 @@ async function boot(): Promise<void> {
     focusAgent,
     approvals,
     policyAlerts, // lane L2
+    radar, // lane L4
   );
+  // lane L4: time-to-intervene card (live mode only — it reads the daemon's metrics)
+  if (useWs) {
+    const ivRoot = document.createElement("div");
+    ivRoot.id = "intervention-stats";
+    document.body.appendChild(ivRoot);
+    mountInterventionStats(ivRoot, (): Promise<InterventionSummary> =>
+      fetch("/metrics/intervention?days=7").then((r) => r.json()),
+    );
+  }
 
   // THE ONE THING: ❗ out of the 3D window → OS notification (native toast on
   // the customer's Windows + taskbar badge). Same alert signal as the queue.
