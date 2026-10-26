@@ -161,3 +161,24 @@ test("--range scans added lines and commit messages of a git range", () => {
   });
   assert.equal(clean.status, 0, clean.stdout + clean.stderr);
 });
+
+test("--range: an added line that looks like a diff header cannot hide the lines after it", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ao-range-evade-"));
+  const git = (...a) => spawnSync("git", a, { cwd: root, encoding: "utf8" });
+  git("init", "-q");
+  git("config", "user.email", "t@example.com");
+  git("config", "user.name", "t");
+  fs.writeFileSync(path.join(root, "a.txt"), "hello\n");
+  git("add", ".");
+  git("commit", "-qm", "init");
+  const base = git("rev-parse", "HEAD").stdout.trim();
+  // "++ b/other" is stored as "+++ b/other" in the diff; "@@ -1 +1 @@" likewise as "+@@ ..."
+  fs.writeFileSync(path.join(root, "a.txt"), `hello\n++ b/other\n@@ -1 +1 @@\nip ${IP_192}\n`);
+  git("add", ".");
+  git("commit", "-qm", "sneaky");
+  const res = spawnSync(process.execPath, [SCRIPT, "--root", root, "--range", `${base}..HEAD`, "--no-denylist"], {
+    encoding: "utf8",
+  });
+  assert.equal(res.status, 1, res.stdout + res.stderr);
+  assert.match(res.stdout, /a\.txt:4:/);
+});

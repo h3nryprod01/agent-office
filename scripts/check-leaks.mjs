@@ -218,16 +218,34 @@ export function scanRange(root, range, denylist = []) {
   const findings = [];
   const diff = git(root, ["diff", "--unified=0", "--no-color", "--no-renames", range]);
   if (diff.status !== 0) throw new Error(`git diff ${range} failed: ${diff.stderr.trim()}`);
-  let file = null;
+  // Walk the diff by hunk line counts, not by prefix: an ADDED line "++ b/x" shows up
+  // as "+++ b/x" and must not be mistaken for a file header (that would let a
+  // commit hide what follows it).
+  let file = "(unparsed path)";
   let lineNo = 0;
+  let oldLeft = 0;
+  let newLeft = 0;
   for (const raw of diff.stdout.split("\n")) {
-    if (raw.startsWith("+++ ")) {
-      file = raw.startsWith("+++ b/") ? raw.slice(6) : null;
+    if (oldLeft > 0 || newLeft > 0) {
+      if (raw.startsWith("+")) {
+        newLeft -= 1;
+        lineNo += 1;
+        for (const f of scanText(raw.slice(1), file, denylist)) findings.push({ ...f, line: lineNo });
+      } else if (raw.startsWith("-")) {
+        oldLeft -= 1;
+      } else if (raw.startsWith(" ")) {
+        oldLeft -= 1;
+        newLeft -= 1;
+        lineNo += 1;
+      } // "\ No newline at end of file" consumes nothing
+    } else if (raw.startsWith("+++ ")) {
+      file = raw.startsWith("+++ b/") ? raw.slice(6) : "(unparsed path)";
     } else if (raw.startsWith("@@")) {
-      lineNo = Number(/\+(\d+)/.exec(raw)?.[1] ?? 0) - 1;
-    } else if (file && raw.startsWith("+")) {
-      lineNo += 1;
-      for (const f of scanText(raw.slice(1), file, denylist)) findings.push({ ...f, line: lineNo });
+      const m = /^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(raw);
+      if (!m) continue;
+      oldLeft = m[1] === undefined ? 1 : Number(m[1]);
+      newLeft = m[3] === undefined ? 1 : Number(m[3]);
+      lineNo = Number(m[2]) - 1;
     }
   }
   const log = git(root, ["log", "--format=%h%x1f%B%x1e", range]);
