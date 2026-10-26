@@ -586,4 +586,16 @@ export const en = {
   "wizard.nameRequired": "Give the project a name.",
   "wizard.error": "Could not create the project: {error}",
   "kanban.openDoc": "Open the document",
+  // lane L8: office places (hover tooltips) + the spend board title
+  "wall.spend": "SPEND · 24H",
+  "office.place.receptionSign": "RECEPTION",
+  "office.place.library": "Library: agents read files here",
+  "office.place.arcade": "Arcade: agents run commands here",
+  "office.place.server_rack": "LLM providers: a light per agent on each",
+  "office.place.filing_cabinet": "Outputs: open what the team finished",
+  "office.place.meeting_table": "Meeting table: handing work to sub-agents",
+  "office.place.reception": "Reception: hire an agent",
+  "office.place.elevator": "Lift: your other projects",
+  "office.place.board_work": "Work board",
+  "office.place.board_spend": "Spend board: the last 24 hours",
 };

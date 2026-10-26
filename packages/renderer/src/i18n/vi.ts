@@ -580,4 +580,16 @@ export const vi: Record<string, string> = {
   "wizard.nameRequired": "Hãy đặt tên cho dự án.",
   "wizard.error": "Không tạo được dự án: {error}",
   "kanban.openDoc": "Mở tài liệu",
+  // lane L8: office places (hover tooltips) + the spend board title
+  "wall.spend": "CHI PHÍ · 24H",
+  "office.place.receptionSign": "LỄ TÂN",
+  "office.place.library": "Thư viện: agent đọc file ở đây",
+  "office.place.arcade": "Máy arcade: agent chạy lệnh ở đây",
+  "office.place.server_rack": "Nhà cung cấp LLM: mỗi đèn là một agent đang dùng",
+  "office.place.filing_cabinet": "Tủ hồ sơ: mở sản phẩm đã xong",
+  "office.place.meeting_table": "Bàn họp: giao việc cho sub-agent",
+  "office.place.reception": "Lễ tân: tuyển agent",
+  "office.place.elevator": "Thang máy: sang dự án khác",
+  "office.place.board_work": "Bảng việc",
+  "office.place.board_spend": "Bảng chi phí: 24 giờ qua",
 };
