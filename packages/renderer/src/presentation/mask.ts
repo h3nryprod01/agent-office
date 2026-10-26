@@ -206,7 +206,9 @@ export function createMasker(): Masker {
     // harness / lane names first: before the secret and alias checks, so even an odd name ("sk-…",
     // "project-1") becomes a reversible alias the daemon still accepts on save
     if (HARNESS_LIST_KEYS.has(lower) || lower === "harness" || lower === "lane") {
-      if (value.startsWith("tool-") && isAlias(value)) return value; // masking twice (a replay saved while presenting) keeps the alias
+      // ponytail: masking twice (a replay saved while presenting) keeps the alias; ceiling: a REAL harness or
+      // lane literally named tool-<n> can collide with a live alias. Upgrade: have the daemon reject /^tool-\d+$/.
+      if (value.startsWith("tool-") && isAlias(value)) return value;
       return PUBLIC_HARNESSES.has(value) ? value : alias("tool", value);
     }
     if (isSecretKey(key) || SECRET_VALUE.test(value)) return "••••";
