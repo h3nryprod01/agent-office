@@ -339,4 +339,22 @@ export const en = {
   "wall.scrumBoard": "WORK BOARD",
   "chat.note": "\u24d8 this chat cannot approve permissions \u2014 do that in the agent's own app \u00b7 each message is one real Claude turn",
   "org.counts": "{total} agents · {working} working · {blocked} blocked · {done} done",
+
+  // lane L6: persona cards + SOP view
+  "persona.viewSop": "View SOP",
+  "persona.voice": "Voice",
+  "persona.tone": "Tone",
+  "sop.inputs": "Inputs",
+  "sop.steps": "Steps",
+  "sop.done": "Done when",
+  "sop.handoff": "Hand over to",
+  "sop.escalate": "Ask a human when",
+  "sop.close": "Close",
+  "sop.loading": "Loading the procedure…",
+  "sop.failed": "Could not load the procedure: {error}",
+  "templates.personaMeta": "{personas} personas · {sops} SOPs",
+  "templates.showPeople": "Show people",
+  "templates.hidePeople": "Hide people",
+  "templates.peopleFailed": "Could not load the people: {error}",
+  "work.sopStep": "SOP step {n}",
 };

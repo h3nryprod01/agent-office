@@ -5,6 +5,7 @@ import {
   matchWorkItem,
   workItemLinksHtml,
   workItemSectionHtml,
+  sopStepHtml,
   OBSIDIAN_VAULT,
   type WorkItem,
 } from "../src/ui/workItems";
@@ -138,5 +139,20 @@ describe("whyChainHtml", () => {
   it("escape tiêu đề (chống XSS)", () => {
     const items = [item({ id: "a", parentItemId: "b" }), item({ id: "b", title: "<img src=x>" })];
     expect(whyChainHtml(items[0], items)).not.toContain("<img src=x>");
+  });
+});
+
+// lane L6: member + SOP step on the work item
+describe("sopStepHtml", () => {
+  it("shows the assignee and the step, and nothing when the item has no step", () => {
+    expect(sopStepHtml({ id: "a", title: "t", assignee: "linh", sopStep: 3 })).toContain("linh · SOP step 3");
+    expect(sopStepHtml({ id: "a", title: "t", assignee: "linh" })).toBe("");
+    expect(sopStepHtml({ id: "a", title: "t", sopStep: null })).toBe("");
+  });
+
+  it("escapes the assignee and lands in the side panel section", () => {
+    const html = workItemSectionHtml(agent({ sessionId: "s" }), [item({ id: "x", sessionId: "s", assignee: "<b>x</b>", sopStep: 2 })]);
+    expect(html).toContain("SOP step 2");
+    expect(html).not.toContain("<b>x</b>");
   });
 });

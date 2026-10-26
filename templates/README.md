@@ -9,3 +9,8 @@ Cách dùng qua `node scripts/company-template.mjs`:
 - `save <name>` — lưu roster hiện tại thành template mới.
 
 Template là sản phẩm bán được: làm xong 1 setup thật cho khách → `save` thành template → bán/tái dùng.
+
+Từ lane L6: member có thể kèm `persona:` (ai) và `sop:` (làm thế nào — file `sops/<vị-trí>.md`).
+`apply` chép cả `sops/` cạnh roster; thử mà không đụng roster thật:
+`node scripts/company-template.mjs apply coding --company-dir /tmp/thu/company --home /tmp/thu/home`.
+Định dạng + kiểm tra: `docs/company-templates.md`.

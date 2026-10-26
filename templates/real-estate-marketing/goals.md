@@ -69,7 +69,7 @@ giao việc cho chúng cho tới khi tuyển xong.
 | Đăng Facebook Page / Zalo OA / TikTok | 3 kênh chính của BĐS VN, `crosspost` không hỗ trợ | Kiểm tra MCP `zernio` có tool đăng bài không trước khi tuyển skill mới |
 | Ads Manager (Facebook / Google) | Goal 2 dừng ở ad copy, chưa chạy & tối ưu được ngân sách | Cần quyền tài khoản ads của khách |
 | Định giá / so sánh giá·m² | Báo cáo thị trường đang dựa hoàn toàn vào nguồn public | Có thể thay bằng data feed khách cung cấp |
-| Pháp lý dự án (sổ, quy hoạch, tiến độ) | Bài review dự án chạm nội dung pháp lý — rủi ro sai | Trong lúc chưa có: mọi khẳng định pháp lý phải người thật duyệt |
+| Pháp lý dự án (sổ, quy hoạch, tiến độ) | Bài review dự án chạm nội dung pháp lý — rủi ro sai | Đã có vị trí `kiem-tra-phap-ly` (đối chiếu khẳng định với giấy tờ khách cung cấp, KHÔNG cho phép đăng). Vẫn cần người có thẩm quyền pháp lý ký duyệt và cung cấp danh sách thông tin bắt buộc; chưa có công cụ tra cứu pháp lý tự động. |
 | CRM lead pipeline thật | `small-business:*` là plugin generic, không có pipeline BĐS | Hoặc nối CRM sẵn có của khách |
 | Lịch lặp lại (`schedule`) | Goal 4 cần chạy định kỳ mà không ai nhắc | Skill `schedule` **có trên máy nhưng chỉ là symlink vào phiên Claude Desktop** — không phải bản cài bền, `apply` sẽ báo thiếu. Cài bản thật vào `~/.claude/skills/` hoặc dùng cron. |
 | Dựng landing page bản thật (`frontend-design`) | Đang thay bằng `ui-ux-pro-max` | Cùng lý do symlink như trên — tuỳ chọn nâng cấp, không chặn |

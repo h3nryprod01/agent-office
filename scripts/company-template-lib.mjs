@@ -145,20 +145,23 @@ const ASSET_DIRS = ["sops", "personas"];
  * Templates without these directories (every pre-persona template) copy nothing.
  */
 export function copyCompanyAssets(templateDir, destDir) {
+  const counts = { sops: 0, personas: 0 };
   for (const name of ASSET_DIRS) {
     const src = path.join(templateDir, name);
     if (!fs.statSync(src, { throwIfNoEntry: false })?.isDirectory()) continue;
     const dest = path.join(destDir, name);
     if (fs.existsSync(dest)) fs.renameSync(dest, backupPathFor(dest));
     fs.cpSync(src, dest, { recursive: true });
+    counts[name] = fs.readdirSync(dest).length;
   }
+  return counts;
 }
 
 /**
  * Back up the current roster (if any), overwrite it with the template's, and
  * report what the caller must still do. Never installs a skill — missing ones
  * go through the company-hire skill (mandatory safety scan).
- * @returns {{name: string, rosterPath: string, backupPath: string|null, missingSkills: string[], goals: string|null}}
+ * @returns {{name: string, rosterPath: string, backupPath: string|null, missingSkills: string[], goals: string|null, assets: {sops: number, personas: number}}}
  */
 export function applyTemplate({ templatesDir, companyDir, homeDir, name }) {
   const templateDir = resolveTemplateDir(templatesDir, name);
@@ -180,9 +183,11 @@ export function applyTemplate({ templatesDir, companyDir, homeDir, name }) {
     fs.copyFileSync(rosterPath, backupPath);
   }
   fs.copyFileSync(srcRoster, rosterPath);
-  copyCompanyAssets(templateDir, companyDir);
+  const assets = copyCompanyAssets(templateDir, companyDir);
 
   return {
+    assets,
+    personaCount: (rosterText.match(/^[ \t]+persona:[ \t]*$/gm) ?? []).length,
     name,
     rosterPath,
     backupPath,

@@ -23,16 +23,30 @@ import {
 } from "./company-template-lib.mjs";
 
 const TEMPLATES_DIR = fileURLToPath(new URL("../templates/", import.meta.url));
-const HOME_DIR = os.homedir();
-const COMPANY_DIR = path.join(HOME_DIR, ".claude", "company");
+// lane L6: `--home <dir>` / `--company-dir <dir>` aim apply/save at a throwaway directory
+// instead of the real ~/.claude (tests, demos, trying a template without touching your roster).
+const flag = (name) => {
+  const i = process.argv.indexOf(name);
+  if (i === -1) return null;
+  const value = process.argv[i + 1];
+  if (!value || value.startsWith("--")) {
+    console.error(`Lỗi: ${name} cần một đường dẫn.`);
+    process.exit(1);
+  }
+  return value;
+};
+const HOME_DIR = flag("--home") ?? os.homedir();
+const COMPANY_DIR = flag("--company-dir") ?? path.join(HOME_DIR, ".claude", "company");
 const ROSTER_PATH = path.join(COMPANY_DIR, "roster.yaml");
 
 const USAGE = `Cách dùng: company-template <lệnh> [tên]
 
   list            liệt kê template có sẵn
   show <name>     xem roster + goals của template
-  apply <name>    đè template lên ~/.claude/company/roster.yaml (backup .bak), báo skill thiếu
-  save <name>     lưu roster hiện tại thành template mới`;
+  apply <name>    đè template lên ~/.claude/company/roster.yaml (backup .bak), kèm sops/ + personas/, báo skill thiếu
+  save <name>     lưu roster hiện tại thành template mới
+
+  Tuỳ chọn cho apply/save: --company-dir <thư mục>  --home <thư mục>  (mặc định ~/.claude/company)`;
 
 function listTemplates() {
   let dirs;
@@ -78,6 +92,9 @@ function apply(name) {
 
   if (result.backupPath) console.log(`Đã backup roster hiện tại → ${result.backupPath}`);
   console.log(`Đã apply template "${name}" → ${result.rosterPath}`);
+  if (result.personaCount || result.assets.sops) {
+    console.log(`Kèm ${result.personaCount} persona (trong roster.yaml) và ${result.assets.sops} SOP (thư mục sops/ cạnh roster).`);
+  }
 
   // Báo skill thiếu (bỏ qua member dạng plugin — không check được).
   if (result.missingSkills.length) {
@@ -108,7 +125,7 @@ function save(name) {
 }
 
 function main() {
-  const [cmd, name] = process.argv.slice(2);
+  const [cmd, name] = process.argv.slice(2).filter((a, i, all) => !a.startsWith("--") && !all[i - 1]?.startsWith("--"));
   try {
     switch (cmd) {
       case "list":

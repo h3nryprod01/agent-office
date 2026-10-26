@@ -246,14 +246,15 @@ export function buildMemberPrompt({ member, kit, task, goals = null }) {
         `## Definition of done — every line must be true before you report Done\n${sop.done.map((d) => `- [ ] ${d}`).join("\n")}`,
         `## Hand over to\n${handoff}`,
         `## Escalate to a human when\n${bullet(sop.escalate)}`,
-        sop.body ? `## Notes for this position\n${sop.body}` : null,
+        sop.body || null,
       ]
         .filter(Boolean)
         .join("\n\n"),
     );
   }
 
-  if (goals) sections.push(`# Project goals\n${goals.trim().slice(0, 2000)}`);
+  // demote the file's own headings so they nest under "Project goals" instead of competing with it
+  if (goals) sections.push(`# Project goals\n${goals.trim().slice(0, 2000).replace(/^(#+) /gm, "#$1 ")}`);
 
   const taskLines = [`# Your task`, task.title];
   if (task.brief) taskLines.push("", task.brief);
@@ -265,7 +266,7 @@ export function buildMemberPrompt({ member, kit, task, goals = null }) {
     `When you finish or get stuck, report in five parts, each at most two lines: Did / Verified / Links / Blockers / Next.`,
   ];
   if (sop && task.id) {
-    report.push(`Keep the work item's \`sopStep\` equal to the SOP step number you are on (1-${sop.steps.length}); update it each time you move to the next step.`);
+    report.push(`Say which SOP step (1-${sop.steps.length}) you are on in every progress message and in your final report; the PM records it as the work item's \`sopStep\`.`);
   }
   sections.push(report.join("\n"));
 

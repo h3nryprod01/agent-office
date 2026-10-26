@@ -195,3 +195,14 @@ test("validateCompany: strict check of a whole company directory", () => {
   rmSync(ok, { recursive: true });
   rmSync(broken, { recursive: true });
 });
+
+test("validateCompany: a handoff target may be a position (basename of a member's SOP)", () => {
+  const dir = makeDir({
+    "roster.yaml": ROSTER,
+    "sops/developer.md": GOOD_SOP.replace("code-reviewer:", "reviewer:"), // `reviewer` is the position of sops/reviewer.md
+    "sops/reviewer.md": GOOD_SOP,
+    "personas/linh.md": "x",
+  });
+  assert.deepEqual(validateCompany({ baseDir: dir }), []);
+  rmSync(dir, { recursive: true });
+});
