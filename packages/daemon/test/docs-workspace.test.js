@@ -78,12 +78,31 @@ async function withDocs(s, opts, run) {
 
 const asRole = (role) => ({ roleOf: () => role });
 
-test("loopbackRole: loopback = owner, anything else = null", () => {
-  assert.equal(loopbackRole({ socket: { remoteAddress: "127.0.0.1" } }), "owner");
-  assert.equal(loopbackRole({ socket: { remoteAddress: "::1" } }), "owner");
-  assert.equal(loopbackRole({ socket: { remoteAddress: "::ffff:127.0.0.1" } }), "owner");
-  assert.equal(loopbackRole({ socket: { remoteAddress: "192.168.1.20" } }), null);
-  assert.equal(loopbackRole({ socket: {} }), null);
+test("loopbackRole: loopback socket + loopback Host = owner, anything else = null", () => {
+  const req = (remoteAddress, host = "127.0.0.1:8787") => ({ socket: { remoteAddress }, headers: { host } });
+  assert.equal(loopbackRole(req("127.0.0.1")), "owner");
+  assert.equal(loopbackRole(req("::1", "[::1]:8787")), "owner");
+  assert.equal(loopbackRole(req("::ffff:127.0.0.1", "localhost:8797")), "owner");
+  assert.equal(loopbackRole(req("192.168.1.20")), null);
+  assert.equal(loopbackRole({ socket: {}, headers: {} }), null);
+  // DNS rebinding: the socket is loopback but the page's own hostname is in Host
+  assert.equal(loopbackRole(req("127.0.0.1", "evil.example.com:8787")), null);
+  assert.equal(loopbackRole(req("127.0.0.1", "")), null);
+  assert.equal(loopbackRole({ socket: { remoteAddress: "127.0.0.1" } }), null);
+});
+
+test("a planted symlink at a guessable temp name cannot redirect a save", async () => {
+  const s = sandbox();
+  const victim = path.join(s.homeDir, "victim.txt");
+  fs.writeFileSync(victim, "keep me");
+  // the old scheme wrote to `<file>.ao-tmp-<pid>`; plant links at that name
+  fs.symlinkSync(victim, path.join(s.cwd, `README.md.ao-tmp-${process.pid}`));
+  await withDocs(s, {}, async ({ post }) => {
+    assert.equal((await post("/docs/save", { path: "README.md", content: "# new\n" })).status, 200);
+  });
+  assert.equal(fs.readFileSync(victim, "utf8"), "keep me");
+  assert.equal(fs.readFileSync(path.join(s.cwd, "README.md"), "utf8"), "# new\n");
+  s.cleanup();
 });
 
 test("unrelated route → handler returns false", async () => {

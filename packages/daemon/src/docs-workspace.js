@@ -95,10 +95,18 @@ function fail(code, message, extra) {
 const invalid = (m) => fail("INVALID", m);
 const forbidden = (m) => fail("FORBIDDEN", m);
 
-/** Loopback → owner; any other source has no role. The stand-in for L1's roleOf(req). */
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+
+/**
+ * Loopback → owner; any other source has no role. The stand-in for L1's roleOf(req).
+ * The Host header must be loopback too: a DNS-rebinding page reaches this socket from 127.0.0.1
+ * but still carries its own hostname in Host (and, for POSTs, an Origin the guard already refuses).
+ */
 export function loopbackRole(req) {
   const addr = req.socket?.remoteAddress;
-  return addr === "127.0.0.1" || addr === "::1" || addr === "::ffff:127.0.0.1" ? "owner" : null;
+  if (addr !== "127.0.0.1" && addr !== "::1" && addr !== "::ffff:127.0.0.1") return null;
+  const host = String(req.headers?.host ?? "").toLowerCase().replace(/:\d+$/, "");
+  return LOOPBACK_HOSTS.has(host) ? "owner" : null;
 }
 
 // ---- paths -----------------------------------------------------------------------------------
@@ -344,10 +352,11 @@ const ACTIONS = {
     if (previous === body.content) return [200, { ok: true, mtime: st.mtimeMs, size: st.size, status: docOf(readMeta(projectsDir, slug), rel).status }];
 
     // snapshot first: if the write fails the old text is still recoverable
-    const tmp = `${real}.ao-tmp-${process.pid}`;
+    // random name + exclusive create: a link planted at a guessable temp path cannot redirect the write
+    const tmp = `${real}.ao-tmp-${randomUUID().slice(0, 8)}`;
     let doc;
     try {
-      fs.writeFileSync(tmp, body.content, { mode: st.mode & 0o777 });
+      fs.writeFileSync(tmp, body.content, { mode: st.mode & 0o777, flag: "wx" });
       const history = snapshot({ projectsDir, slug, rel, previous, role, history: docOf(readMeta(projectsDir, slug), rel).history });
       fs.renameSync(tmp, real);
       doc = updateDoc(projectsDir, slug, rel, (d) => ({
