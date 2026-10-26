@@ -14,6 +14,19 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 # buộc để Web Speech / getUserMedia chạy.
 URL="http://localhost:8787"
 
+# lane L1: operations verbs go to the ao CLI: ./scripts/start.sh doctor | update | backup | restore | lan | token
+case "${1:-}" in
+  doctor | update | backup | restore | lan | token)
+    command -v node >/dev/null 2>&1 || { echo "Node.js 20+ is required: https://nodejs.org/en/download" >&2; exit 1; }
+    exec node "$REPO/scripts/ao.mjs" "$@"
+    ;;
+esac
+
+# lane L1: stop early, with the fix, on the problems that would break the start
+# (old Node, no npm, port taken by another program, unwritable data directory)
+command -v node >/dev/null 2>&1 || { echo "Node.js 20+ is required: https://nodejs.org/en/download" >&2; exit 1; }
+node "$REPO/scripts/ao.mjs" doctor --preflight || exit 1
+
 for pkg in daemon renderer; do
   [ -d "$REPO/packages/$pkg/node_modules" ] || npm --prefix "$REPO/packages/$pkg" install
 done

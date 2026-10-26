@@ -245,7 +245,8 @@ test("one-time link cannot be turned into an open redirect", () => {
   const res = fakeRes();
   guard.http(fakeReq({ url: `//evil.example/x?ao_token=${tokens.v}` }), res);
   assert.equal(res.status, 302);
-  assert.equal(res.headers.location, "/evil.example/x");
+  assert.match(res.headers.location, /^\/(?!\/)/, "stays on this origin");
+  assert.ok(!res.headers.location.includes("evil.example"));
 });
 
 test("one-time link: Secure is added when the request came over https", () => {
@@ -306,6 +307,25 @@ test("manager may write, but POST /open (acts on the host's desktop) is owner-on
   assert.equal(guard.http(fakeReq({ method: "POST", url: "/open", headers: { authorization: `Bearer ${tokens.m}` } }), res), false);
   assert.equal(res.status, 403);
   assert.equal(post("/open", tokens.o), true);
+});
+
+test("paths are judged after normalisation, the way the router sees them (no ../ or encoded-dot bypass)", () => {
+  const { guard, tokens } = setup({ v: "viewer", m: "manager" });
+  const as = (token, method, url) =>
+    guard.http(fakeReq({ method, url, headers: { authorization: `Bearer ${token}` } }), fakeRes());
+  for (const url of ["/x/../open", "/./open", "/%2e/open", "/x/%2e%2e/open", "/x/%2E%2E/open"]) {
+    assert.equal(as(tokens.m, "POST", url), false, `manager must not reach /open via ${url}`);
+  }
+  for (const url of ["/./harnesses?probe=claude", "/x/../harnesses?probe=claude", "/%2e/harnesses?probe=claude"]) {
+    assert.equal(as(tokens.v, "GET", url), false, `viewer must not probe via ${url}`);
+  }
+  // and a token-less request cannot borrow the public webhook path to reach another route
+  assert.equal(guard.http(fakeReq({ method: "POST", url: "/zalo/webhook/../chat" }), fakeRes()), false);
+  assert.equal(guard.http(fakeReq({ method: "POST", url: "/zalo/webhook/../../chat" }), fakeRes()), false);
+  // a malformed target is refused, not thrown on
+  const res = fakeRes();
+  assert.equal(guard.http(fakeReq({ url: "http://[bad" }), res), false);
+  assert.equal(res.status, 400);
 });
 
 test("POST /zalo/webhook stays reachable without a token (Zalo's servers cannot send one; zalo.js checks the sender)", () => {

@@ -13,10 +13,21 @@ die() {
   exit 1
 }
 
+# lane L1: operations verbs go to the ao CLI: ./scripts/install-ubuntu.sh doctor | update | backup | restore | lan | token
+case "${1:-}" in
+  doctor | update | backup | restore | lan | token)
+    command -v node >/dev/null 2>&1 || die "Node.js 20+ is required: https://nodejs.org/en/download"
+    exec node "$REPO/scripts/ao.mjs" "$@"
+    ;;
+esac
+
 # (1) node >= 20
 command -v node >/dev/null 2>&1 || die "Thiếu Node.js. Cài Node.js >= 20 rồi chạy lại: https://nodejs.org/en/download"
 NODE_MAJOR="$(node -v | sed 's/^v//' | cut -d. -f1)"
 [ "$NODE_MAJOR" -ge 20 ] || die "Node.js $(node -v) quá cũ — cần >= 20. Cài bản mới rồi chạy lại: https://nodejs.org/en/download"
+
+# lane L1: the same readiness check the other platforms use; prints only what is wrong, with the fix
+node "$REPO/scripts/ao.mjs" doctor --preflight || exit 1
 
 # (2) notify-send + xdg-open (thông báo desktop + mở file/URL)
 if ! command -v notify-send >/dev/null 2>&1 || ! command -v xdg-open >/dev/null 2>&1; then

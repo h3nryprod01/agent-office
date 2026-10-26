@@ -257,8 +257,16 @@ export function createAccessGuard({ store, isLoopback = isLoopbackRequest }) {
 
   const http = (req, res) => {
     const method = req.method ?? "GET";
-    const [rawPath, rawQuery = ""] = String(req.url ?? "/").split("?");
-    const params = new URLSearchParams(rawQuery);
+    // Parse exactly as the router does (ws-server: new URL(req.url, …).pathname) so
+    // "/x/../open", "/./open" and "/%2e%2e/open" are judged as the route they reach.
+    let parsed;
+    try {
+      parsed = new URL(String(req.url ?? "/"), "http://localhost");
+    } catch {
+      return reject(req, res, 400, "bad request");
+    }
+    const rawPath = parsed.pathname;
+    const params = parsed.searchParams;
 
     // One-time link: GET only (a token in a POST URL would just end up in logs).
     if (params.has(TOKEN_PARAM) && (method === "GET" || method === "HEAD")) {
