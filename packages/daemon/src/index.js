@@ -33,6 +33,7 @@ import { VieNeuTts, createTtsHttpHandler } from "./tts.js";
 import { createHarnessHttpHandler } from "./harness-probe.js";
 import { createStaticHttpHandler } from "./static-serve.js";
 import { createOriginGuard } from "./origin-guard.js";
+import { createAssignmentsHttpHandler } from "./assignments.js"; // lane L6
 
 const PROJECTS_ROOT =
   process.env.CLAUDE_PROJECTS_ROOT ?? path.join(os.homedir(), ".claude", "projects");
@@ -103,6 +104,8 @@ async function main() {
   const templatesHttp = createTemplatesHttpHandler();
   // ~/.agent-office/projects/<slug>/ — the daemon is the only writer of an item.
   const projectsHttp = createProjectsHttpHandler();
+  // lane L6: persona + SOP — /members, /sop, /assign. SOP files sit next to the company roster.
+  const assignmentsHttp = createAssignmentsHttpHandler({ companyDir: path.dirname(rosterPath) });
   // R13-INFRA: harness install/login probe for the onboarding wizard, and a
   // static handler serving the renderer build (1 process, 1 port).
   const harnessHttp = createHarnessHttpHandler();
@@ -129,6 +132,7 @@ async function main() {
       rosterHttp(req, res, url) ||
       templatesHttp(req, res, url) ||
       projectsHttp(req, res, url) ||
+      assignmentsHttp(req, res, url) || // lane L6
       harnessHttp(req, res, url) ||
       ttsHttp(req, res, url) ||
       staticHttp(req, res, url), // static-serve LAST: catch-all GET, must not shadow an API route

@@ -161,3 +161,62 @@ test("RosterWatcher survives a missing directory", () => {
   watcher.start(); // must not throw
   watcher.stop();
 });
+
+// lane L6: persona + sop on a member (block form with a nested `persona:` map).
+const PERSONA_ROSTER = `version: 1
+departments:
+  engineering:
+    members:
+      - name: planner
+        source: "~/.claude/agents"
+        role: "Plans features"
+        sop: sops/planner.md
+        persona:
+          name: Mai
+          role: Tech lead
+          avatar: planner
+          voice: "Short sentences: asks one question at a time"
+          tone: calm
+          prompt: "You are Mai. Never start coding before the plan is agreed."
+      - { name: legacy, source: "~/.claude/agents", role: "Old style" }
+      - name: after-block
+        role: "Still a separate member"
+`;
+
+test("parseRoster reads a nested persona map and the sop path", () => {
+  const [planner, legacy, after] = parseRoster(PERSONA_ROSTER).departments[0].members;
+  assert.equal(planner.name, "planner");
+  assert.equal(planner.role, "Plans features");
+  assert.equal(planner.sop, "sops/planner.md");
+  assert.deepEqual(planner.persona, {
+    name: "Mai",
+    role: "Tech lead",
+    avatar: "planner",
+    voice: "Short sentences: asks one question at a time",
+    tone: "calm",
+    prompt: "You are Mai. Never start coding before the plan is agreed.",
+    promptFile: null,
+  });
+  // persona keys must not leak into / overwrite the member's own keys
+  assert.equal(after.name, "after-block");
+  assert.equal(after.role, "Still a separate member");
+  // a member without persona/sop keeps the exact old shape (no new keys)
+  assert.equal("persona" in legacy, false);
+  assert.equal("sop" in legacy, false);
+});
+
+test("parseRoster tolerates a half-filled persona", () => {
+  const roster = parseRoster(`departments:
+  d:
+    members:
+      - name: a
+        persona:
+          name: Only Name
+      - name: b
+        persona: oops-not-a-map
+`);
+  const [a, b] = roster.departments[0].members;
+  assert.equal(a.persona.name, "Only Name");
+  assert.equal(a.persona.avatar, null);
+  assert.equal("persona" in b, false); // junk persona is dropped, never thrown
+});
