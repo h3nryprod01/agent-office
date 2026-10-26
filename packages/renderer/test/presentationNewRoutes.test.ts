@@ -108,3 +108,13 @@ describe("saving a policy while presenting reaches the daemon intact", () => {
     expect(SENSITIVE.filter((s) => out.includes(s))).toEqual([]);
   });
 });
+
+describe("masking harness/lane values twice keeps the same alias (replays saved while presenting)", () => {
+  it("is idempotent and still unmasks to the real name", () => {
+    const m = createMasker();
+    const once = m.mask({ harness: "acme-h", lane: "acme-lane" });
+    const twice = m.mask(once);
+    expect(twice).toEqual(once);
+    expect(m.unmask(twice.harness)).toBe("acme-h");
+  });
+});

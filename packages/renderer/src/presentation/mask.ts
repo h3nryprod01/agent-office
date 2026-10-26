@@ -51,6 +51,9 @@ const BUILTIN_TOOLS = new Set([
   // Codex and Gemini CLI built-ins
   "shell", "apply_patch", "update_plan", "exec_command", "read_file", "write_file", "replace", "run_shell_command",
   "glob", "search_file_content", "list_directory", "web_fetch", "google_web_search", "read_many_files", "save_memory",
+  "web_search", "write_stdin", "view_image", "write_todos", "unknown_tool",
+  // Hermes, and Workflow (routes an agent to the meeting station)
+  "terminal", "browser", "Workflow",
 ]);
 /** Keys whose value is removed outright. */
 const SECRET_KEY =
@@ -203,6 +206,7 @@ export function createMasker(): Masker {
     // harness / lane names first: before the secret and alias checks, so even an odd name ("sk-…",
     // "project-1") becomes a reversible alias the daemon still accepts on save
     if (HARNESS_LIST_KEYS.has(lower) || lower === "harness" || lower === "lane") {
+      if (value.startsWith("tool-") && isAlias(value)) return value; // masking twice (a replay saved while presenting) keeps the alias
       return PUBLIC_HARNESSES.has(value) ? value : alias("tool", value);
     }
     if (isSecretKey(key) || SECRET_VALUE.test(value)) return "••••";
