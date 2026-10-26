@@ -1,5 +1,6 @@
 import type { OfficeState } from "../sim/model";
 import { repoTabs } from "../sim/selectors";
+import { modeBadgeHtml, type PolicyMode } from "./policyLabels"; // lane L2
 
 /** Tab key: "all" or a repo name. Kept distinct so a repo named "all" can't collide. */
 export type TabKey = { kind: "all" } | { kind: "repo"; repo: string };
@@ -12,6 +13,8 @@ export interface OfficeTabs {
   readonly active: TabKey;
   /** Programmatic switch (intervention queue: jump to the alert's repo). */
   select(key: TabKey): void;
+  /** lane L2: approval mode per repo name; a tab whose repo has a project shows the mode badge. */
+  setPolicyModes(modes: ReadonlyMap<string, PolicyMode>): void;
 }
 
 /**
@@ -23,6 +26,7 @@ export function mountOfficeTabs(root: HTMLElement, onChange: (key: TabKey) => vo
   root.classList.add("office-tabs");
   let active: TabKey = TAB_ALL;
   let lastSig = "";
+  let policyModes: ReadonlyMap<string, PolicyMode> = new Map(); // lane L2
 
   root.addEventListener("click", (ev) => {
     const el = (ev.target as HTMLElement).closest<HTMLElement>("[data-tab]");
@@ -47,6 +51,10 @@ export function mountOfficeTabs(root: HTMLElement, onChange: (key: TabKey) => vo
       return active;
     },
     select: setActive,
+    setPolicyModes(modes) {
+      policyModes = modes;
+      lastSig = ""; // force the next render() to rebuild the tab buttons with the new badges
+    },
     render(state: OfficeState): void {
       const tabs = repoTabs(state, Date.now());
 
@@ -59,11 +67,11 @@ export function mountOfficeTabs(root: HTMLElement, onChange: (key: TabKey) => vo
       // DOM is only rebuilt when the tab SET changes; badges / alert dots /
       // the active highlight update in place — so a click can't land on a
       // button that a timer render just detached (same trick as the queue).
-      const sig = tabs.map((t) => t.repo).join("|");
+      const sig = tabs.map((t) => `${t.repo}:${policyModes.get(t.repo) ?? ""}`).join("|");
       if (sig !== lastSig) {
         lastSig = sig;
         root.innerHTML =
-          tabButton("", "All") + tabs.map((t) => tabButton(t.repo, t.repo)).join("");
+          tabButton("", "All") + tabs.map((t) => tabButton(t.repo, t.repo, policyModes.get(t.repo))).join("");
       }
 
       const total = [...state.agents.values()].filter((a) => a.despawnedAt === null).length;
@@ -78,10 +86,11 @@ export function mountOfficeTabs(root: HTMLElement, onChange: (key: TabKey) => vo
   };
 }
 
-function tabButton(tabAttr: string, label: string): string {
+function tabButton(tabAttr: string, label: string, policyMode?: PolicyMode): string {
   return `
     <button data-tab="${esc(tabAttr)}">
       <span class="label">${esc(label)}</span>
+      ${policyMode ? modeBadgeHtml(policyMode) : ""}
       <span class="badge"></span>
       <span class="alert-dot"></span>
     </button>`;

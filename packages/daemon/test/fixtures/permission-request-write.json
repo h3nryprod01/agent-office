@@ -1,0 +1,12 @@
+{
+  "session_id": "00000000-0000-4000-8000-000000000002",
+  "transcript_path": "/work/transcripts/00000000-0000-4000-8000-000000000002.jsonl",
+  "cwd": "/work/demo-app",
+  "prompt_id": "00000000-0000-4000-8000-0000000000bb",
+  "permission_mode": "default",
+  "effort": { "level": "medium" },
+  "hook_event_name": "PermissionRequest",
+  "tool_name": "Write",
+  "tool_input": { "file_path": "/work/demo-app/notes.txt", "content": "hi" },
+  "permission_suggestions": [{ "type": "setMode", "mode": "acceptEdits", "destination": "session" }]
+}

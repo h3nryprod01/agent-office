@@ -1954,3 +1954,66 @@ body[data-view="log"] .activity-log {
 }
 .set-lang:hover { border-color: #3d4b6e; }
 .set-lang.active { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+
+/* ── lane L2: approval modes + data rules ──────────────────────── */
+.policy-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: #1e293b;
+  color: #94a3b8;
+}
+.policy-badge.mode-auto { background: #14532d; color: #dcfce7; }
+.policy-badge.mode-read-only { background: #1e3a5f; color: #bfdbfe; }
+.policy-badge.mode-deny { background: #7f1d1d; color: #fecaca; }
+.office-tabs .policy-badge { margin-left: 6px; }
+.policy-card {
+  border: 1px solid #1e242e;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: rgba(15, 23, 42, 0.5);
+}
+.policy-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: #f1f5f9; }
+.policy-path { margin-left: auto; font-size: 11px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%; }
+.policy-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 6px 0; font-size: 13px; }
+.policy-line-label { min-width: 120px; color: #94a3b8; }
+.policy-sub { margin: 12px 0 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; }
+.policy-help { margin: 2px 0 6px; }
+.policy-card select, .policy-card input[type="text"], .policy-panel select {
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+}
+.policy-card input[type="text"] { min-width: 180px; }
+.policy-check { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; font-size: 12px; color: #cbd5e1; }
+.policy-overrides { display: flex; flex-wrap: wrap; gap: 6px; }
+.policy-override {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #1e293b; color: #cbd5e1; border-radius: 6px; padding: 2px 4px 2px 8px; font-size: 12px;
+}
+.policy-x { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 14px; line-height: 1; }
+.policy-x:hover { color: #fca5a5; }
+.policy-status { font-size: 12px; color: #86efac; }
+.policy-audit { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+.policy-audit th { text-align: left; color: #64748b; font-weight: 600; padding: 4px 8px; border-bottom: 1px solid #1e242e; }
+.policy-audit td { padding: 5px 8px; border-bottom: 1px solid #1e242e; vertical-align: top; color: #cbd5e1; }
+.policy-preview { color: #94a3b8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+.policy-decision { font-weight: 700; }
+.policy-decision.allow { color: #86efac; }
+.policy-decision.deny { color: #fca5a5; }
+.policy-decision.ask { color: #fcd34d; }
+.queue-panel li.policy-alert { border-left-color: #f59e0b; background: rgba(120, 53, 15, 0.3); }
+.queue-panel .dismiss { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 13px; }
+.queue-panel .dismiss:hover { color: #fff; }
+.queue-panel .why { grid-column: 1 / -1; color: #fcd34d; font-size: 11px; }
+.queue-panel li.policy-alert .what { white-space: normal; }

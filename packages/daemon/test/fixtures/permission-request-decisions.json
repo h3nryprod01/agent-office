@@ -1,0 +1,10 @@
+{
+  "_comment": "What a PermissionRequest hook prints on stdout, as verified by a REAL `claude -p` run (Claude Code 2.1.308, 2026-10-27): a hook printing `allow` made the Bash call run (the marker file appeared); a hook printing `deny` + message blocked the call, and the model quoted the message back verbatim. A hook printing nothing falls through to the normal permission flow. The two input fixtures next to this file are captured payloads with paths replaced.",
+  "allow": { "hookSpecificOutput": { "hookEventName": "PermissionRequest", "decision": { "behavior": "allow" } } },
+  "denyWithMessage": {
+    "hookSpecificOutput": {
+      "hookEventName": "PermissionRequest",
+      "decision": { "behavior": "deny", "message": "denied by AO policy test" }
+    }
+  }
+}

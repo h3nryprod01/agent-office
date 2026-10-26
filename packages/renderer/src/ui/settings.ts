@@ -27,6 +27,8 @@ interface SettingsDeps {
   daemonUrl: string;
   fetchHarnesses?: () => Promise<HarnessStatus[]>;
   probeHarness?: (key: string) => Promise<HarnessStatus[]>;
+  /** lane L2: a persistent element (the policy panel) placed under "Agent sources" on every render. */
+  extra?: HTMLElement;
 }
 
 /**
@@ -91,6 +93,7 @@ export function mountSettings(root: HTMLElement, deps: SettingsDeps): SettingsHa
       `<p class="set-hint">${t("settings.sourcesHint")}</p>` +
       harnessBody +
       `</section>` +
+      `<div data-extra-slot></div>` + // lane L2: the policy panel goes here
       `<section class="set-block"><h2>${t("settings.language")}</h2>` +
       `<div class="set-row"><span class="set-row-chips">` +
       langButton("en", "English") +
@@ -101,6 +104,7 @@ export function mountSettings(root: HTMLElement, deps: SettingsDeps): SettingsHa
       `<section class="set-block"><h2>${t("settings.about")}</h2>` +
       `<p class="set-about">${t("settings.aboutText")}</p>` +
       `</section>`;
+    if (deps.extra) root.querySelector("[data-extra-slot]")?.replaceWith(deps.extra); // lane L2
   }
 
   function langButton(lang: Lang, label: string): string {

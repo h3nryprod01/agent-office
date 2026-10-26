@@ -33,6 +33,12 @@ import { VieNeuTts, createTtsHttpHandler } from "./tts.js";
 import { createHarnessHttpHandler } from "./harness-probe.js";
 import { createStaticHttpHandler } from "./static-serve.js";
 import { createOriginGuard } from "./origin-guard.js";
+// lane L2: per-project approval modes + data rules
+import { PolicyStore } from "./policy-store.js";
+import { PolicyEngine } from "./policy-engine.js";
+import { createPolicyHttpHandler } from "./policy-http.js";
+import { attachPolicyWatch } from "./policy-watch.js";
+import { DEFAULT_PROJECTS_DIR } from "./projects.js";
 
 const PROJECTS_ROOT =
   process.env.CLAUDE_PROJECTS_ROOT ?? path.join(os.homedir(), ".claude", "projects");
@@ -112,6 +118,16 @@ async function main() {
   const vieneuTts = new VieNeuTts();
   const ttsHttp = createTtsHttpHandler(vieneuTts);
 
+  // lane L2: per-project approval modes (project.json -> policy.approval) and data rules
+  // (policy.allowedHarnesses/allowedLanes). The engine answers permission requests in the
+  // approval broker; the HTTP handler serves the Settings panel; attachPolicyWatch warns
+  // when a forbidden harness shows up. AGENT_OFFICE_PROJECTS_DIR points the store at a
+  // scratch dir for tests.
+  const policyStore = new PolicyStore({ projectsDir: process.env.AGENT_OFFICE_PROJECTS_DIR || DEFAULT_PROJECTS_DIR });
+  approvalBroker.policy = new PolicyEngine({ store: policyStore, isOverBudget: () => usageIndex.overBudgetNow() });
+  // L1 JOIN POINT: pass `roleOf` from access.js here; the default trusts only direct loopback callers.
+  const policyHttp = createPolicyHttpHandler({ store: policyStore });
+
   const server = new EventBroadcastServer({
     port: WS_PORT,
     host: WS_HOST,
@@ -129,6 +145,7 @@ async function main() {
       rosterHttp(req, res, url) ||
       templatesHttp(req, res, url) ||
       projectsHttp(req, res, url) ||
+      policyHttp(req, res, url) || // lane L2
       harnessHttp(req, res, url) ||
       ttsHttp(req, res, url) ||
       staticHttp(req, res, url), // static-serve LAST: catch-all GET, must not shadow an API route
@@ -160,6 +177,7 @@ async function main() {
   });
   rosterWatcher.start();
   attachNotifier(server); // macOS notification khi agent kẹt >30s (AGENT_OFFICE_NOTIFY=0 để tắt)
+  attachPolicyWatch(server, { store: policyStore }); // lane L2: warn when a forbidden harness/lane runs in a project
   // Two-way Telegram: a silent no-op unless TELEGRAM_BOT_TOKEN +
   // TELEGRAM_CHAT_ID are both set — see telegram.js's own config gate.
   const telegramPoll = pollUpdates(chatManager);
