@@ -33,7 +33,7 @@ import { mountProjectsOverview, type OverviewProject, type Role } from "./ui/pro
 import { mountHiringHall, type HiringHallHandle, type RosterPayload } from "./ui/hiringHall";
 import { mountTemplates, type ApplyResult, type TemplateSummary } from "./ui/templates";
 import { mountDocs } from "./ui/docs"; // lane L7
-import { httpDocsApi, parseDocHash, resolveEntryView } from "./ui/docsModel"; // lane L7
+import { getActiveProject, httpDocsApi, parseDocHash, resolveEntryView } from "./ui/docsModel"; // lane L7
 import { EventRecorder } from "./replay/recorder";
 import { createSfx } from "./audio/sfx";
 import type { EventSource } from "./events/EventSource";
@@ -63,12 +63,17 @@ async function boot(): Promise<void> {
     office3d = createOffice3D({
       onPick: (agentId) => sidePanel.show(agentId),
       onFurniture: (id) => {
-        // the props L8 made clickable open the panel they stand for (closures run at click time)
+        // the props L8 made clickable open the panel they stand for. A click during boot (before the
+        // panels exist) is simply ignored instead of throwing out of the 3D click handler.
+        try {
         if (id === "filing_cabinet") outputsPanel.show();
         else if (id === "reception") hiringHall?.open();
         else if (id === "board_work") setView("kanban");
         else if (id === "board_spend") setView("costs");
         else if (id === "elevator") document.querySelector<HTMLElement>("#building .building-toggle")?.click();
+        } catch {
+          /* still booting */
+        }
       },
     });
     document.querySelector<HTMLElement>("#app")!.appendChild(office3d.canvas);
@@ -217,7 +222,7 @@ async function boot(): Promise<void> {
     { key: "settings", icon: "⚙", label: t("nav.settings") },
   ];
   const kanban = mountKanban(document.querySelector<HTMLElement>("#kanban")!, {
-    project: "agent-office",
+    project: getActiveProject() ?? "agent-office", // the project the Documents tab / wizard last used
     ...(fetchItems ? { fetchItems } : {}),
     ...(addItem ? { addItem } : {}),
     // R13-B-3: "Giao cho PM" on an idea → pre-fill the PM chat (closure reads
@@ -405,7 +410,7 @@ async function boot(): Promise<void> {
       }
       applyRoom();
       // the Board starts on the only project there is, when there is just one
-      if (projects.length === 1) kanban.setProject(projects[0].slug);
+      if (projects.length === 1 && !getActiveProject()) kanban.setProject(projects[0].slug);
     } catch {
       // the office still works on the default floor
     }

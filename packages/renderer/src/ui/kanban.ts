@@ -138,10 +138,13 @@ export function mountKanban(root: HTMLElement, opts: KanbanOpts): KanbanHandle {
   });
 
   async function refresh(): Promise<void> {
+    const asked = project;
     try {
-      const data = await loadItems(project);
+      const data = await loadItems(asked);
+      if (asked !== project) return; // the tab changed while this was in flight: a newer refresh owns the Board
       items = data?.items ?? [];
     } catch (err) {
+      if (asked !== project) return;
       console.error("[kanban] fetchItems failed:", err);
       items = [];
     }
