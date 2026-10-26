@@ -262,3 +262,20 @@ describe("createMasker — review findings", () => {
     expect(m.unmask("project-7")).toBe("repo-6");
   });
 });
+
+describe("createMasker — third review", () => {
+  it("a project whose name is also a public word is still aliased inside free text", () => {
+    const m = createMasker();
+    m.mask({ repo: "Hermes" });
+    const out = m.mask({ text: "pushed Hermes to staging" }) as { text: string };
+    expect(out.text).not.toContain("Hermes");
+    expect(out.text).toContain("project-1");
+  });
+
+  it("MCP names round-trip through unmask, and a name without a tool part gets no invented one", () => {
+    const m = createMasker();
+    const { tool } = m.mask({ tool: "mcp__acme_crm__lookup" }) as { tool: string };
+    expect(m.unmask(tool)).toBe("mcp__acme_crm__lookup");
+    expect((m.mask({ tool: "mcp__acme" }) as { tool: string }).tool).toBe("mcp__server-2");
+  });
+});
