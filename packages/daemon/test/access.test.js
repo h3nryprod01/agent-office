@@ -141,7 +141,7 @@ test("store: a corrupt or hostile file fails closed (no tokens), never throws", 
   assert.deepEqual(store2.list(), [], "entries with an invalid role are dropped");
 });
 
-test("store: a file with some unreadable entries keeps the good tokens working but is never rewritten", () => {
+test("store: unreadable entries never authenticate, are preserved on every write, and do not block revoke / lan off", () => {
   const file = tmpFile();
   const good = new AccessStore({ file });
   const { token } = good.addToken({ label: "good", role: "viewer" });
@@ -150,8 +150,13 @@ test("store: a file with some unreadable entries keeps the good tokens working b
   fs.writeFileSync(file, JSON.stringify(raw));
   const store = new AccessStore({ file });
   assert.equal(store.verify(token).role, "viewer");
-  assert.throws(() => store.addToken({ label: "y", role: "viewer" }), /cannot read/);
-  assert.equal(JSON.parse(fs.readFileSync(file, "utf8")).tokens.length, 2, "nothing was dropped");
+  assert.equal(store.skippedCount(), 1);
+  store.addToken({ label: "y", role: "viewer" });
+  store.setLan(false);
+  assert.equal(store.revoke("good"), true);
+  const after = JSON.parse(fs.readFileSync(file, "utf8")).tokens;
+  assert.ok(after.some((t) => t.label === "from-the-future" && t.role === "superuser"), "the unknown entry survived untouched");
+  assert.deepEqual(after.map((t) => t.label).sort(), ["from-the-future", "y"]);
 });
 
 test("store: edits made by another process (the CLI) are picked up without a restart", () => {

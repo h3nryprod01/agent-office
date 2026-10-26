@@ -15,7 +15,7 @@ import { createBackup } from "./backup.js";
 const SERVICE = { darwin: "com.agentoffice.daemon", linux: "agent-office-daemon", win32: "AgentOfficeDaemon" };
 
 /** The command that restarts the installed background service on this platform. */
-export function restartCommand(platform = process.platform, uid = process.getuid?.() ?? 501) {
+export function restartCommand(platform = process.platform, uid = process.getuid?.() ?? 501, repo = "") {
   if (platform === "darwin") return { cmd: "launchctl", args: ["kickstart", "-k", `gui/${uid}/${SERVICE.darwin}`] };
   if (platform === "win32") {
     const task = SERVICE.win32;
@@ -24,13 +24,16 @@ export function restartCommand(platform = process.platform, uid = process.getuid
       args: [
         "-NoProfile",
         "-Command",
-        // The task runs `cmd /c node …`; make sure the old node.exe is really gone (matched by
-        // its script path, so ao.mjs itself and other node programs are left alone) before the new one starts.
+        // The task runs `cmd /c node …`; make sure the old node.exe is really gone before the new
+        // one starts. Matched by THIS checkout's script path (.Contains: no wildcard surprises), so
+        // ao.mjs, other node programs and daemons from other clones are left alone.
         `Stop-ScheduledTask -TaskName ${task} -ErrorAction SilentlyContinue; ` +
           `Get-CimInstance Win32_Process -Filter "Name='node.exe'" | ` +
-          `Where-Object { $_.CommandLine -like '*packages\\daemon\\src\\index.js*' } | ` +
+          `Where-Object { $_.CommandLine -and $_.CommandLine.Contains('${(repo ? `${repo}\\packages\\daemon\\src\\index.js` : "packages\\daemon\\src\\index.js").replace(/'/g, "''")}') } | ` +
           `ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; ` +
-          `Start-Sleep -Seconds 1; Start-ScheduledTask -TaskName ${task}`,
+          // a task still showing Running would silently ignore the start
+          `foreach ($i in 1..10) { if ((Get-ScheduledTask -TaskName ${task}).State -ne 'Running') { break }; Start-Sleep -Milliseconds 500 }; ` +
+          `Start-ScheduledTask -TaskName ${task}`,
       ],
     };
   }
@@ -43,6 +46,11 @@ export function restartCommand(platform = process.platform, uid = process.getuid
  */
 export function needsShell(cmd, platform = process.platform) {
   return platform === "win32" && cmd === "npm";
+}
+
+/** A command as one pasteable line (the PowerShell script is a single quoted argument). */
+export function commandLine({ cmd, args }) {
+  return [cmd, ...args.map((a) => (/[\s|;"']/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a))].join(" ");
 }
 
 export function defaultRun(cmd, args, opts = {}) {
@@ -124,8 +132,8 @@ export async function runUpdate({
 }) {
   const daemonDir = path.join(repo, "packages", "daemon");
   const rendererDir = path.join(repo, "packages", "renderer");
-  const restart = restartCommand(platform, uid);
-  const restartLine = [restart.cmd, ...restart.args].join(" ");
+  const restart = restartCommand(platform, uid, repo);
+  const restartLine = commandLine(restart);
 
   if (dryRun) {
     log("Dry run — nothing will be executed. `update` would:");

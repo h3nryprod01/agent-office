@@ -68,16 +68,16 @@ export function hashToken(token) {
 const HEX64 = /^[0-9a-f]{64}$/;
 
 function sanitize(raw) {
-  const out = { version: 1, lan: false, tokens: [], corrupt: false };
+  const out = { version: 1, lan: false, tokens: [], unknown: [], corrupt: false };
   if (!raw || typeof raw !== "object") return out;
   out.lan = raw.lan === true;
   if (!Array.isArray(raw.tokens)) return out;
-  out.corrupt = raw.tokens.some(
-    (t) => !t || typeof t !== "object" || !ROLES.includes(t.role) || typeof t.hash !== "string" || !HEX64.test(t.hash),
-  ); // entries we would drop on rewrite: valid ones keep working, but we refuse to save over the rest
   for (const t of raw.tokens) {
     if (!t || typeof t !== "object") continue;
-    if (!ROLES.includes(t.role) || typeof t.hash !== "string" || !HEX64.test(t.hash)) continue;
+    if (!ROLES.includes(t.role) || typeof t.hash !== "string" || !HEX64.test(t.hash)) {
+      out.unknown.push(t); // not usable here (newer format, hand edit): never authenticates, but is written back untouched
+      continue;
+    }
     out.tokens.push({
       id: String(t.id ?? ""),
       label: String(t.label ?? ""),
@@ -119,9 +119,9 @@ export class AccessStore {
 
   #save(data) {
     // never overwrite a file we could not read: that would silently drop every token in it
-    if (data.corrupt) throw new Error(`${this.file} is unreadable or has entries this version cannot read; fix or move it aside first`);
-    const { corrupt: _corrupt, ...clean } = data;
-    data = clean;
+    if (data.corrupt) throw new Error(`${this.file} is unreadable; fix or move it aside first`);
+    const { corrupt: _corrupt, unknown, ...clean } = data;
+    data = { ...clean, tokens: [...clean.tokens, ...unknown] };
     const dir = path.dirname(this.file);
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     const tmp = `${this.file}.${process.pid}.tmp`;
@@ -133,6 +133,11 @@ export class AccessStore {
       // Windows: ACLs, not mode bits
     }
     this.cache = null;
+  }
+
+  /** Entries in the file this version cannot use (kept untouched on every write). */
+  skippedCount() {
+    return this.#load().unknown.length;
   }
 
   lanEnabled() {

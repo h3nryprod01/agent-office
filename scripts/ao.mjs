@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { agentOfficeHome, AccessStore } from "../packages/daemon/src/access.js";
 import { runChecks, formatReport, exitCode } from "../packages/daemon/src/cli/doctor.js";
 import { createBackup, restoreBackup, defaultBackupDir } from "../packages/daemon/src/cli/backup.js";
-import { runUpdate, restartCommand, defaultRun } from "../packages/daemon/src/cli/update.js";
+import { runUpdate, restartCommand, commandLine, defaultRun } from "../packages/daemon/src/cli/update.js";
 import { runAccessCommand, lanAddresses } from "../packages/daemon/src/cli/access-cmd.js";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -90,12 +90,12 @@ async function main(argv) {
         if (flag(rest, "--no-restart")) {
           console.log("Not restarting (--no-restart): restart the daemon to load the restored data.");
         } else {
-          const { cmd, args } = restartCommand();
-          const r = defaultRun(cmd, args);
+          const restart = restartCommand(process.platform, undefined, repo);
+          const r = defaultRun(restart.cmd, restart.args);
           console.log(
             r.status === 0
               ? "Service restarted with the restored data."
-              : `Could not restart the service. Restart it yourself: ${[cmd, ...args].join(" ")}`,
+              : `Could not restart the service. Restart it yourself: ${commandLine(restart)}`,
           );
         }
         return 0;
@@ -115,9 +115,9 @@ async function main(argv) {
           platform: process.platform,
           addresses: lanAddresses,
           restart: () => {
-            const { cmd, args } = restartCommand();
-            const r = defaultRun(cmd, args);
-            return { ok: r.status === 0, hint: [cmd, ...args].join(" ") };
+            const restart = restartCommand(process.platform, undefined, repo);
+            const r = defaultRun(restart.cmd, restart.args);
+            return { ok: r.status === 0, hint: commandLine(restart) };
           },
         });
       } catch (error) {

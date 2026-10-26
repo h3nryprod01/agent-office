@@ -91,5 +91,6 @@ jobs:
           if git cat-file -e "${{ github.event.before }}^{commit}" 2>/dev/null; then
             node scripts/check-leaks.mjs --range "${{ github.event.before }}..${{ github.sha }}"
           else
-            echo "previous tip not in this clone (force-push?); the tree scan above still covered the result"
+            # fall back to everything this ref adds over the default branch
+            node scripts/check-leaks.mjs --range "origin/${{ github.event.repository.default_branch }}..${{ github.sha }}"
           fi

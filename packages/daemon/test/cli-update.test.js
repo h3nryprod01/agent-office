@@ -4,7 +4,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runUpdate, restartCommand, needsShell } from "../src/cli/update.js";
+import { runUpdate, restartCommand, needsShell, commandLine } from "../src/cli/update.js";
 
 function harness({ platform = "linux", dirty = false, head = ["aaa111", "bbb222"], failOn = null, healthy = true } = {}) {
   const calls = [];
@@ -153,6 +153,11 @@ test("restart commands per platform", () => {
   const script = win.args.join(" ");
   assert.match(script, /Stop-ScheduledTask.*AgentOfficeDaemon.*Start-ScheduledTask/s);
   assert.match(script, /Stop-Process/, "the old node.exe is stopped explicitly, not assumed gone");
+  const scoped = restartCommand("win32", undefined, "C:\\Apps\\agent'office").args[2];
+  assert.ok(scoped.includes("Contains('C:\\\\Apps\\\\agent''office\\\\packages\\\\daemon\\\\src\\\\index.js')") || scoped.includes("agent''office"), "this checkout's path, quote-escaped");
+  const order = ["Stop-ScheduledTask", "Stop-Process", "Get-ScheduledTask", "Start-ScheduledTask"].map((k) => scoped.lastIndexOf(k));
+  assert.deepEqual([...order].sort((a, b) => a - b), order, "stop task → stop leftover node → wait until not Running → start");
+  assert.match(commandLine(win), /^powershell -NoProfile -Command ".*"$/s, "the hint is one pasteable line");
 });
 
 test("restart failure is reported with the manual command, after the new build is already in place", async () => {
