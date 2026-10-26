@@ -1954,3 +1954,65 @@ body[data-view="log"] .activity-log {
 }
 .set-lang:hover { border-color: #3d4b6e; }
 .set-lang.active { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+
+/* ── lane L5: all-projects overview (ui/projectsOverview.ts) ─────────────────────────── */
+#projects-overview {
+  display: none;
+  margin-left: var(--nav-w);
+  width: calc(100vw - var(--nav-w));
+}
+body[data-view="projects"] #projects-overview {
+  display: block;
+}
+.projects-overview {
+  height: 100vh;
+  overflow: auto;
+  padding: 20px 28px 220px; /* room for the fixed PM chat dock */
+  color: #e2e8f0;
+}
+.projects-overview h2 { margin: 0 0 4px; font-size: 18px; }
+.po-sub { margin: 0 0 16px; color: #94a3b8; font-size: 13px; }
+.po-muted { color: #64748b; font-size: 12px; margin: 4px 0; }
+.po-empty { color: #94a3b8; padding: 48px 24px; text-align: center; }
+.po-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.po-card {
+  background: #1a1f2b; border: 1px solid #2a2f3a; border-radius: 10px; padding: 14px;
+  display: flex; flex-direction: column; gap: 6px; font-size: 13px;
+}
+.po-card header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.po-card h3 { margin: 0; font-size: 15px; }
+.po-card h4 { margin: 8px 0 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #64748b; }
+.po-tpl { color: #64748b; font-size: 11px; }
+.po-pm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.po-pill { border-radius: 999px; padding: 2px 10px; font-size: 11px; background: #232a3a; color: #94a3b8; }
+.po-pill.pm-working { background: #3b2a08; color: #fde68a; }
+.po-pill.pm-error { background: #3b1212; color: #fecaca; }
+.po-unread { background: #ef4444; color: #fff; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 700; }
+.po-approvals { background: #3b2a08; color: #fde68a; border-radius: 6px; padding: 4px 8px; font-size: 12px; }
+.po-items { margin: 2px 0; color: #94a3b8; font-size: 12px; }
+.po-rooms { margin: 2px 0; color: #94a3b8; font-size: 12px; }
+.po-btn {
+  margin-left: auto; background: #2b6cb0; color: #fff; border: 0; border-radius: 6px;
+  padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer;
+}
+.po-btn.ghost { margin-left: 0; align-self: flex-start; background: #232a3a; color: #cbd5e1; border: 1px solid #2f3748; }
+.po-btn:hover { filter: brightness(1.15); }
+.po-members { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.po-member { display: flex; align-items: center; gap: 8px; }
+.po-avatar {
+  width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; background: #334155; color: #e2e8f0;
+}
+.po-member.role-owner .po-avatar { background: #92400e; }
+.po-member.role-manager .po-avatar { background: #1e40af; }
+.po-mname { flex: 1; }
+.po-role { color: #64748b; font-size: 11px; }
+.po-x { background: none; border: 0; color: #64748b; cursor: pointer; font-size: 11px; }
+.po-x:hover { color: #f87171; }
+.po-form { display: flex; flex-direction: column; gap: 6px; background: #12151d; border: 1px solid #2a2f3a; border-radius: 8px; padding: 8px; }
+.po-form select { background: #10131c; color: #e2e8f0; border: 1px solid #2b3245; border-radius: 6px; padding: 4px 6px; font: inherit; font-size: 12px; }
+.po-form .po-btn { margin-left: 0; align-self: flex-start; }
+.po-code { border-top: 1px dashed #2a2f3a; padding-top: 6px; }
+.po-code-label { color: #94a3b8; font-size: 11px; }
+.po-code code { display: inline-block; margin: 4px 0; padding: 4px 10px; background: #0b0e15; color: #fde68a; border-radius: 6px; font-size: 16px; letter-spacing: 0.08em; user-select: all; }
+.po-code p { margin: 0; color: #94a3b8; font-size: 11px; }

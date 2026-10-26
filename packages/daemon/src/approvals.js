@@ -84,17 +84,18 @@ export class ApprovalBroker {
   }
 
   /**
-   * Office decision for one pending approval.
+   * Decision for one pending approval. `source` says who answered ("office", or a chat
+   * channel's "telegram:Name" — lane L5) and ends up in the approval_resolved event.
    * @returns {{ok: boolean, error?: string}}
    */
-  respond(id, decision) {
+  respond(id, decision, source = "office") {
     if (decision !== "allow" && decision !== "deny") {
       return { ok: false, error: "decision must be allow or deny" };
     }
     if (!this.pending.has(id)) {
       return { ok: false, error: "no such approval — it expired or was already answered" };
     }
-    this.#settle(id, decision, "office");
+    this.#settle(id, decision, source);
     return { ok: true };
   }
 

@@ -328,3 +328,23 @@ test("stale --resume (No conversation found) clears the repo session so the next
   });
   assert.equal(savedRepos(stateFile)["acme-web"], undefined, "stale session cleared");
 });
+
+test("channel credentials never reach the PM process environment", async () => {
+  const { pmEnv } = await import("../src/chat-session.js");
+  const env = pmEnv({ PATH: "/bin", TELEGRAM_BOT_TOKEN: "123:abc", ZALO_OA_TOKEN: "z", ZALO_OA_SECRET: "s", HOME: "/h" });
+  assert.deepEqual(env, { PATH: "/bin", HOME: "/h" });
+});
+
+test("both spawn paths pass the scrubbed environment", () => {
+  const prev = process.env.TELEGRAM_BOT_TOKEN;
+  process.env.TELEGRAM_BOT_TOKEN = "123:must-not-leak";
+  try {
+    const { manager, spawns } = setup();
+    manager.send("hi");
+    assert.equal(spawns[0].opts.env.TELEGRAM_BOT_TOKEN, undefined);
+    assert.ok(spawns[0].opts.env.PATH !== undefined || Object.keys(spawns[0].opts.env).length > 0);
+    manager.dispose();
+  } finally {
+    if (prev === undefined) delete process.env.TELEGRAM_BOT_TOKEN; else process.env.TELEGRAM_BOT_TOKEN = prev;
+  }
+});

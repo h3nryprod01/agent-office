@@ -31,6 +31,12 @@ describe("daemon v1 -> protocol v0 adapter", () => {
     expect(out[0]).toMatchObject({ agentId: "sess-1", parentId: null, label: "acme-web" });
   });
 
+  it("project-PM chat lines and statuses never create a character (lane L5)", () => {
+    const adapt = makeAdapter();
+    expect(adapt(v1({ type: "pm_message", sessionId: "pm:acme-web", status: "ok" }))).toEqual([]);
+    expect(adapt(v1({ type: "pm_status", sessionId: "pm:acme-web", status: "ok" }))).toEqual([]);
+  });
+
   it("synthesizes the spawn even when the first-seen event is a tool_call (start fell outside recency window)", () => {
     const adapt = makeAdapter();
     const out = adapt(v1({ type: "tool_call", tool: "Bash", status: "start", detail: "Bash: ls" }));

@@ -30,6 +30,15 @@ import { cliSpawnOptions } from "./platform.js";
 
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // PM reads registry/git before answering
 
+// Channel credentials must not ride into a PM process: a PM runs tools a chat member can ask
+// it to run (`env`), so anything in its environment is readable by that member.
+const SECRET_ENV = ["TELEGRAM_BOT_TOKEN", "ZALO_OA_TOKEN", "ZALO_OA_SECRET"];
+export function pmEnv(env = process.env) {
+  const out = { ...env };
+  for (const key of SECRET_ENV) delete out[key];
+  return out;
+}
+
 export const PM_SYSTEM_PROMPT =
   "You are the PM for Agent Office, answering through the chat box in the office. " +
   "Act as the stateless PM described in docs/company-protocol.md and the company-pm " +
@@ -289,6 +298,7 @@ export class ChatSessionManager {
       child = this.spawnFn(this.claudeBin, args, {
         cwd,
         stdio: ["pipe", "pipe", "pipe"],
+        env: pmEnv(),
         ...cliSpawnOptions(process.platform),
       });
     } catch (error) {
@@ -378,6 +388,7 @@ export class ChatSessionManager {
       child = this.spawnFn(this.claudeBin, args, {
         cwd,
         stdio: ["pipe", "pipe", "pipe"],
+        env: pmEnv(),
         ...cliSpawnOptions(process.platform),
       });
     } catch {
