@@ -104,7 +104,7 @@ The event protocol lives in `packages/protocol`. The daemon is the only writer a
 
 ## Status
 
-A working tool, used daily by its author, still a personal project rather than a product. Known limits:
+A working tool, still a personal project rather than a product. Known limits:
 
 - **Localhost only, no authentication** — read [SECURITY.md](SECURITY.md) before exposing the port anywhere.
 - Spend in USD is only complete for models with published pricing; others count tokens but not dollars rather than guessing.

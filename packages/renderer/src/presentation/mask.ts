@@ -176,7 +176,10 @@ export function createMasker(): Masker {
     if (!m) return blur(token);
     const [, lead, core, trail] = m;
     if (!core) return token;
-    if (isAlias(core) || PUBLIC_WORDS.has(core.toLowerCase())) return token;
+    if (isAlias(core)) return token;
+    // a project name wins over the public vocabulary: a repo called "Hermes" must not survive in chat
+    if (projectRaw.has(core)) return lead + alias("project", core) + trail;
+    if (PUBLIC_WORDS.has(core.toLowerCase())) return token;
     if (UUID.test(core) || OPAQUE_ID.test(core)) return token;
     if (looksLikeUrl(core)) return lead + alias("link", core) + trail;
     if (looksLikePath(core)) return lead + maskPath(core) + trail;
@@ -195,9 +198,9 @@ export function createMasker(): Masker {
   function maskTool(value: string): string {
     if (value.startsWith("mcp__")) {
       const [, server = "", ...rest] = value.split("__");
-      const masked = `mcp__${alias("server", server)}__${alias("tool", rest.join("__"))}`;
-      reverse.set(masked, value); // the whole name is one unmask token, so map it whole too
-      return masked;
+      const out = rest.length ? `mcp__${alias("server", server)}__${alias("tool", rest.join("__"))}` : `mcp__${alias("server", server)}`;
+      if (!reverse.has(out)) reverse.set(out, value); // whole-name entry so unmask() restores it
+      return out;
     }
     // only built-in names are public; a custom tool can name a client (same rule as the policy map keys)
     return BUILTIN_TOOLS.has(value) ? value : alias("tool", value);
