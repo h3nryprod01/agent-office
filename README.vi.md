@@ -104,7 +104,7 @@ Giao thức sự kiện nằm ở `packages/protocol`. Daemon là bên ghi duy n
 
 ## Trạng thái
 
-Một công cụ chạy được, tác giả dùng hằng ngày, nhưng vẫn là dự án cá nhân chứ chưa phải sản phẩm. Giới hạn đã biết:
+Một công cụ chạy được, nhưng vẫn là dự án cá nhân chứ chưa phải sản phẩm. Giới hạn đã biết:
 
 - **Chỉ localhost, không có xác thực** — đọc [SECURITY.md](SECURITY.md) trước khi expose cổng đi đâu.
 - Chi phí quy ra USD chỉ đầy đủ với model có giá công bố; model khác đếm token nhưng không quy tiền, thay vì đoán bừa.
