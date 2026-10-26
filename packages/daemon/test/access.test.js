@@ -543,10 +543,10 @@ test("a loopback connection with a foreign Host is not loopback (DNS rebinding)"
   assert.equal(roleOf(req("localhost:8787")), "owner");
 });
 
-test("loopback Host names a browser cannot be tricked into sending still count as local", async () => {
+test("0.0.0.0 counts as local; *.localhost does not (a system resolver can rebind it)", async () => {
   const { isLoopbackRequest } = await import("../src/access.js");
   const req = (host) => ({ socket: { remoteAddress: "127.0.0.1" }, headers: { host } });
-  assert.equal(isLoopbackRequest(req("office.localhost:8787")), true);
+  assert.equal(isLoopbackRequest(req("office.localhost:8787")), false);
   assert.equal(isLoopbackRequest(req("0.0.0.0:8787")), true);
   assert.equal(isLoopbackRequest(req("localhost.evil.example:8787")), false);
 });

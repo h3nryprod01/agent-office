@@ -57,11 +57,17 @@ describe("presentation mode masks the payloads of routes added by other lanes", 
 describe("presentation mode keeps policy maps round-trippable", () => {
   it("modes survive, tool and role keys are aliased and come back on unmask", () => {
     const m = createMasker();
-    const body = { approval: { mode: "auto", roles: { "billing specialist": "ask" }, tools: { "mcp__acme_crm__lookup": "deny", "Notebook*": "read-only", Bash: "auto" } } };
+    const body = { approval: { mode: "auto", roles: { "billing specialist": "ask" }, tools: { "mcp__acme_crm__lookup": "deny", "Notebook*": "read-only", Bash: "auto", acme_crm_sync: "ask" } }, allowedHarnesses: ["claude", "claude-worker"], allowedLanes: ["deepseek", "acme-lane"] };
     const masked = m.mask(body);
     const out = JSON.stringify(masked);
     expect(SENSITIVE.filter((s) => out.includes(s))).toEqual([]);
-    expect(Object.values(masked.approval.tools).sort()).toEqual(["auto", "deny", "read-only"]);
+    expect(Object.values(masked.approval.tools).sort()).toEqual(["ask", "auto", "deny", "read-only"]);
+    expect(masked.approval.tools.Bash).toBe("auto"); // built-in tool names stay readable
+    expect(masked.allowedHarnesses).toEqual(["claude", "claude-worker"]);
+    expect(masked.allowedLanes[0]).toBe("deepseek");
+    // what the daemon validates (policy.js): aliases must still be legal values
+    for (const k of Object.keys(masked.approval.tools)) expect(k).toMatch(/^[A-Za-z0-9_.:-]{1,79}\*?$/);
+    for (const v of [...masked.allowedHarnesses, ...masked.allowedLanes]) expect(v).toMatch(/^[a-z0-9][a-z0-9-]{0,39}$/);
     expect(Object.values(masked.approval.roles)).toEqual(["ask"]);
     expect(JSON.parse(m.unmask(out))).toEqual(body);
   });

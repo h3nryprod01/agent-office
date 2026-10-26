@@ -26,12 +26,12 @@ it — trusted networks only, or a VPN / HTTPS proxy in front.
 |---|---|
 | HTTP + WebSocket (`:8787`) | Loopback bind by default; origin check always (a foreign web page is refused). In LAN mode: token required for every non-loopback request, roles `owner` / `manager` / `viewer`. |
 | `POST /approval-response` | Loopback or a `manager`/`owner` token. Whoever can call it can approve any pending agent action. |
-| `POST /open`, `POST /sessions/open-terminal`, `GET /outputs` | `/open` and `/sessions/open-terminal` (they act on the host desktop) are owner-only; both use whitelisted roots resolved with `realpath` so symlinks cannot escape. |
-| `POST /zalo/webhook` | Reachable without a token **only while the Zalo channel is configured** (`ZALO_OA_TOKEN` + `ZALO_APP_ID` + `ZALO_OA_SECRET`; Zalo's servers cannot send a token); body capped at 64 KB. Each event is checked against Zalo's `X-ZEvent-Signature` before it is read, and only paired project members are heard. |
+| `POST /open`, `POST /sessions/open-terminal`, `GET /outputs` | `/open` and `/sessions/open-terminal` act on the host desktop and are owner-only. `/sessions/open-terminal` only opens directories the daemon itself saw a session work in. `/open` and `GET /outputs` use whitelisted roots resolved with `realpath` so symlinks cannot escape. |
+| `POST /zalo/webhook` | Reachable without a token **only while the Zalo channel is configured** (`ZALO_OA_TOKEN` + `ZALO_APP_ID` + `ZALO_OA_SECRET`; Zalo's servers cannot send a token); body capped at 64 KB. Each event is checked against Zalo's `X-ZEvent-Signature` before it is read, and only paired project members (plus the optional owner chat `ZALO_ALLOWED_USER`) are heard. |
 | Telegram channel | Long polling only (no inbound port). Hears `TELEGRAM_CHAT_ID` and paired project members; every approve/deny is checked against the member's role. |
 
 Known limits: DNS rebinding against the loopback interface is closed — a loopback request only
-counts as the local user when its `Host` is a loopback name (`localhost`, `*.localhost`, `127.0.0.1`,
+counts as the local user when its `Host` is a loopback name (`localhost`, `127.0.0.1`,
 `::1`, `0.0.0.0`); any other name needs a token. Opening the office by the machine's own hostname
 therefore asks for an access link. And anyone with a shell on
 the machine is the owner.

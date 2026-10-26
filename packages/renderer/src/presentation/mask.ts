@@ -38,6 +38,17 @@ const TOOL_MAP_KEYS = new Set(["tools"]);
 const ROLE_MAP_KEYS = new Set(["roles"]);
 /** The values of those maps are approval modes: public words the panel must read back intact. */
 const APPROVAL_MODES = new Set(["ask", "auto", "read-only", "deny"]);
+/** Agent CLIs and model vendors are product names, public; any other harness or lane value is aliased. */
+const PUBLIC_HARNESSES = new Set(["claude", "claude-code", "codex", "gemini", "claude-worker", "hermes", "deepseek", "mimo", "glm", "kimi"]);
+const HARNESS_LIST_KEYS = new Set(["allowedharnesses", "allowedlanes"]);
+/**
+ * Built-in tool names a policy may key on. Anything else in a policy's tool map (a custom tool, a
+ * prefix like `Notebook*`) can carry a client's name, so it is aliased — reversibly, for saving.
+ */
+const BUILTIN_TOOLS = new Set([
+  "Bash", "Read", "Write", "Edit", "MultiEdit", "Glob", "Grep", "LS", "WebFetch", "WebSearch", "Task", "Agent",
+  "TodoWrite", "NotebookRead", "NotebookEdit", "Skill", "BashOutput", "KillShell", "ExitPlanMode", "shell", "apply_patch",
+]);
 /** Keys whose value is removed outright. */
 const SECRET_KEY =
   /token|secret|passw|credential|cookie|apikey|api_key|privatekey|private_key|accesskey|access_key|sessionkey|signature|jwt|authorization|oauth/i;
@@ -187,6 +198,7 @@ export function createMasker(): Masker {
     const lower = key.toLowerCase();
     if (isSecretKey(key) || SECRET_VALUE.test(value)) return "••••";
     if (isAlias(value)) return value;
+    if (HARNESS_LIST_KEYS.has(lower)) return PUBLIC_HARNESSES.has(value) ? value : alias("tool", value);
     if (PROJECT_KEYS.has(lower) || /repo$/i.test(key) || (lower === "name" && "slug" in siblings)) return maskProject(value);
     if (BRANCH_KEYS.has(lower)) return /^(main|master|develop|HEAD)$/.test(value) ? value : alias("branch", value);
     if (AGENT_KEYS.has(lower)) return alias("agent", value);
@@ -225,7 +237,7 @@ export function createMasker(): Masker {
       const out: Record<string, unknown> = {};
       const keyOf = (k: string): string =>
         keyed ? maskProject(k)
-        : !inArray && TOOL_MAP_KEYS.has(lowerKey) ? (k.startsWith("mcp__") || /^[A-Za-z][\w.-]{0,40}$/.test(k) ? maskTool(k) : alias("tool", k))
+        : !inArray && TOOL_MAP_KEYS.has(lowerKey) ? (k.startsWith("mcp__") ? maskTool(k) : BUILTIN_TOOLS.has(k) ? k : alias("tool", k))
         : !inArray && ROLE_MAP_KEYS.has(lowerKey) ? alias("agent", k)
         : k;
       for (const k of Object.keys(src)) out[keyOf(k)] = visited[k];

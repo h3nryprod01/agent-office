@@ -295,7 +295,7 @@ Chạy `doctor` trước. Nó bao quát phần lớn bảng này.
 | Đồng nghiệp bị hỏi lại link sau một thời gian | Cookie bị xoá, hoặc token đã bị thu hồi (`token list`). |
 | Đồng nghiệp hoàn toàn không vào được địa chỉ | Chế độ LAN đang tắt (`lan status`), tường lửa chặn cổng (mục 4), hoặc họ ở mạng khác. |
 | `update` báo "local changes" | Bạn đã sửa file trong thư mục cài. `git stash` chúng rồi chạy lại `update`. |
-| Cổng 8787 đã bị dùng | `doctor` chỉ ra ai đang giữ. Tắt chương trình đó, hoặc chạy cổng khác bằng `DAEMON_WS_PORT`. |
+| Cổng 8787 đã bị dùng | `doctor` chỉ ra ai đang giữ. Tắt chương trình đó, hoặc chạy cổng khác bằng `DAEMON_WS_PORT`. Các hook tuỳ chọn trong settings Claude Code của bạn chạy trong shell của bạn chứ không trong service: đưa cổng cho chúng nữa, ví dụ `AGENT_OFFICE_PORT=8788 node …/approve-gateway.mjs`. |
 | `claude` đã cài nhưng văn phòng báo không có | Dịch vụ có PATH nhỏ hơn terminal của bạn. Cài lại dịch vụ từ terminal chạy được `claude`: macOS `./scripts/install-daemon-service.sh`, Linux `./scripts/install-daemon-service-linux.sh`, Windows `scripts\install-daemon-service.ps1`. |
 
 ## Đã kiểm tra và chưa kiểm tra

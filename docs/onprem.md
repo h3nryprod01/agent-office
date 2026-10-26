@@ -301,7 +301,7 @@ Run `doctor` first. It covers most of this table.
 | A colleague gets "Access link required" again after a while | Their cookie was cleared, or the token was revoked (`token list`). |
 | A colleague cannot reach the address at all | LAN mode is off (`lan status`), a firewall blocks the port (section 4), or they are on a different network. |
 | `update` says "local changes" | You edited files in the checkout. `git stash` them, then run `update`. |
-| Port 8787 already in use | `doctor` shows what holds it. Stop that program, or run on another port with `DAEMON_WS_PORT`. |
+| Port 8787 already in use | `doctor` shows what holds it. Stop that program, or run on another port with `DAEMON_WS_PORT`. The optional hooks in your own Claude Code settings run in your shell, not the service: give them the port too, e.g. `AGENT_OFFICE_PORT=8788 node …/approve-gateway.mjs`. |
 | `claude` is installed but the office says it isn't | The service has a smaller PATH than your terminal. Re-install the service from a terminal where `claude` works: macOS `./scripts/install-daemon-service.sh`, Linux `./scripts/install-daemon-service-linux.sh`, Windows `scripts\install-daemon-service.ps1`. |
 
 ## What has and has not been tested

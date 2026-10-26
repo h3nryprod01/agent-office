@@ -213,9 +213,9 @@ export function isLoopbackRequest(req) {
   // ITS name in Host (and the origin guard lets Origin == Host through). Only a loopback name
   // in Host is the person at this machine; anything else must bring a token like a LAN caller.
   const host = String(req.headers?.host ?? "").replace(/:\d+$/, "").replace(/^\[|\]$/g, "").toLowerCase();
-  // *.localhost is resolved by the browser itself and 0.0.0.0 is what the daemon prints in LAN
-  // mode: no outside site can make a browser send either as Host, so neither is a rebinding door.
-  return host === "" || host === "localhost" || host.endsWith(".localhost") || host === "127.0.0.1" || host === "::1" || host === "0.0.0.0";
+  // 0.0.0.0 is what the daemon prints in LAN mode; an IP literal cannot be rebound. *.localhost is
+  // deliberately NOT accepted: a browser that asks the system resolver for it can be rebound.
+  return host === "" || host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "0.0.0.0";
 }
 
 /** True when the guard verified an access token on this request (a LAN or tunnel caller, not loopback). */
