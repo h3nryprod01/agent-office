@@ -436,7 +436,10 @@ async function boot(): Promise<void> {
     activeRepo = repo; // lane L8 wiring
     applyRoom();
     const slug = repo ? slugByRepo.get(repo) : undefined;
-    if (slug) kanban.setProject(slug); // the Board follows the office tab's project
+    if (slug) {
+      kanban.setProject(slug); // the Board follows the office tab's project
+      boardSeeded = true; // a tab choice also uses up the one-time start seed
+    }
   });
 
   // lane L2: approval modes + data rules (Settings block) and the mode badge on each office tab.
