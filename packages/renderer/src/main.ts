@@ -33,7 +33,7 @@ import { mountProjectsOverview, type OverviewProject, type Role } from "./ui/pro
 import { mountHiringHall, type HiringHallHandle, type RosterPayload } from "./ui/hiringHall";
 import { mountTemplates, type ApplyResult, type TemplateSummary } from "./ui/templates";
 import { mountDocs } from "./ui/docs"; // lane L7
-import { getActiveProject, httpDocsApi, parseDocHash, resolveEntryView } from "./ui/docsModel"; // lane L7
+import { getActiveProject, httpDocsApi, parseDocHash, pickProject, resolveEntryView, type ProjectInfo } from "./ui/docsModel"; // lane L7
 import { EventRecorder } from "./replay/recorder";
 import { createSfx } from "./audio/sfx";
 import type { EventSource } from "./events/EventSource";
@@ -66,13 +66,13 @@ async function boot(): Promise<void> {
         // the props L8 made clickable open the panel they stand for. A click during boot (before the
         // panels exist) is simply ignored instead of throwing out of the 3D click handler.
         try {
-        if (id === "filing_cabinet") outputsPanel.show();
-        else if (id === "reception") hiringHall?.open();
-        else if (id === "board_work") setView("kanban");
-        else if (id === "board_spend") setView("costs");
-        else if (id === "elevator") document.querySelector<HTMLElement>("#building .building-toggle")?.click();
-        } catch {
-          /* still booting */
+          if (id === "filing_cabinet") outputsPanel.show();
+          else if (id === "reception") hiringHall?.open();
+          else if (id === "board_work") setView("kanban");
+          else if (id === "board_spend") setView("costs");
+          else if (id === "elevator") document.querySelector<HTMLElement>("#building .building-toggle")?.click();
+        } catch (err) {
+          if (!(err instanceof ReferenceError)) throw err; // only "that panel is not mounted yet" is expected
         }
       },
     });
@@ -398,7 +398,7 @@ async function boot(): Promise<void> {
   const refreshRooms = async (): Promise<void> => {
     try {
       const [projects, policies] = await Promise.all([
-        fetch("/projects").then((r) => (r.ok ? r.json() : [])) as Promise<{ slug: string; template?: string }[]>,
+        fetch("/projects").then((r) => (r.ok ? r.json() : [])) as Promise<ProjectInfo[]>,
         fetch("/policy").then((r) => (r.ok ? r.json() : { projects: [] })) as Promise<{ projects: { slug: string; repo: string }[] }>,
       ]);
       const templateOf = new Map(projects.map((p) => [p.slug, p.template ?? null]));
@@ -410,7 +410,9 @@ async function boot(): Promise<void> {
       }
       applyRoom();
       // the Board starts on the only project there is, when there is just one
-      if (projects.length === 1 && !getActiveProject()) kanban.setProject(projects[0].slug);
+      // the Board opens on the remembered project if it still exists, else the only one there is
+      const start = pickProject(projects, getActiveProject());
+      if (start) kanban.setProject(start.slug);
     } catch {
       // the office still works on the default floor
     }
