@@ -34,7 +34,7 @@ export const BOARD_SPEND = { x: 6.2, w: 6.8, h: 5 };
 export const LIBRARY = [{ x: -18.6, z: -16.3 }, { x: -15, z: -16.3 }] as const; // two shelves, 3.4 wide
 export const WINDOW_BACK = { x: 13.2, w: 3.6, y: 3.2, h: 3 };
 export const LIFT = { x: 18.8, w: 3.4, h: 4.2 };
-export const RECEPTION = { x: 20.2, z: -12, w: 3.4, d: 1.1 }; // right of the lift: out of every path that leaves it
+export const RECEPTION = { x: 20.45, z: -12, w: 2.9, d: 1.1 }; // right of the lift: out of every path that leaves it
 export const CEO_DESK = { x: 0, z: -12.2 };
 
 // ── left wall ──
@@ -127,8 +127,13 @@ export function decorFootprints(): Rect[] {
 /** where an agent stands to work at desk (row, col) — Office3D.seatStand, same offset */
 export const deskStand = (row: number, col: number): Pt => ({ x: DESK_COLS[col], z: DESK_ROWS[row] - 0.55 });
 
-/** does the straight walk from a to b pass through r? (agents walk straight lines, no pathfinding) */
-export function crosses(a: Pt, b: Pt, r: Rect): boolean {
+/**
+ * Does the straight walk from a to b pass through r? (agents walk straight lines, no
+ * pathfinding). `pad` grows the rect — a robot is ~0.6 wide with its arms, so the
+ * centre line must keep that far off a corner.
+ */
+export function crosses(a: Pt, b: Pt, rIn: Rect, pad = 0): boolean {
+  const r = { x0: rIn.x0 - pad, x1: rIn.x1 + pad, z0: rIn.z0 - pad, z1: rIn.z1 + pad };
   // Liang–Barsky clip of the segment against the rectangle
   let t0 = 0, t1 = 1;
   const dx = b.x - a.x, dz = b.z - a.z;

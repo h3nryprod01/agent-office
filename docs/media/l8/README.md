@@ -5,10 +5,10 @@ vsync off (`--disable-frame-rate-limit`) so the number is frame cost, not the di
 
 | Scene | Before (HEAD 3b01230) | After L8 |
 |---|---|---|
-| `?stress=30` (36 agents, 11 on screen) | 360–389 fps · p50 2.3–2.6 ms | 271–352 fps · p50 2.6–3.6 ms |
-| `?stress=30` + 30 walk-in characters | 281–314 fps · p50 3.0–3.3 ms | 222–247 fps · p50 3.8–4.4 ms |
+| `?stress=30` (36 agents, 11 on screen) | 360–401 fps · p50 2.2–2.6 ms | 271–352 fps · p50 2.5–3.6 ms |
+| `?stress=30` + 30 walk-in characters | 281–335 fps · p50 2.8–3.3 ms | 222–266 fps · p50 3.5–4.4 ms |
 
-Runs alternated before/after three times; budget is ≥ 55 fps. With vsync on both sit at the display cap.
+Runs alternated before/after five times in total; budget is ≥ 55 fps. With vsync on both sit at the display cap.
 
 - `before-stress30.jpg` — the office as it was.
 - `after-dev-day.jpg`, `after-dev-night.jpg` — dev floor at 10:00 and 21:30 (`?hour=`).

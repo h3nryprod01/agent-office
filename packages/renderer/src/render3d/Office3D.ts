@@ -505,6 +505,7 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
     const m = MODELS[kind];
     const c = cloneSkinned(m.scene) as THREE.Object3D;
     c.scale.setScalar(m.scale); c.rotation.y = Math.PI; c.position.y = m.y;
+    c.userData.keepGpu = true; // a skinned clone shares geometry + textures with the loaded model
     c.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
@@ -550,15 +551,15 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
    * one global geometry in three.js, so only meshes have theirs disposed.
    */
   function disposeTree(root: THREE.Object3D): void {
-    root.traverse((o) => {
-      const m = o as THREE.Mesh | THREE.Sprite;
-      if (!(m as THREE.Mesh).isMesh && !(m as THREE.Sprite).isSprite) return;
-      if ((m as THREE.Mesh).isMesh) m.geometry.dispose();
-      (Array.isArray(m.material) ? m.material : [m.material]).forEach((mm) => {
-        if (mm.userData.shared) return;
-        (mm as THREE.MeshBasicMaterial).map?.dispose();
-        mm.dispose();
-      });
+    if (root.userData.keepGpu) return; // GLB clones: freeing would pull buffers from under the others
+    root.children.forEach(disposeTree);
+    const m = root as THREE.Mesh | THREE.Sprite;
+    if (!(m as THREE.Mesh).isMesh && !(m as THREE.Sprite).isSprite) return;
+    if ((m as THREE.Mesh).isMesh) m.geometry.dispose();
+    (Array.isArray(m.material) ? m.material : [m.material]).forEach((mm) => {
+      if (mm.userData.shared) return;
+      (mm as THREE.MeshBasicMaterial).map?.dispose();
+      mm.dispose();
     });
   }
   /** the per-character fields the L8 systems add; spread into every Char literal */
@@ -1125,7 +1126,7 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
           // no bubbles in time-lapse: at 16-60x they'd strobe (2D did the same)
           const show = !instant && !!msg && clockNow - msg.at < BUBBLE_MS && clockNow >= msg.at;
           ch.bubble.sprite.visible = show;
-          ch.bubble.sprite.position.y = ch.markKind ? 5.1 : 4.4; // lift it clear of the ❗
+          ch.bubble.sprite.position.y = (ch.markKind ? 5.1 : 4.4) + 0.75 * ch.blend.sit; // clear of the ❗, which rises when seated
           if (show && msg) drawBubble(ch.bubble, msg.text);
         }
       }

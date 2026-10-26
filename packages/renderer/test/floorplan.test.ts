@@ -61,7 +61,7 @@ describe("floor plan", () => {
     ];
     const solid = rects.filter((r) => !r.id.startsWith("desk") && !r.id.startsWith("plant") && r.id !== "meeting");
     for (const [name, p] of dests) for (const r of solid) {
-      expect(crosses(ENTRANCE, p, r), `lift → ${name} walks through ${r.id}`).toBe(false);
+      expect(crosses(ENTRANCE, p, r, 0.3), `lift → ${name} brushes ${r.id}`).toBe(false);
     }
   });
 
