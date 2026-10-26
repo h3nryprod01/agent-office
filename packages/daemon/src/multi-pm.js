@@ -47,7 +47,7 @@ export function hostAllowed(hostHeader, allowList = "") {
   } catch {
     return false;
   }
-  if (hostname === "localhost" || hostname.endsWith(".localhost")) return true;
+  if (hostname === "localhost") return true; // not *.localhost: a system resolver can rebind it (see access.js)
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) || hostname.startsWith("[")) return true; // IPv4 / IPv6 literal
   return String(allowList).split(",").map((h) => h.trim().toLowerCase()).filter(Boolean).includes(hostname);
 }

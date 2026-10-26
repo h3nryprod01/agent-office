@@ -142,7 +142,7 @@ function unmaskUrl(masker: Masker, raw: string): string {
 }
 
 /** Unmask a request body. JSON is walked structurally: raw values with quotes or backslashes must not corrupt the document. */
-function unmaskBody(masker: Masker, body: string): string {
+export function unmaskBody(masker: Masker, body: string): string {
   let doc: unknown;
   try {
     doc = JSON.parse(body);

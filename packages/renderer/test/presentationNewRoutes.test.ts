@@ -76,3 +76,35 @@ describe("presentation mode keeps policy maps round-trippable", () => {
     expect(SENSITIVE.filter((s) => out.includes(s))).toEqual([]);
   });
 });
+
+// The path a real save takes while presenting: the panel builds its payload from the masked
+// project, the fetch patch unmasks the body, and the daemon validates what arrives.
+import { draftFrom, buildPolicyPayload, type ProjectPolicy } from "../src/ui/policyPanel";
+import { unmaskBody } from "../src/presentation/install";
+// @ts-expect-error — plain JS module from the daemon package, imported to validate exactly as it does
+import { validatePolicy } from "../../daemon/src/policy.js";
+
+describe("saving a policy while presenting reaches the daemon intact", () => {
+  const real: ProjectPolicy = {
+    slug: "acme-web", name: "acme-web", cwd: `${HOME}/Projects/acme-web`, repo: "acme-web", hasPolicy: true,
+    policy: {
+      approval: { mode: "auto", roles: { "billing-specialist": "ask" }, tools: { "mcp__acme_crm__lookup": "deny", "Notebook*": "read-only", acme_crm_sync: "ask", Bash: "auto" } },
+      allowedHarnesses: ["claude", "claude-worker", "acme-harness"],
+      allowedLanes: ["deepseek", "sk-abcdefghij", "project-1"],
+    },
+  };
+  it("round-trips through draftFrom → buildPolicyPayload → unmaskBody → validatePolicy", () => {
+    const m = createMasker();
+    const masked = m.mask(real);
+    expect(SENSITIVE.filter((s) => JSON.stringify(masked).includes(s))).toEqual([]);
+    const sent = JSON.parse(unmaskBody(m, JSON.stringify({ project: masked.slug, policy: buildPolicyPayload(draftFrom(masked)) })));
+    expect(sent.project).toBe("acme-web");
+    expect(sent.policy).toEqual(real.policy);
+    expect(validatePolicy(sent.policy)).toEqual(real.policy);
+  });
+  it("the audit rows under the card are masked the same way", () => {
+    const row = { ts: 1, project: "acme-web", agent: "acme-bot", harness: "acme-harness", lane: "acme-lane", tool: "acme_crm_sync", preview: "sync", mode: "auto", decision: "allow", reasons: [], forced: null };
+    const out = JSON.stringify(createMasker().mask(row));
+    expect(SENSITIVE.filter((s) => out.includes(s))).toEqual([]);
+  });
+});

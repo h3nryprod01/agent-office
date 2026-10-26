@@ -47,7 +47,10 @@ const HARNESS_LIST_KEYS = new Set(["allowedharnesses", "allowedlanes"]);
  */
 const BUILTIN_TOOLS = new Set([
   "Bash", "Read", "Write", "Edit", "MultiEdit", "Glob", "Grep", "LS", "WebFetch", "WebSearch", "Task", "Agent",
-  "TodoWrite", "NotebookRead", "NotebookEdit", "Skill", "BashOutput", "KillShell", "ExitPlanMode", "shell", "apply_patch",
+  "TodoWrite", "NotebookRead", "NotebookEdit", "Skill", "BashOutput", "KillShell", "ExitPlanMode",
+  // Codex and Gemini CLI built-ins
+  "shell", "apply_patch", "update_plan", "exec_command", "read_file", "write_file", "replace", "run_shell_command",
+  "glob", "search_file_content", "list_directory", "web_fetch", "google_web_search", "read_many_files", "save_memory",
 ]);
 /** Keys whose value is removed outright. */
 const SECRET_KEY =
@@ -191,14 +194,19 @@ export function createMasker(): Masker {
       reverse.set(masked, value); // the whole name is one unmask token, so map it whole too
       return masked;
     }
-    return /^[A-Za-z][\w.-]{0,40}$/.test(value) ? value : maskText(value);
+    // only built-in names are public; a custom tool can name a client (same rule as the policy map keys)
+    return BUILTIN_TOOLS.has(value) ? value : alias("tool", value);
   }
 
   function maskString(key: string, value: string, siblings: Record<string, unknown>): string {
     const lower = key.toLowerCase();
+    // harness / lane names first: before the secret and alias checks, so even an odd name ("sk-…",
+    // "project-1") becomes a reversible alias the daemon still accepts on save
+    if (HARNESS_LIST_KEYS.has(lower) || lower === "harness" || lower === "lane") {
+      return PUBLIC_HARNESSES.has(value) ? value : alias("tool", value);
+    }
     if (isSecretKey(key) || SECRET_VALUE.test(value)) return "••••";
     if (isAlias(value)) return value;
-    if (HARNESS_LIST_KEYS.has(lower)) return PUBLIC_HARNESSES.has(value) ? value : alias("tool", value);
     if (PROJECT_KEYS.has(lower) || /repo$/i.test(key) || (lower === "name" && "slug" in siblings)) return maskProject(value);
     if (BRANCH_KEYS.has(lower)) return /^(main|master|develop|HEAD)$/.test(value) ? value : alias("branch", value);
     if (AGENT_KEYS.has(lower)) return alias("agent", value);
