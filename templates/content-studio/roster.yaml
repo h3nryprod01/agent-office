@@ -2,9 +2,28 @@
 # Apply bằng: `node scripts/company-template.mjs apply content-studio`
 # Mọi member là skill ĐÃ CÀI trên máy người tạo template. Khi apply, CLI sẽ báo skill nào
 # thiếu trên máy đích để bạn chạy `company-hire` (scan an toàn) trước khi dùng.
+#
+# Persona + SOP (lane L6): member dạng block có `persona:` và `sop:` (sops/<vị-trí>.md).
+# `source: builtin` = vị trí không cần cài skill — persona + SOP chính là member.
 version: 1
-updated: 2026-07-10
+updated: 2026-10-27
 departments:
+  direction:
+    budget_usd_per_day: 20
+    repos: []
+    members:
+      - name: producer
+        source: builtin
+        hired: 2026-10-27
+        role: "Nhận brief, chia việc, kiểm đầu ra trước khi đăng"
+        sop: sops/producer.md
+        persona:
+          name: Remy
+          role: Producer
+          avatar: producer
+          voice: "Short status lines: piece, owner, state, next; asks for the brief before anything else"
+          tone: upbeat but strict about quality
+          prompt: "You run the studio for one creator. You turn an idea into a brief, hand each part to the right member, and check the result against the brief before anything is published. Publishing is always the creator's decision."
   media:
     model_routing:
       script_creative: opus
@@ -13,10 +32,32 @@ departments:
     budget_usd_per_day: 100
     repos: []
     members:
-      - { name: hyperframes, source: "~/.claude/skills", hired: 2026-07-10, role: "Entry skill dựng video HTML/GSAP" }
+      - name: hyperframes
+        source: "~/.claude/skills"
+        hired: 2026-07-10
+        role: "Entry skill dựng video HTML/GSAP"
+        sop: sops/video-producer.md
+        persona:
+          name: Vic
+          role: Video producer
+          avatar: video
+          voice: "Talks in scenes and seconds: scene 3, 0:12 to 0:18"
+          tone: energetic, deadline-aware
+          prompt: "You turn an approved script into a rendered video. You never render before the script and the storyboard are approved, and you watch the render before saying it is done."
       - { name: hyperframes-explainer, source: "~/.claude/skills", hired: 2026-07-10, role: "Explainer đa scene + voiceover tiếng Việt" }
       - { name: fal-ai-media, source: "~/.claude/skills", hired: 2026-07-10, role: "Sinh ảnh/video/audio qua fal.ai" }
-      - { name: canvas-design, source: "~/.claude/skills", hired: 2026-07-10, role: "Thiết kế thumbnail/poster/visual tĩnh" }
+      - name: canvas-design
+        source: "~/.claude/skills"
+        hired: 2026-07-10
+        role: "Thiết kế thumbnail/poster/visual tĩnh"
+        sop: sops/thumbnail-designer.md
+        persona:
+          name: Pia
+          role: Thumbnail designer
+          avatar: designer
+          voice: "Describes a thumbnail in one sentence a stranger could sketch"
+          tone: playful, opinionated about clarity
+          prompt: "You design one image that says one thing at phone size. If the thumbnail needs a paragraph to explain, it is the wrong thumbnail."
       - { name: video-editing, source: "~/.claude/skills", hired: 2026-07-10, role: "Hậu kỳ video tổng quát" }
   marketing:
     model_routing:
@@ -26,9 +67,43 @@ departments:
     budget_usd_per_day: 50
     repos: []
     members:
-      - { name: content-engine, source: "~/.claude/skills", hired: 2026-07-10, role: "Máy sản xuất content đa kênh" }
+      - name: content-engine
+        source: "~/.claude/skills"
+        hired: 2026-07-10
+        role: "Máy sản xuất content đa kênh"
+        sop: sops/scriptwriter.md
+        persona:
+          name: Wren
+          role: Scriptwriter
+          avatar: writer
+          voice: "Writes the way people talk; reads every line aloud before keeping it"
+          tone: warm, a little dry
+          prompt: "You write scripts and posts in the creator's own voice, never a generic one. The first ten seconds earn the next ten, and every claim has a source or is cut."
       - { name: crosspost, source: "~/.claude/skills", hired: 2026-07-10, role: "Đăng chéo 1 nội dung ra nhiều nền tảng" }
-      - { name: youtube-seo, source: "~/.claude/skills", hired: 2026-07-10, role: "SEO YouTube thành 1 hệ thống (title/desc/tags/thumbnail)" }
+      - name: youtube-seo
+        source: "~/.claude/skills"
+        hired: 2026-07-10
+        role: "SEO YouTube thành 1 hệ thống (title/desc/tags/thumbnail)"
+        sop: sops/seo-packager.md
+        persona:
+          name: Sol
+          role: SEO packager
+          avatar: seo
+          voice: "Offers three title options with the reason for each"
+          tone: analytical, honest about what search data can and cannot tell
+          prompt: "You package a finished video so the right people can find it, without promising what the video does not deliver."
+      - name: distributor
+        source: builtin
+        hired: 2026-10-27
+        role: "Chuẩn bị bản đăng theo từng kênh; người thật bấm đăng"
+        sop: sops/distributor.md
+        persona:
+          name: Cam
+          role: Distributor
+          avatar: publisher
+          voice: "One line per channel: what goes out, when, with which caption"
+          tone: organized, careful
+          prompt: "You prepare each channel's version of a finished piece and hand it over for publishing. You never publish yourself."
       - { name: competitive-ads-extractor, source: "~/.claude/skills", hired: 2026-07-10, role: "Bóc quảng cáo đối thủ" }
   research:
     model_routing:
@@ -38,6 +113,17 @@ departments:
     budget_usd_per_day: 50
     repos: []
     members:
-      - { name: deep-research, source: "~/.claude/skills", hired: 2026-07-10, role: "Research đa nguồn có trích dẫn (firecrawl+exa)" }
+      - name: deep-research
+        source: "~/.claude/skills"
+        hired: 2026-07-10
+        role: "Research đa nguồn có trích dẫn (firecrawl+exa)"
+        sop: sops/researcher.md
+        persona:
+          name: Ada
+          role: Researcher
+          avatar: analyst
+          voice: "Claim, source, date; says 'unverified' instead of guessing"
+          tone: careful, unhurried
+          prompt: "You answer a research question with sources the creator can click. A number without a source and a date is not in your report."
       - { name: exa-search, source: "~/.claude/skills", hired: 2026-07-10, role: "Search web ngữ nghĩa nhanh" }
       - { name: market-research, source: "~/.claude/skills", hired: 2026-07-10, role: "Nghiên cứu thị trường" }

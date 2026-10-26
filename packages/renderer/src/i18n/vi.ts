@@ -430,4 +430,22 @@ export const vi: Record<string, string> = {
   "session.openTerminal": "Mở terminal tại đây",
   "session.openDesktop": "Mở trong Claude desktop",
   "session.terminalFailed": "Không mở được terminal",
+
+  // lane L6: persona cards + SOP view
+  "persona.viewSop": "Xem quy trình",
+  "persona.voice": "Giọng",
+  "persona.tone": "Sắc thái",
+  "sop.inputs": "Đầu vào",
+  "sop.steps": "Các bước",
+  "sop.done": "Xong khi",
+  "sop.handoff": "Bàn giao cho",
+  "sop.escalate": "Hỏi người khi",
+  "sop.close": "Đóng",
+  "sop.loading": "Đang tải quy trình…",
+  "sop.failed": "Không tải được quy trình: {error}",
+  "templates.personaMeta": "{personas} nhân vật · {sops} quy trình",
+  "templates.showPeople": "Xem nhân sự",
+  "templates.hidePeople": "Ẩn nhân sự",
+  "templates.peopleFailed": "Không tải được nhân sự: {error}",
+  "work.sopStep": "Bước {n} của quy trình",
 };

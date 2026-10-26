@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { EventBroadcastServer } from "../src/ws-server.js";
@@ -173,6 +173,68 @@ test("/templates rejects the wrong method and answers CORS preflight", async () 
       assert.equal(pre.status, 204);
       assert.equal(pre.headers.get("access-control-allow-origin"), "*");
     });
+  } finally {
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+// lane L6: personas + SOPs travel with the template.
+const PERSONA_ROSTER = `version: 1
+departments:
+  eng:
+    members:
+      - name: developer
+        source: builtin
+        sop: sops/developer.md
+        persona:
+          name: Linh
+          role: Developer
+          avatar: engineer
+          voice: Plain
+          tone: calm
+          prompt: "You are Linh."
+      - name: marketing:thing
+        source: "plugin marketing"
+        sop: sops/thing.md
+      - { name: not-installed, source: "~/.claude/skills" }
+`;
+
+function personaFixture() {
+  const fx = makeFixture({ installed: [] });
+  const tpl = path.join(fx.templatesDir, "studio");
+  writeFileSync(path.join(tpl, "roster.yaml"), PERSONA_ROSTER);
+  mkdirSync(path.join(tpl, "sops"), { recursive: true });
+  writeFileSync(path.join(tpl, "sops", "developer.md"), "---\ntitle: Developer\n---\n");
+  writeFileSync(path.join(tpl, "sops", "thing.md"), "---\ntitle: Thing\n---\n");
+  return fx;
+}
+
+test("listTemplates counts personas and SOPs; builtin and block-form plugin members are never 'missing'", () => {
+  const fx = personaFixture();
+  try {
+    const [tpl] = listTemplates({ templatesDir: fx.templatesDir, homeDir: fx.homeDir });
+    assert.equal(tpl.personaCount, 1);
+    assert.equal(tpl.sopCount, 2);
+    assert.deepEqual(tpl.missingSkills, ["not-installed"]);
+  } finally {
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("applyTemplate copies sops/ next to the roster and sets the old sops/ aside", async () => {
+  const fx = personaFixture();
+  try {
+    mkdirSync(path.join(fx.companyDir, "sops"), { recursive: true });
+    writeFileSync(path.join(fx.companyDir, "sops", "mine.md"), "my own");
+    await withServer(fx, async (base) => {
+      const res = await postApply(base, { name: "studio" });
+      assert.equal(res.status, 200);
+    });
+    assert.match(readFileSync(path.join(fx.companyDir, "sops", "developer.md"), "utf8"), /Developer/);
+    assert.equal(readdirSync(path.join(fx.companyDir, "sops")).includes("mine.md"), false);
+    const aside = readdirSync(fx.companyDir).filter((n) => /^sops\..*\.bak$/.test(n));
+    assert.equal(aside.length, 1);
+    assert.equal(readFileSync(path.join(fx.companyDir, aside[0], "mine.md"), "utf8"), "my own");
   } finally {
     rmSync(fx.root, { recursive: true, force: true });
   }

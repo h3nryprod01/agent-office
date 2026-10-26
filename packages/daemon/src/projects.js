@@ -16,6 +16,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { templateNames } from "../../../scripts/company-template-lib.mjs";
+import { copyCompanyAssets } from "../../../scripts/company-template-lib.mjs"; // lane L6
 import { DEFAULT_TEMPLATES_DIR } from "./templates.js";
 
 export const PROJECT_SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
@@ -29,6 +30,7 @@ export const DEFAULT_PROJECTS_DIR = path.join(
 
 const TITLE_MAX = 200;
 const PATCHABLE = ["title", "status", "assignee", "fromIdea", "links"];
+PATCHABLE.push("sopStep", "parentItemId"); // lane L6: which SOP step a member is on; the ancestry link
 const LINK_KEYS = ["pr", "plane", "obsidian", "branch"];
 /** These two are rendered as clickable links — a `javascript:` value would be an injection. */
 const URL_LINK_KEYS = new Set(["pr", "plane"]);
@@ -201,11 +203,26 @@ export function createProject({
   writeJsonAtomic(path.join(dir, "items.json"), { version: 1, items: [] });
   fs.copyFileSync(path.join(templateDir, "roster.yaml"), path.join(dir, "roster.yaml"));
   fs.copyFileSync(path.join(templateDir, "goals.md"), path.join(dir, "goals.md"));
+  copyCompanyAssets(templateDir, dir); // lane L6: sops/ + personas/
   return project;
 }
 
+/** lane L6: the 1-based SOP step a member is on, or null when the item has no SOP. */
+function assertSopStep(step) {
+  if (step === null || step === undefined) return null;
+  if (!Number.isInteger(step) || step < 1 || step > 50) throw invalid("sopStep must be an integer from 1 to 50");
+  return step;
+}
+
+/** lane L6: ancestry link to another item of the same project (existence is not enforced — orphans are legal). */
+function assertParentItemId(id) {
+  if (id === null || id === undefined) return null;
+  if (typeof id !== "string" || id.length < 1 || id.length > 100) throw invalid("parentItemId must be a string of 1-100 characters");
+  return id;
+}
+
 /** Coerce one outbox line / API payload into a stored item. Throws INVALID. */
-function makeItem({ id, title, source, status, fromIdea = null, assignee = null, links = {}, now }) {
+function makeItem({ id, title, source, status, fromIdea = null, assignee = null, links = {}, sopStep = null, parentItemId = null, now }) {
   const clean = assertTitle(title);
   if (!ITEM_SOURCES.includes(source)) throw invalid(`source must be one of ${ITEM_SOURCES.join("|")}`);
   const finalStatus = status ?? (source === "human" ? "idea" : "doing");
@@ -220,6 +237,8 @@ function makeItem({ id, title, source, status, fromIdea = null, assignee = null,
     fromIdea,
     assignee,
     links: assertLinks(links),
+    sopStep: assertSopStep(sopStep), // lane L6
+    parentItemId: assertParentItemId(parentItemId), // lane L6
   };
 }
 
@@ -254,7 +273,10 @@ function drainOutbox(dir, itemsFile, raw) {
     if (line.trim() === "") continue;
     try {
       const parsed = JSON.parse(line);
-      drained.push(makeItem({ ...parsed, now: parsed.createdAt ?? new Date().toISOString() }));
+      // lane L6: a chip's stray sopStep/parentItemId must not cost the whole item its place on the board
+      const sopStep = Number.isInteger(parsed.sopStep) && parsed.sopStep >= 1 && parsed.sopStep <= 50 ? parsed.sopStep : null;
+      const parentItemId = typeof parsed.parentItemId === "string" && parsed.parentItemId.length >= 1 && parsed.parentItemId.length <= 100 ? parsed.parentItemId : null;
+      drained.push(makeItem({ ...parsed, sopStep, parentItemId, now: parsed.createdAt ?? new Date().toISOString() }));
     } catch (error) {
       console.warn(`[projects] outbox kept a malformed line (${error.message})`);
       corrupt.push(line);
@@ -312,6 +334,15 @@ export function updateItem({
     changes[key] = patch[key];
   }
   if ("title" in changes) changes.title = assertTitle(changes.title);
+  if ("sopStep" in changes) changes.sopStep = assertSopStep(changes.sopStep); // lane L6
+  if ("parentItemId" in changes) {
+    // lane L6: no self-parent and no cycle — whoever walks the ancestry chain must be able to stop
+    changes.parentItemId = assertParentItemId(changes.parentItemId);
+    for (let up = changes.parentItemId, hops = 0; up && hops <= items.length; hops++) {
+      if (up === id) throw invalid("parentItemId would make the item its own ancestor");
+      up = items.find((i) => i.id === up)?.parentItemId ?? null;
+    }
+  }
   if ("status" in changes && !ITEM_STATUSES.includes(changes.status)) {
     throw invalid(`status must be one of ${ITEM_STATUSES.join("|")}`);
   }

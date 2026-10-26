@@ -331,3 +331,66 @@ test("http: GET /items thiếu ?project= → 400", async () => {
   assert.equal((await caller(s)("GET", "/items")).status, 400);
   s.cleanup();
 });
+
+// lane L6: a project carries the template's persona + SOP files, and an item records the SOP step.
+test("createProject copies the template's sops/ and personas/ into the project", () => {
+  const s = sandbox();
+  fs.mkdirSync(path.join(s.templatesDir, "coding", "sops"));
+  fs.writeFileSync(path.join(s.templatesDir, "coding", "sops", "dev.md"), "---\ntitle: Dev\n---\n");
+  s.make();
+  assert.equal(fs.readFileSync(path.join(s.projectsDir, "agent-office", "sops", "dev.md"), "utf8"), "---\ntitle: Dev\n---\n");
+  s.cleanup();
+});
+
+test("items record the SOP step and the parent item; both are patchable and validated", () => {
+  const s = sandbox();
+  s.make();
+  const parent = addItem({ projectsDir: s.projectsDir, slug: "agent-office", title: "Epic", source: "human", now: NOW });
+  const child = addItem({
+    projectsDir: s.projectsDir,
+    slug: "agent-office",
+    title: "Build it",
+    source: "agent",
+    assignee: "developer",
+    parentItemId: parent.id,
+    sopStep: 1,
+    now: NOW,
+  });
+  assert.equal(child.parentItemId, parent.id);
+  assert.equal(child.sopStep, 1);
+  assert.equal(parent.sopStep, null); // an item without an SOP has no step
+  assert.equal(parent.parentItemId, null);
+
+  const moved = updateItem({ projectsDir: s.projectsDir, slug: "agent-office", id: child.id, patch: { sopStep: 3 }, now: NOW });
+  assert.equal(moved.sopStep, 3);
+  for (const bad of [0, -1, 1.5, "2", 99999]) {
+    assert.throws(
+      () => updateItem({ projectsDir: s.projectsDir, slug: "agent-office", id: child.id, patch: { sopStep: bad } }),
+      (e) => e.code === "INVALID",
+      `sopStep ${bad}`,
+    );
+  }
+  assert.throws(
+    () => updateItem({ projectsDir: s.projectsDir, slug: "agent-office", id: child.id, patch: { parentItemId: 42 } }),
+    (e) => e.code === "INVALID",
+  );
+  s.cleanup();
+});
+
+test("parentItemId refuses a self-parent and a cycle; a stray outbox sopStep does not lose the item", () => {
+  const s = sandbox();
+  s.make();
+  const a = addItem({ projectsDir: s.projectsDir, slug: "agent-office", title: "A", source: "human", now: NOW });
+  const b = addItem({ projectsDir: s.projectsDir, slug: "agent-office", title: "B", source: "agent", parentItemId: a.id, now: NOW });
+  const upd = (id, parentItemId) => updateItem({ projectsDir: s.projectsDir, slug: "agent-office", id, patch: { parentItemId } });
+  assert.throws(() => upd(a.id, a.id), (e) => e.code === "INVALID");
+  assert.throws(() => upd(a.id, b.id), (e) => e.code === "INVALID"); // A -> B -> A
+  assert.equal(upd(b.id, null).parentItemId, null);
+
+  const dir = path.join(s.projectsDir, "agent-office");
+  fs.appendFileSync(path.join(dir, "items-outbox.jsonl"), JSON.stringify({ title: "from a chip", source: "agent", sopStep: "3", parentItemId: "" }) + "\n");
+  const drained = readItems({ projectsDir: s.projectsDir, slug: "agent-office" }).find((i) => i.title === "from a chip");
+  assert.equal(drained.sopStep, null);
+  assert.equal(fs.existsSync(path.join(dir, "items-outbox.corrupt")), false);
+  s.cleanup();
+});

@@ -2125,4 +2125,139 @@ body:not([data-view="office"]) .iv-panel {
   color: #93c5fd;
   font-size: 12px;
   align-self: center;
+/* ── lane L6: persona cards + SOP view (Hiring Hall and Templates panel) ── */
+.persona-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 2px 0 8px 6px;
+  padding: 8px 10px;
+  background: rgba(2, 6, 23, 0.55);
+  border: 1px solid #334155;
+  border-radius: 10px;
+}
+/* L8 draws the real avatar from data-avatar; until then a colored initial keeps cards distinguishable */
+.persona-avatar {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #fff;
+  background: hsl(var(--hue, 210) 55% 42%);
+}
+.persona-body {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+}
+.persona-head {
+  color: #e2e8f0;
+}
+.persona-line {
+  color: #94a3b8;
+  margin-top: 2px;
+}
+.persona-line span {
+  color: #64748b;
+  margin-right: 4px;
+}
+.persona-sop,
+.tpl-people-toggle,
+.sop-close {
+  flex: none;
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  padding: 4px 9px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.persona-sop:hover,
+.tpl-people-toggle:hover,
+.sop-close:hover {
+  border-color: #7dd3fc;
+}
+.tpl-people-toggle {
+  margin: 8px 6px 0 0;
+}
+.tpl-dept {
+  margin: 10px 0 4px;
+  font-size: 12px;
+  color: #7dd3fc;
+}
+.hh-sop,
+.tpl-sop {
+  margin: 8px 0;
+  padding: 10px 12px;
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.hh-sop[hidden],
+.tpl-sop[hidden] {
+  display: none;
+}
+.sop .sop-close,
+.hh-sop > .sop-close,
+.tpl-sop > .sop-close {
+  float: right;
+}
+.sop h3 {
+  margin: 0;
+  font-size: 14px;
+  color: #7dd3fc;
+}
+.sop .sop-role {
+  margin: 2px 0 6px;
+  color: #94a3b8;
+}
+.sop-section h4 {
+  margin: 10px 0 2px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #f59e0b;
+}
+.sop-section ul,
+.sop-section ol {
+  margin: 2px 0;
+  padding-left: 20px;
+}
+.sop-done {
+  list-style: none;
+  padding-left: 4px;
+}
+.sop-done li::before {
+  content: "☐ ";
+  color: #4ade80;
+}
+.sop-notes p,
+.sop-notes pre {
+  margin: 4px 0;
+}
+.sop-notes code {
+  background: rgba(148, 163, 184, 0.15);
+  padding: 0 4px;
+  border-radius: 4px;
+}
+.sop-table {
+  border-collapse: collapse;
+  margin: 4px 0;
+}
+.sop-table th,
+.sop-table td {
+  border: 1px solid #334155;
+  padding: 2px 8px;
+  text-align: left;
+}
+.wi-sop {
+  margin: 2px 0 4px;
+  font-size: 11px;
+  color: #f59e0b;
 }

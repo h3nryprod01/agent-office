@@ -436,4 +436,22 @@ export const en = {
   "session.openTerminal": "Open terminal here",
   "session.openDesktop": "Open in Claude desktop",
   "session.terminalFailed": "Could not open a terminal",
+
+  // lane L6: persona cards + SOP view
+  "persona.viewSop": "View SOP",
+  "persona.voice": "Voice",
+  "persona.tone": "Tone",
+  "sop.inputs": "Inputs",
+  "sop.steps": "Steps",
+  "sop.done": "Done when",
+  "sop.handoff": "Hand over to",
+  "sop.escalate": "Ask a human when",
+  "sop.close": "Close",
+  "sop.loading": "Loading the procedure…",
+  "sop.failed": "Could not load the procedure: {error}",
+  "templates.personaMeta": "{personas} personas · {sops} SOPs",
+  "templates.showPeople": "Show people",
+  "templates.hidePeople": "Hide people",
+  "templates.peopleFailed": "Could not load the people: {error}",
+  "work.sopStep": "SOP step {n}",
 };

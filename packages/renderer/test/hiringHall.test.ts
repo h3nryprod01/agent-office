@@ -118,3 +118,41 @@ describe("hirePrompt", () => {
     );
   });
 });
+
+// lane L6: persona cards inside the roster list
+describe("rosterHtml with personas", () => {
+  const withPersona = (): RosterPayload => ({
+    version: 1,
+    updated: "2026-10-27",
+    departments: [
+      {
+        name: "eng",
+        budgetUsdPerDay: null,
+        members: [
+          {
+            name: "developer",
+            role: "Implements tickets",
+            hired: null,
+            source: "builtin",
+            cv: null,
+            sop: "sops/developer.md",
+            persona: { name: "Linh", role: "Developer", avatar: "engineer", voice: "Plain", tone: "calm" },
+          },
+          { name: "legacy", role: "Old style", hired: null, source: null, cv: null },
+        ],
+      },
+    ],
+  });
+
+  it("puts a card under the member that has a persona, and only there", () => {
+    const html = rosterHtml(withPersona());
+    expect(html.match(/class="persona-card"/g)).toHaveLength(1);
+    expect(html).toContain("Linh");
+    expect(html).toContain('data-sop="developer"');
+  });
+
+  it("a roster without personas renders exactly as before", () => {
+    const plain = roster({ dev: ["a"] });
+    expect(rosterHtml(plain)).not.toContain("persona");
+  });
+});

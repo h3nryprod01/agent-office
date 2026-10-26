@@ -36,7 +36,7 @@ const CORS_HEADERS = {
  * Summarize every template on disk. Read per request — a handful of small files,
  * same discipline as /roster. A broken template is skipped, never fatal; a missing
  * templates/ dir degrades to `[]`.
- * @returns {{name: string, departments: {name: string, memberCount: number}[], memberTotal: number, hasGoals: boolean, missingSkills: string[]}[]}
+ * @returns {{name: string, personaCount: number, sopCount: number, departments: {name: string, memberCount: number}[], memberTotal: number, hasGoals: boolean, missingSkills: string[]}[]}
  */
 export function listTemplates({ templatesDir = DEFAULT_TEMPLATES_DIR, homeDir = os.homedir() } = {}) {
   let names;
@@ -52,11 +52,16 @@ export function listTemplates({ templatesDir = DEFAULT_TEMPLATES_DIR, homeDir = 
     try {
       const dir = path.join(templatesDir, name);
       const rosterText = readFileSync(path.join(dir, "roster.yaml"), "utf8");
-      const departments = parseRoster(rosterText).departments.map((d) => ({
+      const parsed = parseRoster(rosterText);
+      const members = parsed.departments.flatMap((d) => d.members);
+      const departments = parsed.departments.map((d) => ({
         name: d.name,
         memberCount: d.members.length,
       }));
       out.push({
+        // lane L6: how many members arrive with a persona / an SOP
+        personaCount: members.filter((m) => m.persona).length,
+        sopCount: members.filter((m) => m.sop).length,
         name,
         departments,
         memberTotal: departments.reduce((n, d) => n + d.memberCount, 0),

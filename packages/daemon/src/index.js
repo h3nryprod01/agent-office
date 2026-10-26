@@ -50,6 +50,7 @@ import { DEFAULT_PROJECTS_DIR } from "./projects.js";
 import { attachRadar, createRadarHttpHandler } from "./radar.js";
 import { attachInterventionMetrics, createMetricsHttpHandler } from "./intervention-metrics.js";
 import { createSessionOpenHandler } from "./session-open.js";
+import { createAssignmentsHttpHandler } from "./assignments.js"; // lane L6
 
 const PROJECTS_ROOT =
   process.env.CLAUDE_PROJECTS_ROOT ?? path.join(os.homedir(), ".claude", "projects");
@@ -130,6 +131,8 @@ async function main() {
   const templatesHttp = createTemplatesHttpHandler();
   // ~/.agent-office/projects/<slug>/ — the daemon is the only writer of an item.
   const projectsHttp = createProjectsHttpHandler();
+  // lane L6: persona + SOP — /members, /sop, /assign. SOP files sit next to the company roster.
+  const assignmentsHttp = createAssignmentsHttpHandler({ companyDir: path.dirname(rosterPath) });
   // R13-INFRA: harness install/login probe for the onboarding wizard, and a
   // static handler serving the renderer build (1 process, 1 port).
   const harnessHttp = createHarnessHttpHandler();
@@ -168,6 +171,7 @@ async function main() {
       templatesHttp(req, res, url) ||
       projectsHttp(req, res, url) ||
       policyHttp(req, res, url) || // lane L2
+      assignmentsHttp(req, res, url) || // lane L6
       harnessHttp(req, res, url) ||
       ttsHttp(req, res, url) ||
       radarHttp(req, res, url) || // lane L4
