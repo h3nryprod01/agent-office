@@ -11,7 +11,7 @@ import { buildScenario } from "./events/scenario";
 import { mountControls } from "./ui/controls";
 import { mountSidePanel } from "./ui/sidePanel";
 import { mountBoard } from "./ui/board";
-import { mountCosts, type CostWindow, type CostsPayload } from "./ui/costs";
+import { mountCosts, type CostWindow, type CostsPayload, type ScorecardPayload } from "./ui/costs";
 import { mountOutputs, type OutputFile } from "./ui/outputs";
 import type { WorkItemsFile } from "./ui/workItems";
 import { mountNavbar, type NavItem } from "./ui/navbar";
@@ -222,7 +222,11 @@ async function boot(): Promise<void> {
     ? (w: CostWindow): Promise<CostsPayload> =>
         fetch(`/costs?window=${w}`).then((r) => r.json())
     : undefined;
-  const costs = mountCosts(document.querySelector<HTMLElement>("#costs")!, fetchCosts, fetchWorkItems);
+  // lane L3: per-lane review/job scorecard next to the spend tables
+  const fetchScorecard = useWs
+    ? (days: number): Promise<ScorecardPayload> => fetch(`/scorecard?days=${days}`).then((r) => r.json())
+    : undefined;
+  const costs = mountCosts(document.querySelector<HTMLElement>("#costs")!, fetchCosts, fetchWorkItems, fetchScorecard);
 
   // Settings: a real status screen — daemon connection + which agent CLIs
   // the app sees. Harness list is live-only; the WS reports connection changes.

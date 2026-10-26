@@ -1954,3 +1954,10 @@ body[data-view="log"] .activity-log {
 }
 .set-lang:hover { border-color: #3d4b6e; }
 .set-lang.active { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+
+/* lane L3: vendor badge (side panel, Spend lane table) — the dot colour comes from --vc */
+.vendor-badge { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.vendor-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--vc, #94a3b8); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25); }
+.costs .lane-table th { font-size: 10px; font-weight: 500; color: #94a3b8; text-align: right; padding: 2px 4px; white-space: nowrap; }
+.costs .lane-table .cost-label { max-width: none; overflow: visible; }
+.costs .lane-note { font-size: 10px; line-height: 1.4; margin: 4px 0 0; }

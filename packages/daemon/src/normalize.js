@@ -18,6 +18,7 @@
 // the result line arrives.
 
 import { makeEvent } from "./event-schema.js";
+import { laneOfModel } from "./worker-lanes.js";
 
 // wi-office-life: this was 140 (one status-line length) — the side panel's
 // "Hoạt động gần nhất" and Transcript both show `detail` verbatim, so 140
@@ -91,13 +92,17 @@ export class SessionNormalizer {
    *   sub-agent's toolUseId wasn't known yet when it was constructed.
    * @param {string|null} [opts.spawnToolUseId]  id of the tool_use block that
    *   spawned this agent, for lazy parentId resolution (sub-agents only).
+   * @param {string} [opts.harness]  "claude-worker" for transcripts from a worker
+   *   config dir; their events also carry the model vendor as `lane`.
    */
-  constructor(sessionId, { agentId, parentId = null, registry = null, spawnToolUseId = null } = {}) {
+  constructor(sessionId, { agentId, parentId = null, registry = null, spawnToolUseId = null, harness = "claude-code" } = {}) {
     this.sessionId = sessionId;
     this.agentId = agentId ?? sessionId;
     this.parentId = parentId;
     this.registry = registry;
     this.spawnToolUseId = spawnToolUseId;
+    this.harness = harness;
+    this.lane = null;
     /** @type {Map<string, {toolName: string, cwd: string}>} */
     this.pendingToolUse = new Map();
     this.sessionStarted = false;
@@ -123,6 +128,20 @@ export class SessionNormalizer {
    */
   normalizeLine(raw) {
     if (!raw || typeof raw !== "object") return [];
+    // A non-Anthropic model can also run from the main config dir (MiMo does on the
+    // owner's machine), so the lane comes from the model in every Claude-format root.
+    // Main root: known vendors only (strict); worker root: any readable slug.
+    if (!this.lane) {
+      this.lane = laneOfModel(raw.message?.model, { strict: this.harness === "claude-code" }); // sticky: a later placeholder can't erase it
+    }
+    const events = this._normalizeLine(raw);
+    return this.harness === "claude-code" && !this.lane
+      ? events
+      : events.map((e) => ({ ...e, harness: this.harness, lane: this.lane }));
+  }
+
+  /** @private */
+  _normalizeLine(raw) {
 
     const cwd = raw.cwd ?? null;
     const ts = raw.timestamp ? Date.parse(raw.timestamp) : Date.now();

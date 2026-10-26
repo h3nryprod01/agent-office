@@ -52,6 +52,13 @@ export interface OfficeEventBase {
   agentId: string;
   /** Spawning agent, null for the session root. */
   parentId: string | null;
+  /**
+   * Model vendor behind a "claude-worker" agent ("deepseek" | "mimo" | "glm" |
+   * "kimi" | ...). Optional and additive (lane L3): absent for other harnesses
+   * and while the model is not yet known — the first reply carries it, so the
+   * renderer fills it in from any later event.
+   */
+  lane?: string | null;
 }
 
 export interface SessionStartedEvent extends OfficeEventBase {

@@ -339,4 +339,14 @@ export const en = {
   "wall.scrumBoard": "WORK BOARD",
   "chat.note": "\u24d8 this chat cannot approve permissions \u2014 do that in the agent's own app \u00b7 each message is one real Claude turn",
   "org.counts": "{total} agents · {working} working · {blocked} blocked · {done} done",
+  // lane L3: multi-vendor team — worker lanes, scorecard, vendor badge
+  "panel.vendor": "Vendor",
+  "costs.lanes": "Worker lanes",
+  "costs.lanes.jobs": "Jobs",
+  "costs.lanes.pass": "Passed review",
+  "costs.lanes.logged": "Logged $",
+  "costs.lanes.est": "Transcript $",
+  "costs.lanes.tokens": "Tokens",
+  "costs.lanes.note":
+    "Jobs, Passed review and Logged $ come from your worker-run and review logs (Logged $ is the exact cost of headless runs). Transcript $ is estimated from tokens at published prices — flat-fee plans show tokens only. — means no data.",
 };
