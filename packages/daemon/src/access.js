@@ -208,7 +208,12 @@ export function isLoopbackRequest(req) {
   const addr = req.socket?.remoteAddress;
   if (!addr) return false;
   if (PROXY_HEADERS.some((h) => req.headers?.[h] !== undefined)) return false;
-  return addr === "::1" || addr.startsWith("127.") || addr.startsWith("::ffff:127.");
+  if (!(addr === "::1" || addr.startsWith("127.") || addr.startsWith("::ffff:127."))) return false;
+  // DNS rebinding: a hostile name that resolves to 127.0.0.1 arrives from loopback but keeps
+  // ITS name in Host (and the origin guard lets Origin == Host through). Only a loopback name
+  // in Host is the person at this machine; anything else must bring a token like a LAN caller.
+  const host = String(req.headers?.host ?? "").replace(/:\d+$/, "").replace(/^\[|\]$/g, "").toLowerCase();
+  return host === "" || host === "localhost" || host === "127.0.0.1" || host === "::1";
 }
 
 /** "owner" | "manager" | "viewer" | null. Reads what the guard decided; safe default without a guard. */

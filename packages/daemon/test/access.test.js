@@ -35,7 +35,8 @@ function fakeReq({ method = "GET", url = "/", headers = {}, remote = "192.0.2.50
   return {
     method,
     url,
-    headers: { host: "192.0.2.10:8787", ...headers },
+    // the person at the machine browses to localhost; a LAN caller to the machine's LAN address
+    headers: { host: /^(127\.|::1$|::ffff:127\.)/.test(remote) ? "localhost:8787" : "192.0.2.10:8787", ...headers },
     socket: { remoteAddress: remote },
     on: (event, fn) => (listeners[event] = fn),
     emitData: (chunk) => listeners.data?.(chunk),
@@ -527,4 +528,17 @@ test("e2e: an empty Host header gets 400 and the daemon keeps serving (it used t
     assert.match(raw, /^HTTP\/1\.1 400/);
     assert.equal((await fetch(`${base}/transcript`, { headers: { authorization: `Bearer ${tokens.viewer}` } })).status, 200);
   });
+});
+
+// coordinator (integration): DNS rebinding must not count as the person at this machine
+test("a loopback connection with a foreign Host is not loopback (DNS rebinding)", async () => {
+  const { isLoopbackRequest, roleOf } = await import("../src/access.js");
+  const req = (host) => ({ socket: { remoteAddress: "127.0.0.1" }, headers: host === undefined ? {} : { host } });
+  assert.equal(isLoopbackRequest(req("localhost:8787")), true);
+  assert.equal(isLoopbackRequest(req("127.0.0.1:8787")), true);
+  assert.equal(isLoopbackRequest(req("[::1]:8787")), true);
+  assert.equal(isLoopbackRequest(req(undefined)), true);
+  assert.equal(isLoopbackRequest(req("evil.example:8787")), false);
+  assert.equal(roleOf(req("evil.example:8787")), null);
+  assert.equal(roleOf(req("localhost:8787")), "owner");
 });

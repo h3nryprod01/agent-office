@@ -32,7 +32,7 @@ import { createHarnessHttpHandler } from "./harness-probe.js";
 import { createStaticHttpHandler } from "./static-serve.js";
 import { createOriginGuard } from "./origin-guard.js";
 // lane L1: LAN access control (token auth for non-loopback requests)
-import { AccessStore, createAccessGuard, combineGuards, resolveBindHost, watchRevocations } from "./access.js";
+import { AccessStore, createAccessGuard, combineGuards, resolveBindHost, watchRevocations, roleOf } from "./access.js";
 // lane L3: multi-vendor team — worker roots, Hermes, scorecard
 import { resolveClaudeRoots } from "./worker-lanes.js";
 import { HermesTailer } from "./hermes-tailer.js";
@@ -136,9 +136,9 @@ async function main() {
   // lane L5: one PM per project, members + pairing codes, Telegram/Zalo channels, the
   // end-of-day digest (multi-pm.js). Owns /pms /pm/* /overview /members /pairing /channels and
   // the Zalo webhook. `server` is assigned below — every callback here runs after it exists.
-  // TODO(coordinator, lane L1): pass `roleOf: (req) => ...` once the platform lane's access
-  // control lands; until then every caller counts as owner, as before roles existed.
+  // Roles come from L1's access guard (loopback = owner; a LAN token carries its own role).
   const multiPm = createMultiPm({
+    roleOf,
     chatManager,
     approvalBroker,
     broadcast: (event) => server.broadcast(event),
@@ -151,10 +151,9 @@ async function main() {
     metricsUrl: (slug) => `http://127.0.0.1:${WS_PORT}/metrics/intervention?project=${encodeURIComponent(slug)}`,
     ...(process.env.CHAT_CLAUDE_BIN ? { claudeBin: process.env.CHAT_CLAUDE_BIN } : {}),
   });
-  // lane L7: document workspace (/docs/*) + new-project wizard (/wizard/*). Pass L1's roleOf(req)
-  // as `{ roleOf }` to both once it exists; until then loopback = owner, any other source = refused.
-  const docsHttp = createDocsHttpHandler();
-  const wizardHttp = createProjectWizardHandler();
+  // lane L7: document workspace (/docs/*) + new-project wizard (/wizard/*), roles from L1's guard.
+  const docsHttp = createDocsHttpHandler({ roleOf });
+  const wizardHttp = createProjectWizardHandler({ roleOf });
   // R13-INFRA: harness install/login probe for the onboarding wizard, and a
   // static handler serving the renderer build (1 process, 1 port).
   const harnessHttp = createHarnessHttpHandler();
@@ -171,8 +170,8 @@ async function main() {
   // scratch dir for tests.
   const policyStore = new PolicyStore({ projectsDir: process.env.AGENT_OFFICE_PROJECTS_DIR || DEFAULT_PROJECTS_DIR });
   approvalBroker.policy = new PolicyEngine({ store: policyStore, isOverBudget: () => usageIndex.overBudgetNow() });
-  // L1 JOIN POINT: pass `roleOf` from access.js here; the default trusts only direct loopback callers.
-  const policyHttp = createPolicyHttpHandler({ store: policyStore });
+  // roles from L1's access guard; switching a project to `auto` stays owner-only.
+  const policyHttp = createPolicyHttpHandler({ store: policyStore, roleOf });
 
   const server = new EventBroadcastServer({
     port: WS_PORT,
