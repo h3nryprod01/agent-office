@@ -20,12 +20,14 @@ import { isLinux, isWindows } from "./platform.js";
  * @param {string} cwd already realpath-resolved directory
  * @param {string} [platform]
  * @param {Record<string, string|undefined>} [env]
- * @returns {{cmd: string, args: string[], options: {cwd?: string}}}
+ * @returns {{cmd: string, args: string[], options: {cwd?: string}}|null} null = a Windows path
+ *   cmd.exe would re-parse (`& | < > ^ " % ! ( )` or control characters): refuse rather than quote
  */
 export function terminalCommand(cwd, platform = process.platform, env = process.env) {
   if (isWindows(platform)) {
     // Absolute shell path, and NO cwd option on the launch: Windows looks in the working
     // folder before PATH, so a program an agent planted there as cmd.exe would run.
+    if (/["%&|<>^!()\x00-\x1f]/.test(cwd)) return null;
     const shell = env.ComSpec || path.win32.join(env.SystemRoot ?? "C:\\Windows", "System32", "cmd.exe");
     return { cmd: shell, args: ["/c", "start", "/D", cwd, shell], options: {} };
   }
@@ -78,7 +80,12 @@ export function createSessionOpenHandler({ resolveCwd, execFileFn = execFile, pl
         respond(404, { error: "no known working directory for that agent" });
         return;
       }
-      const { cmd, args, options } = terminalCommand(real, platform);
+      const launch = terminalCommand(real, platform);
+      if (!launch) {
+        respond(400, { error: "that folder name cannot be opened safely from here" });
+        return;
+      }
+      const { cmd, args, options } = launch;
       execFileFn(cmd, args, options, (error) => {
         // `cmd /c start` detaches and may report a non-zero code even on success (same quirk as explorer in outputs.js)
         if (error && !isWindows(platform)) {

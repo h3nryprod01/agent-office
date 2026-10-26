@@ -19,6 +19,13 @@ test("terminalCommand: macOS opens Terminal on the folder; Windows/Linux start a
   assert.deepEqual(terminalCommand("/w/demo-app", "linux"), { cmd: "x-terminal-emulator", args: [], options: { cwd: "/w/demo-app" } });
 });
 
+test("a Windows folder name cmd.exe would re-parse is refused, not quoted", () => {
+  for (const bad of ["C:\\w\\a&calc", "C:\\w\\a|b", "C:\\w\\%PATH%", "C:\\w\\a^b", "C:\\w\\a\"b", "C:\\w\\(x)", "C:\\w\\a\nb"]) {
+    assert.equal(terminalCommand(bad, "win32", { SystemRoot: "C:\\Windows" }), null, bad);
+  }
+  assert.notEqual(terminalCommand("C:\\Program Files\\my app", "win32", { SystemRoot: "C:\\Windows" }), null);
+});
+
 function call(handler, method, body) {
   return new Promise((resolve) => {
     const req = {
