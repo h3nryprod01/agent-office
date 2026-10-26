@@ -414,9 +414,12 @@ async function boot(): Promise<void> {
       // the Board opens on the remembered project if it still exists, else the first one — ONCE: after
       // that the office tabs drive it, and the 60s refresh must not pull it back
       if (!boardSeeded) {
-        boardSeeded = true;
-        const start = pickProject(projects, getActiveProject());
-        if (start) kanban.setProject(start.slug);
+        // a tab clicked before this first answer wins; the flag is only spent once a project was set
+        const start = (activeRepo && slugByRepo.get(activeRepo)) || pickProject(projects, getActiveProject())?.slug;
+        if (start) {
+          boardSeeded = true;
+          kanban.setProject(start);
+        }
       }
     } catch {
       // the office still works on the default floor
