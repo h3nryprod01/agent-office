@@ -148,7 +148,7 @@ export function withDemoLook(a: AgentModel): AgentModel {
   if (a.harness) return a;
   const h = hash(a.agentId);
   const harness = DEMO_HARNESSES[h % DEMO_HARNESSES.length];
-  const demo: AgentModel & { lane?: string; persona?: Persona } = { ...a, harness };
+  const demo: AgentModel & { lane?: string | null; persona?: Persona } = { ...a, harness };
   const has = a as AgentModel & { lane?: unknown; persona?: unknown };
   if (harness === "claude-worker" && !has.lane) demo.lane = DEMO_LANES[(h >> 3) % DEMO_LANES.length];
   if (h % 5 === 0 && !has.persona) demo.persona = { name: a.name, avatar: DEMO_AVATARS[(h >> 2) % DEMO_AVATARS.length] };

@@ -592,4 +592,13 @@ export const vi: Record<string, string> = {
   "office.place.elevator": "Thang máy: sang dự án khác",
   "office.place.board_work": "Bảng việc",
   "office.place.board_spend": "Bảng chi phí: 24 giờ qua",
+  // lane L9: presentation mode
+  "present.on": "🎭 Đang trình chiếu",
+  "present.off": "🎭 Trình chiếu",
+  "present.title": "Chế độ trình chiếu: che tên dự án, đường dẫn, branch và nội dung chat bằng bí danh (tải lại trang)",
+  "present.badge": "CHẾ ĐỘ TRÌNH CHIẾU — tên đã được che",
+  "hud.clock": "Đồng hồ ngày +{h}h {m}p",
+  "hud.agents": "{n} agent",
+  "hud.working": "{n} đang làm",
+  "hud.caption": "Một ngày làm việc thật, 3 giờ trong 60 giây — Sonnet lập kế hoạch, worker làm, Opus review. Mọi tên đã được che.",
 };

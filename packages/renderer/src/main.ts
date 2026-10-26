@@ -39,12 +39,15 @@ import type { EventSource } from "./events/EventSource";
 // lane L2: approval modes + data rules
 import { PolicyAlertsStore } from "./ui/policyAlerts";
 import { mountPolicyPanel, type AuditRow, type PolicyBody, type PolicyPanelHandle, type ProjectPolicy } from "./ui/policyPanel";
+// lane L9: presentation mode (data-layer masking)
+import { installPresentationMode, mountCleanHud, mountPresentationToggle } from "./presentation";
 
 /** "" = the All tab's office; otherwise the repo name. */
 const ALL_KEY = "";
 const keyOf = (tab: TabKey): string => (tab.kind === "all" ? ALL_KEY : tab.repo);
 
 async function boot(): Promise<void> {
+  installPresentationMode(); // lane L9: must run before anything fetches or opens a socket
   // The office is 3D (Phase 4 cutover complete — Pixi is gone). One scene, fed
   // the repo-filtered state; the tab filter is what makes desks per-repo.
   //
@@ -638,6 +641,8 @@ async function boot(): Promise<void> {
   });
   paintSfx();
   controlsRoot.append(sfxBtn);
+  mountPresentationToggle(controlsRoot); // lane L9
+  mountCleanHud(() => replayView); // lane L9: ?clean=1 for the launch timelapse
 
   if (office3d) {
     // R10-b: recenter the office — undoes a drag-pan or a focus-pan.

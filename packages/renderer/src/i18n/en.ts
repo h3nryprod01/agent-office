@@ -598,4 +598,13 @@ export const en = {
   "office.place.elevator": "Lift: your other projects",
   "office.place.board_work": "Work board",
   "office.place.board_spend": "Spend board: the last 24 hours",
+  // lane L9: presentation mode
+  "present.on": "🎭 Presenting",
+  "present.off": "🎭 Present",
+  "present.title": "Presentation mode: hide project names, paths, branches and chat text behind aliases (reloads the page)",
+  "present.badge": "PRESENTATION MODE — names are masked",
+  "hud.clock": "Day clock +{h}h {m}m",
+  "hud.agents": "{n} agents",
+  "hud.working": "{n} working",
+  "hud.caption": "One real day, 3 hours in 60 seconds — Sonnet plans, workers build, Opus reviews. Every name masked.",
 };

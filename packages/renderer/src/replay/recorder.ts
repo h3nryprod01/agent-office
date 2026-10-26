@@ -1,4 +1,5 @@
 import { t } from "../i18n";
+import { maskIfPresenting } from "../presentation/active";
 import type { OfficeEvent } from "../../../protocol/src/events";
 
 /** Ring-buffer cap — ~50k events is hours of a busy session, few MB of JSON. */
@@ -87,5 +88,6 @@ export function parseReplayFile(text: string): OfficeEvent[] {
       typeof ev.agentId === "string"
     );
   });
-  return events.slice().sort((a, b) => a.timestamp - b.timestamp);
+  // lane L9: a replay file comes from disk, not fetch/WebSocket, so mask it here
+  return maskIfPresenting(events).sort((a, b) => a.timestamp - b.timestamp);
 }
