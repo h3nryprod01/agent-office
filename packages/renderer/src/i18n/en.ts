@@ -339,4 +339,16 @@ export const en = {
   "wall.scrumBoard": "WORK BOARD",
   "chat.note": "\u24d8 this chat cannot approve permissions \u2014 do that in the agent's own app \u00b7 each message is one real Claude turn",
   "org.counts": "{total} agents · {working} working · {blocked} blocked · {done} done",
+  // lane L8: office places (hover tooltips) + the spend board title
+  "wall.spend": "SPEND · 24H",
+  "office.place.receptionSign": "RECEPTION",
+  "office.place.library": "Library: agents read files here",
+  "office.place.arcade": "Arcade: agents run commands here",
+  "office.place.server_rack": "LLM providers: a light per agent on each",
+  "office.place.filing_cabinet": "Outputs: open what the team finished",
+  "office.place.meeting_table": "Meeting table: handing work to sub-agents",
+  "office.place.reception": "Reception: hire an agent",
+  "office.place.elevator": "Lift: your other projects",
+  "office.place.board_work": "Work board",
+  "office.place.board_spend": "Spend board: the last 24 hours",
 };

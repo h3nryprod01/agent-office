@@ -13,5 +13,7 @@ không rõ nguồn gốc/license.
 | `../docs/media/art-round2/*.png` | Render bởi `assets/tools/preview_round2.py` (dự án này) | CC0 | Ảnh so sánh trước/sau round 2 (characters / ceo-corner / decor / overview) |
 | `preview/makeover-preview.png` | Render bởi `assets/tools/preview_makeover.py` (dự án này) | CC0 | Scene verify asset round 3 (wi-office-makeover) |
 | `../docs/media/makeover/asset-preview.png` | Copy của `preview/makeover-preview.png` cho status doc/PR | CC0 | Ảnh minh hoạ makeover (wi-office-makeover) |
+| 3D office L8 (procedural, không có file asset): đồng phục theo harness, phụ kiện đầu, huy hiệu ngực, bong bóng ❗/✕/✓, sàn gỗ/đá, vân gỗ bàn, đồ trang trí 3 loại phòng, bầu trời/sao | Sinh trong code (`packages/renderer/src/render3d/{accessories,badge,statusMark,rooms,daylight}.ts`) bằng primitive three.js + canvas | CC0 (của dự án) | Không dùng font emoji cho dấu trạng thái (vẽ hình); avatar persona chỉ là chuỗi/URL do người dùng cấp |
+| `../docs/media/l8/*.jpg` | Chụp từ renderer `?mock=1` (dữ liệu giả `acme-web`, `demo-app`) | CC0 | Ảnh trước/sau làn L8 |
 
 Kenney assets không bắt buộc credit nhưng khuyến khích: **kenney.nl**.

@@ -333,4 +333,16 @@ export const vi: Record<string, string> = {
   "wall.scrumBoard": "BẢNG VIỆC",
   "chat.note": "\u24d8 chat kh\u00f4ng duy\u1ec7t \u0111\u01b0\u1ee3c permission \u2014 x\u1eed l\u00fd \u1edf app g\u1ed1c \u00b7 m\u1ed7i tin = 1 turn Claude th\u1eadt",
   "org.counts": "{total} agent · {working} làm · {blocked} kẹt · {done} xong",
+  // lane L8: office places (hover tooltips) + the spend board title
+  "wall.spend": "CHI PHÍ · 24H",
+  "office.place.receptionSign": "LỄ TÂN",
+  "office.place.library": "Thư viện: agent đọc file ở đây",
+  "office.place.arcade": "Máy arcade: agent chạy lệnh ở đây",
+  "office.place.server_rack": "Nhà cung cấp LLM: mỗi đèn là một agent đang dùng",
+  "office.place.filing_cabinet": "Tủ hồ sơ: mở sản phẩm đã xong",
+  "office.place.meeting_table": "Bàn họp: giao việc cho sub-agent",
+  "office.place.reception": "Lễ tân: tuyển agent",
+  "office.place.elevator": "Thang máy: sang dự án khác",
+  "office.place.board_work": "Bảng việc",
+  "office.place.board_spend": "Bảng chi phí: 24 giờ qua",
 };
