@@ -133,15 +133,17 @@ function assertRelPath(rel) {
 }
 
 /**
- * A project folder inside a dot-directory (~/.claude, ~/.config/…) would make agent instruction
+ * A project folder inside a dot-directory of home (~/.claude, ~/.config/…) would make agent instruction
  * and settings files editable from the documents tab, so it is refused here and in the wizard.
  * Both arguments must already be realpath'd.
  */
 export function assertVisibleRoot(realRoot, realHome) {
   const segments = path.relative(realHome, realRoot).split(path.sep);
   if (segments[0] === ".." || path.isAbsolute(segments[0])) return; // outside home: not this check's business
-  if (segments.some((seg) => seg.startsWith("."))) {
-    throw forbidden("a project folder cannot be inside a hidden directory");
+  // Only the first level: ~/.claude, ~/.config, ~/.ssh hold agent and tool settings. A repo that
+  // happens to live under ~/Projects/x/.claude/worktrees/… is an ordinary project folder.
+  if (segments[0].startsWith(".")) {
+    throw forbidden("a project folder cannot be inside a hidden directory of your home folder");
   }
 }
 
@@ -346,6 +348,7 @@ function snapshot({ projectsDir, slug, rel, previous, role, history }) {
  */
 function effectiveStatus(doc, st) {
   if (doc.status !== "approved") return doc.status;
+  if (doc.approvedMtime === undefined) return "approved"; // approved before the content was recorded
   const same = doc.approvedMtime === Math.trunc(st.mtimeMs) && doc.approvedSize === st.size;
   return same ? "approved" : "draft";
 }
@@ -388,7 +391,7 @@ const ACTIONS = {
       throw fail("CONFLICT", "the file changed on disk since you opened it", { mtime: st.mtimeMs });
     }
     const previous = fs.readFileSync(real, "utf8");
-    if (previous === body.content) return [200, { ok: true, mtime: st.mtimeMs, size: st.size, status: docOf(readMeta(projectsDir, slug), rel).status }];
+    if (previous === body.content) return [200, { ok: true, mtime: st.mtimeMs, size: st.size, status: effectiveStatus(docOf(readMeta(projectsDir, slug), rel), st) }];
 
     // snapshot first: if the write fails the old text is still recoverable
     // random name + exclusive create: a link planted at a guessable temp path cannot redirect the write
@@ -458,6 +461,13 @@ const ACTIONS = {
     const resolved = resolveDoc(root, body.path);
     const { rel } = resolved;
     if (body.decision !== "approve" && body.decision !== "changes") throw invalid('decision must be "approve" or "changes"');
+    if (body.decision === "approve") {
+      // approve what the reviewer was looking at, not whatever the file became since
+      if (typeof body.baseMtime !== "number") throw invalid("baseMtime is required to approve (the mtime you opened)");
+      if (Math.trunc(body.baseMtime) !== Math.trunc(resolved.st.mtimeMs)) {
+        throw fail("CONFLICT", "the file changed on disk since you opened it", { mtime: resolved.st.mtimeMs });
+      }
+    }
     const note = body.decision === "changes" ? cleanText(body.note, NOTE_MAX, "note") : optionalText(body.note, NOTE_MAX);
     const at = new Date().toISOString();
     // The item comes first: if it cannot be created, no review is recorded for a request nobody will see.
@@ -487,19 +497,22 @@ const GET_ROUTES = ["/docs", "/docs/doc", "/docs/file", "/docs/versions", "/docs
 export function readJsonBody(req, limit, done) {
   const chunks = [];
   let size = 0;
-  let tooBig = false;
+  let finished = false;
   req.on("data", (chunk) => {
-    if (tooBig) return;
+    if (finished) return;
     size += chunk.length;
     if (size > limit) {
-      tooBig = true;
+      finished = true;
       chunks.length = 0;
+      done(fail("TOO_LARGE", "request body is too large"));
+      req.pause(); // stop reading: the rest of an oversized upload is never consumed
       return;
     }
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   });
   req.on("end", () => {
-    if (tooBig) return done(fail("TOO_LARGE", "request body is too large"));
+    if (finished) return;
+    finished = true;
     try {
       done(null, JSON.parse(Buffer.concat(chunks).toString("utf8")));
     } catch {
@@ -554,7 +567,7 @@ export function createDocsHttpHandler({
         json(403, { error: "your role is read-only" });
         return true;
       }
-      readJsonBody(req, 2.5 * 1024 * 1024, (bodyError, body) => {
+      readJsonBody(req, 6 * MAX_SAVE_BYTES + 4096, (bodyError, body) => {
         try {
           if (bodyError) throw bodyError;
           const slug = body?.project;

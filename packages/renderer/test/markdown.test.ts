@@ -140,7 +140,9 @@ describe("hardening", () => {
   it("closing hashes are still stripped from a heading", () => {
     expect(renderMarkdown("## Plan ##").blocks[0]!.heading).toBe("Plan");
     expect(renderMarkdown("## C# is fine").blocks[0]!.heading).toBe("C# is fine");
-    expect(renderMarkdown("# ").blocks).toHaveLength(1); // "# " alone is not a heading → a paragraph
+    // an empty heading ("# " alone) is a heading with no text, as in CommonMark — and must not loop forever
+    expect(renderMarkdown("# ").blocks.map((b) => b.level)).toEqual([1]);
+    expect(renderMarkdown("#\n\n# \n\ntext").blocks).toHaveLength(3);
   });
 
   it("remote images are never loaded: they become a link", () => {

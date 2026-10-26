@@ -85,6 +85,7 @@ export interface DocsApi {
     path: string,
     decision: "approve" | "changes",
     note: string,
+    baseMtime?: number,
   ): Promise<{ status: DocStatus; item: { id: string; title: string } | null }>;
 }
 
@@ -125,7 +126,8 @@ export function httpDocsApi(base = ""): DocsApi {
     comment: (project, path, text, anchor) => post("/docs/comment", { project, path, text, anchor }),
     resolve: (project, path, id, resolved) => post<void>("/docs/comment/resolve", { project, path, id, resolved }),
     setStatus: (project, path, status) => post<void>("/docs/status", { project, path, status }),
-    review: (project, path, decision, note) => post("/docs/review", { project, path, decision, note }),
+    review: (project, path, decision, note, baseMtime) =>
+      post("/docs/review", { project, path, decision, note, ...(baseMtime === undefined ? {} : { baseMtime }) }),
   };
 }
 
@@ -161,8 +163,10 @@ export function kindCounts(files: DocFile[]): Record<KindFilter, number> {
 /** Does `comment` belong to this rendered block? Heading comments carry no quote. */
 export function anchorMatches(comment: DocComment, block: MdBlock): boolean {
   const { heading, quote } = comment.anchor;
-  if (quote) return block.quote === quote && (block.heading ?? null) === (heading ?? null);
-  if (heading) return block.level !== undefined && block.heading === heading;
+  // the daemon clips a stored heading to 200 characters
+  const here = block.heading === null ? null : block.heading.slice(0, 200);
+  if (quote) return block.quote === quote && here === (heading ?? null);
+  if (heading) return block.level !== undefined && here === heading;
   return false;
 }
 

@@ -88,6 +88,10 @@ function assertCwdInHome(cwd, homeDir) {
   if (real !== realHome && !real.startsWith(realHome + path.sep)) {
     throw invalid(`cwd must be inside ${realHome}`);
   }
+  // lane L7: ~/.claude, ~/.config, ~/.ssh … hold agent and tool settings; a project cannot live there
+  if (path.relative(realHome, real).split(path.sep)[0].startsWith(".")) {
+    throw invalid("cwd cannot be inside a hidden directory of your home folder");
+  }
   return real;
 }
 

@@ -111,13 +111,30 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
     await load();
   }
 
+  interface ActCtx {
+    /** True once another document has been opened: nothing the action still has to do applies any more. */
+    stale(): boolean;
+    /** Re-read the document the action was started on; false if it is no longer the one on screen. */
+    reload(): Promise<boolean>;
+  }
+
   /** Run a daemon action; any failure becomes a visible notice instead of a silent no-op. */
-  async function act(fn: () => Promise<void>): Promise<void> {
+  async function act(fn: (ctx: ActCtx) => Promise<void>): Promise<void> {
     if (busy) return;
     busy = true;
     const token = seq;
+    const [p, d] = [project, path];
+    const ctx: ActCtx = {
+      stale: () => token !== seq,
+      reload: async () => {
+        const next = await api.doc(p, d);
+        if (token !== seq) return false;
+        detail = next;
+        return true;
+      },
+    };
     try {
-      await fn();
+      await fn(ctx);
     } catch (error) {
       if (token !== seq) return;
       const conflict = error instanceof DocsHttpError && error.status === 409;
@@ -174,8 +191,7 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
       const text = await res.text();
       // The frame has no scripts, but a page can still make the browser GET things (images, meta refresh):
       // a CSP meta as the first element shuts every network load, leaving inline styles and data: images.
-      const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">`;
-      if (path === forPath && frame.isConnected) frame.srcdoc = csp + text;
+      if (path === forPath && frame.isConnected) frame.srcdoc = withCsp(text);
     } catch (error) {
       // not render(): that would call this again and loop on a persistent failure
       const text = t("docs.error", { error: messageOf(error) });
@@ -390,7 +406,9 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
       const block = blocks[Number(blockEl.dataset.block)];
       if (block) {
         const isHeading = blockEl.classList.contains("md-heading");
-        pending = isHeading ? { heading: block.heading, quote: null } : { heading: block.heading, quote: block.quote || null };
+        pending = isHeading
+          ? { heading: block.heading, quote: null }
+          : { heading: block.heading?.slice(0, 200) ?? null, quote: block.quote || null };
         render();
         const box = root.querySelector<HTMLTextAreaElement>('[data-field="comment"]');
         box?.scrollIntoView({ block: "center" });
@@ -430,13 +448,14 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
         render();
         break;
       case "save":
-        void act(async () => {
+        void act(async (ctx) => {
           await api.save(project, path, draft.edit, detail!.mtime);
+          if (ctx.stale()) return deps.onChanged();
           editing = false;
           lostEdit = null;
           notice = { kind: "ok", text: t("docs.edit.saved") };
           versions = null;
-          await fetchDetail();
+          if (!(await ctx.reload())) return deps.onChanged();
           render();
           deps.onChanged();
         });
@@ -462,11 +481,12 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
         }
         break;
       case "view-version":
-        void act(async () => {
+        void act(async (ctx) => {
           if (id === "current") {
             older = null;
           } else {
             const v = await api.version(project, path, id);
+            if (ctx.stale()) return;
             older = { id, at: btn.dataset.at ?? "", content: v.content };
           }
           render();
@@ -480,24 +500,29 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
         deps.askPm?.(t("docs.askPm.prefill", { path }));
         break;
       case "send-review":
-        void act(async () => {
+        void act(async (ctx) => {
           await api.setStatus(project, path, "review");
-          await load();
+          if (!(await ctx.reload())) return deps.onChanged();
+          render();
           deps.onChanged();
         });
         break;
       case "reopen":
-        void act(async () => {
+        void act(async (ctx) => {
           await api.setStatus(project, path, "draft");
-          await load();
+          if (!(await ctx.reload())) return deps.onChanged();
+          render();
           deps.onChanged();
         });
         break;
       case "approve":
-        void act(async () => {
-          await api.review(project, path, "approve", "");
+        void act(async (ctx) => {
+          // the mtime the reviewer is looking at: approving text that changed meanwhile is refused (409)
+          await api.review(project, path, "approve", "", detail!.mtime);
+          if (ctx.stale()) return deps.onChanged();
           notice = null;
-          await load();
+          if (!(await ctx.reload())) return deps.onChanged();
+          render();
           deps.onChanged();
         });
         break;
@@ -506,23 +531,25 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
         render();
         break;
       case "send-changes":
-        void act(async () => {
+        void act(async (ctx) => {
           const out = await api.review(project, path, "changes", draft.changes);
+          if (ctx.stale()) return deps.onChanged();
           changesOpen = false;
           draft = { ...draft, changes: "" };
-          await fetchDetail();
+          if (!(await ctx.reload())) return deps.onChanged();
           notice = { kind: "ok", text: t("docs.changes.sent", { title: out.item?.title ?? "" }) };
           render();
           deps.onChanged();
         });
         break;
       case "comment":
-        void act(async () => {
+        void act(async (ctx) => {
           await api.comment(project, path, draft.comment, pending ?? { heading: null, quote: null });
+          if (ctx.stale()) return;
           draft = { ...draft, comment: "" };
           pending = null;
           notice = null;
-          await fetchDetail();
+          if (!(await ctx.reload())) return;
           render();
         });
         break;
@@ -531,9 +558,9 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
         render();
         break;
       case "resolve":
-        void act(async () => {
+        void act(async (ctx) => {
           await api.resolve(project, path, id, btn.dataset.to === "1");
-          await fetchDetail();
+          if (!(await ctx.reload())) return;
           render();
         });
         break;
@@ -553,6 +580,19 @@ export function mountDocViewer(root: HTMLElement, deps: ViewerDeps): ViewerHandl
 
   clear();
   return { show, clear };
+}
+
+/**
+ * Prepend a locked-down CSP to an HTML document before it goes into the sandboxed frame: no network
+ * loads at all (inline styles and data: images still work). The tag goes AFTER a leading doctype —
+ * ahead of it the browser would drop the page into quirks mode. A `<meta http-equiv=refresh>` is
+ * removed too: CSP does not cover navigations, and a refresh to a localhost URL is a free GET.
+ */
+export function withCsp(html: string): string {
+  const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">`;
+  const noRefresh = html.replace(/<meta\b[^>]*http-equiv\s*=\s*["']?\s*refresh[^>]*>/gi, "");
+  const doctype = noRefresh.match(/^\s*<!doctype[^>]*>/i);
+  return doctype ? doctype[0] + csp + noRefresh.slice(doctype[0].length) : csp + noRefresh;
 }
 
 function messageOf(error: unknown): string {

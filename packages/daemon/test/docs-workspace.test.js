@@ -78,6 +78,12 @@ async function withDocs(s, opts, run) {
 
 const asRole = (role) => ({ roleOf: () => role });
 
+/** Approve exactly what is on disk now (the UI sends the mtime it displayed). */
+async function approve(get, post, p, extra = {}) {
+  const { mtime } = await (await get("/docs/doc", { path: p })).json();
+  return post("/docs/review", { path: p, decision: "approve", baseMtime: mtime, ...extra });
+}
+
 test("loopbackRole: loopback socket + loopback Host = owner, anything else = null", () => {
   const req = (remoteAddress, host = "127.0.0.1:8787") => ({ socket: { remoteAddress }, headers: { host } });
   assert.equal(loopbackRole(req("127.0.0.1")), "owner");
@@ -296,7 +302,7 @@ test("viewer reads but cannot write, comment, or review", async () => {
     assert.equal((await get("/docs/doc", { path: "README.md" })).status, 200);
     assert.equal((await post("/docs/save", { path: "README.md", content: "x" })).status, 403);
     assert.equal((await post("/docs/comment", { path: "README.md", text: "x" })).status, 403);
-    assert.equal((await post("/docs/review", { path: "README.md", decision: "approve" })).status, 403);
+    assert.equal((await post("/docs/review", { path: "README.md", decision: "approve", baseMtime: 0 })).status, 403);
     assert.equal((await post("/docs/status", { path: "README.md", status: "review" })).status, 403);
   });
   assert.match(fs.readFileSync(path.join(s.cwd, "README.md"), "utf8"), /Intro paragraph/);
@@ -406,7 +412,7 @@ test("status: draft → review → approve; unknown values rejected; save after 
     let doc = await (await get("/docs/doc", { path: "README.md" })).json();
     assert.equal(doc.status, "review");
 
-    const ok = await post("/docs/review", { path: "README.md", decision: "approve", note: "good" });
+    const ok = await approve(get, post, "README.md", { note: "good" });
     assert.equal(ok.status, 200);
     doc = await (await get("/docs/doc", { path: "README.md" })).json();
     assert.equal(doc.status, "approved");
@@ -605,7 +611,7 @@ test("save: baseMtime is required", async () => {
 test("approval does not survive a rewrite of the file behind the app's back", async () => {
   const s = sandbox();
   await withDocs(s, {}, async ({ get, post }) => {
-    assert.equal((await post("/docs/review", { path: "README.md", decision: "approve" })).status, 200);
+    assert.equal((await approve(get, post, "README.md")).status, 200);
     assert.equal((await (await get("/docs/doc", { path: "README.md" })).json()).status, "approved");
     fs.writeFileSync(path.join(s.cwd, "README.md"), "# an agent rewrote this after approval, with more text\n");
     const doc = await (await get("/docs/doc", { path: "README.md" })).json();
@@ -640,5 +646,74 @@ test("a tampered docs-meta.json cannot delete files, 500 the list, or smuggle a 
     assert.equal((await post("/docs/save", { path: "README.md", content: "# a\n", baseMtime: mtime })).status, 200);
   });
   assert.equal(fs.readFileSync(victim, "utf8"), "keep");
+  s.cleanup();
+});
+
+test("approve: baseMtime is required, and text that changed since it was opened is refused (409)", async () => {
+  const s = sandbox();
+  await withDocs(s, {}, async ({ get, post }) => {
+    assert.equal((await post("/docs/review", { path: "README.md", decision: "approve" })).status, 400);
+    const { mtime } = await (await get("/docs/doc", { path: "README.md" })).json();
+    fs.writeFileSync(path.join(s.cwd, "README.md"), "# rewritten while the reviewer read the old text\n");
+    fs.utimesSync(path.join(s.cwd, "README.md"), new Date(), new Date(Date.now() + 5000));
+    assert.equal((await post("/docs/review", { path: "README.md", decision: "approve", baseMtime: mtime })).status, 409);
+    assert.equal((await (await get("/docs/doc", { path: "README.md" })).json()).status, "draft");
+  });
+  s.cleanup();
+});
+
+test("snapshots: only the newest 20 are kept, and old ones are removed only after the new text is written", async () => {
+  const s = sandbox();
+  await withDocs(s, {}, async ({ get, post }) => {
+    for (let i = 0; i < 23; i += 1) {
+      const { mtime } = await (await get("/docs/doc", { path: "reports/q3.md" })).json();
+      assert.equal((await post("/docs/save", { path: "reports/q3.md", content: `# v${i}\n`, baseMtime: mtime })).status, 200);
+    }
+    const versions = await (await get("/docs/versions", { path: "reports/q3.md" })).json();
+    assert.equal(versions.versions.filter((v) => !v.current).length, 20);
+  });
+  const dir = path.join(s.projectsDir, "acme-web", "docs-history");
+  const files = fs.readdirSync(dir).flatMap((d) => fs.readdirSync(path.join(dir, d)));
+  assert.equal(files.length, 20); // the 3 oldest files are gone from disk, not just from the list
+  s.cleanup();
+});
+
+test("a tampered history entry cannot make the prune delete an arbitrary .txt file", async () => {
+  const s = sandbox();
+  const victim = path.join(s.homeDir, "victim.txt");
+  fs.writeFileSync(victim, "keep");
+  const history = Array.from({ length: 25 }, (_, i) => ({ id: i === 0 ? "../../../victim" : `v-${i}`, at: "x", by: "owner", size: 1 }));
+  fs.writeFileSync(path.join(s.projectsDir, "acme-web", "docs-meta.json"), JSON.stringify({ version: 1, docs: { "README.md": { history } } }));
+  await withDocs(s, {}, async ({ get, post }) => {
+    const { mtime } = await (await get("/docs/doc", { path: "README.md" })).json();
+    assert.equal((await post("/docs/save", { path: "README.md", content: "# a\n", baseMtime: mtime })).status, 200);
+  });
+  assert.equal(fs.readFileSync(victim, "utf8"), "keep");
+  s.cleanup();
+});
+
+test("an oversized request body is refused with 413 without being read to the end", async () => {
+  const s = sandbox();
+  await withDocs(s, {}, async ({ base }) => {
+    const res = await fetch(`${base}/docs/comment`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project: "acme-web", path: "README.md", text: "x".repeat(8 * 1024 * 1024) }),
+    });
+    assert.equal(res.status, 413);
+  });
+  s.cleanup();
+});
+
+test("createProject refuses a folder inside ~/.claude, but not a .claude folder deeper in a repo", () => {
+  const s = sandbox();
+  const claude = path.join(s.homeDir, ".claude");
+  const worktree = path.join(s.homeDir, "repo", ".claude", "worktrees", "wt");
+  fs.mkdirSync(claude, { recursive: true });
+  fs.mkdirSync(worktree, { recursive: true });
+  const templatesDir = path.join(s.root, "templates");
+  const make = (name, cwd) => createProject({ projectsDir: s.projectsDir, templatesDir, homeDir: s.homeDir, name, template: "coding", cwd });
+  assert.throws(() => make("Hidden", claude), (e) => e.code === "INVALID");
+  assert.equal(make("Nested", worktree).slug, "nested");
   s.cleanup();
 });
