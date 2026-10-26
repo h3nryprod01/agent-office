@@ -33,6 +33,10 @@ import { VieNeuTts, createTtsHttpHandler } from "./tts.js";
 import { createHarnessHttpHandler } from "./harness-probe.js";
 import { createStaticHttpHandler } from "./static-serve.js";
 import { createOriginGuard } from "./origin-guard.js";
+// lane L4: collision radar, time-to-intervene metrics, open-the-session actions
+import { attachRadar, createRadarHttpHandler } from "./radar.js";
+import { attachInterventionMetrics, createMetricsHttpHandler } from "./intervention-metrics.js";
+import { createSessionOpenHandler } from "./session-open.js";
 
 const PROJECTS_ROOT =
   process.env.CLAUDE_PROJECTS_ROOT ?? path.join(os.homedir(), ".claude", "projects");
@@ -93,6 +97,7 @@ async function main() {
   // exists once `server` is constructed — same lazy-reference trick as
   // approvalBroker's hasClients above (assigned before any request can land).
   let outputsHttp;
+  let radarHttp, metricsHttp, sessionOpenHttp; // lane L4: built once the broadcast server exists
   // Hiring Hall (wi-hiring-hall): company roster read from
   // ~/.claude/company/roster.yaml; file changes broadcast as the ADDITIVE
   // event type "roster_updated" (renderer diffs members → walk-in greeting).
@@ -131,6 +136,9 @@ async function main() {
       projectsHttp(req, res, url) ||
       harnessHttp(req, res, url) ||
       ttsHttp(req, res, url) ||
+      radarHttp(req, res, url) || // lane L4
+      metricsHttp(req, res, url) || // lane L4
+      sessionOpenHttp(req, res, url) || // lane L4
       staticHttp(req, res, url), // static-serve LAST: catch-all GET, must not shadow an API route
     // reject cross-origin requests before any route runs (CSRF: a remote page
     // must not trip /harnesses?probe= or POST /templates/apply). Same-origin app
@@ -159,6 +167,13 @@ async function main() {
     },
   });
   rosterWatcher.start();
+  // lane L4: attached BEFORE the notifier on purpose — radar alerts go straight to the
+  // base broadcast, so the notifier never reads one as "this agent is alive again".
+  const radar = attachRadar(server);
+  const interventionMetrics = attachInterventionMetrics(server);
+  radarHttp = createRadarHttpHandler(radar);
+  metricsHttp = createMetricsHttpHandler(interventionMetrics);
+  sessionOpenHttp = createSessionOpenHandler({ resolveCwd: (id) => radar.agentCwd(id) });
   attachNotifier(server); // macOS notification khi agent kẹt >30s (AGENT_OFFICE_NOTIFY=0 để tắt)
   // Two-way Telegram: a silent no-op unless TELEGRAM_BOT_TOKEN +
   // TELEGRAM_CHAT_ID are both set — see telegram.js's own config gate.
@@ -167,6 +182,7 @@ async function main() {
   console.log(`[daemon] PM chat endpoint: POST http://${WS_HOST}:${WS_PORT}/chat (repo: ${repoRoot})`);
   console.log(`[daemon] cost dashboard: GET http://${WS_HOST}:${WS_PORT}/costs?window=24h|7d|30d`);
   console.log(`[daemon] outputs (tủ hồ sơ): GET http://${WS_HOST}:${WS_PORT}/outputs, POST /open`);
+  console.log(`[daemon] collision radar: GET http://${WS_HOST}:${WS_PORT}/radar, /radar/touching?path=; metrics: GET /metrics/intervention`);
   console.log(`[daemon] hiring hall roster: GET http://${WS_HOST}:${WS_PORT}/roster (${rosterPath})`);
   console.log(
     `[daemon] company templates: GET http://${WS_HOST}:${WS_PORT}/templates, POST /templates/apply (${DEFAULT_TEMPLATES_DIR})`
@@ -374,6 +390,8 @@ async function main() {
     geminiTailer.stop();
     rosterWatcher.stop();
     endMonitor.stop();
+    radar.stop(); // lane L4
+    interventionMetrics.stop(); // lane L4: flush the queued episodes
     telegramPoll.stop(); // aborts the in-flight getUpdates long-poll (Telegram allows only 1 consumer)
     vieneuTts.dispose();
     chatManager.dispose(); // kill warm PM processes so they don't outlive the daemon

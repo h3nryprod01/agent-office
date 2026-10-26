@@ -3,6 +3,7 @@ import { statusLabel, type AgentModel, type OfficeState, type TimelineEntry } fr
 import { toBusiness } from "./activityLog";
 import { formatSince } from "../sim/selectors";
 import { workItemSectionHtml, type WorkItem, type WorkItemsFile } from "./workItems";
+import { openTerminalFor, sessionActionsHtml } from "./sessionActions"; // lane L4
 
 /** One transcript line from the daemon's GET /transcript endpoint. */
 export interface TranscriptLine {
@@ -86,6 +87,14 @@ export function mountSidePanel(
         .catch(() => {
           copyBtn.textContent = t("panel.copyManually");
         });
+      return;
+    }
+    // lane L4: "Open terminal here" — the daemon opens it at the cwd it saw for this agent
+    const termBtn = target.closest<HTMLElement>("[data-open-terminal]");
+    if (termBtn?.dataset.openTerminal) {
+      openTerminalFor(termBtn.dataset.openTerminal).then((ok) => {
+        termBtn.textContent = ok ? "✓" : t("session.terminalFailed");
+      });
       return;
     }
     const timelineToggle = target.closest<HTMLElement>("[data-toggle-timeline-ts]");
@@ -251,6 +260,7 @@ function panelHtml(
       <button data-close title="${t("panel.close")}">×</button>
     </header>
     ${rows}
+    ${sessionActionsHtml(a)}
     <h3>Work item</h3>
     ${workItemSection}
     <h3>${t("panel.recentActivity")}</h3>

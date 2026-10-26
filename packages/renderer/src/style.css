@@ -1954,3 +1954,107 @@ body[data-view="log"] .activity-log {
 }
 .set-lang:hover { border-color: #3d4b6e; }
 .set-lang.active { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+
+/* ── lane L4: collision radar rows, time-to-intervene card, session actions ── */
+
+.queue-panel li.radar {
+  border-left-color: #f59e0b;
+  background: rgba(120, 53, 15, 0.28);
+}
+
+/* the file name is the point of a radar row: let it wrap instead of ellipsizing */
+.queue-panel li.radar .what {
+  white-space: normal;
+}
+
+.queue-panel li.radar-soft {
+  border-left-color: #94a3b8;
+  background: rgba(51, 65, 85, 0.35);
+}
+
+.iv-panel {
+  position: fixed;
+  right: 12px;
+  top: 108px; /* clears the "Company in a box" button */
+  width: 250px;
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+/* the side panel owns the right edge; the card only belongs to the office view */
+body.side-panel-open .iv-panel,
+body:not([data-view="office"]) .iv-panel {
+  display: none;
+}
+
+.iv-panel h2 {
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: #e2e8f0;
+}
+
+.iv-panel h2 small {
+  font-weight: 400;
+  color: #94a3b8;
+  margin-left: 4px;
+}
+
+.iv-panel b {
+  color: #f8fafc;
+  font-variant-numeric: tabular-nums;
+}
+
+.iv-panel .iv-total {
+  margin-bottom: 6px;
+}
+
+.iv-panel .iv-kinds {
+  list-style: none;
+  border-top: 1px solid #1e293b;
+  padding-top: 6px;
+}
+
+.iv-panel .iv-kinds li {
+  margin: 3px 0;
+  color: #94a3b8;
+}
+
+.iv-panel .iv-kind {
+  display: block;
+  color: #cbd5e1;
+}
+
+.iv-panel .iv-empty {
+  color: #94a3b8;
+}
+
+.side-panel .session-actions .v {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.side-panel .session-actions button {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.side-panel .session-actions button:hover {
+  background: #334155;
+}
+
+.side-panel .session-link {
+  color: #93c5fd;
+  font-size: 12px;
+  align-self: center;
+}
