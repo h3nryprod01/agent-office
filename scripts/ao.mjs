@@ -3,7 +3,7 @@
 //   doctor [--port N] [--json] [--preflight]   is this machine ready, and how to fix what is not
 //   update [--dry-run]                          back up, pull, build, restart
 //   backup [--out DIR]                          archive ~/.agent-office
-//   restore <archive>                           put an archive back (the current data is moved aside)
+//   restore <archive> [--no-restart]            put an archive back (the current data is moved aside)
 //   lan on|off|status                           let other machines in, with a token
 //   token add|list|revoke                       who may connect, and as what
 // The shell wrappers (start.sh, start.ps1, install-ubuntu.sh) forward these verbs here.
@@ -32,7 +32,7 @@ const HELP = `Agent Office
   doctor [--port N] [--json] [--preflight]
   update [--dry-run]
   backup [--out DIR]          (default ${defaultBackupDir()})
-  restore <archive.tar.gz>
+  restore <archive.tar.gz> [--no-restart]
   lan on|off|status
   token add --label <name> --role owner|manager|viewer
   token list | token revoke <id|label>`;
@@ -78,7 +78,27 @@ async function main(argv) {
         const { aside, entries } = restoreBackup({ archive: path.resolve(archive), home });
         console.log(`Restored ${entries} entries into ${home}.`);
         if (aside) console.log(`Your previous data was kept at: ${aside}\nDelete it yourself once you are happy.`);
-        console.log("Restart the daemon to pick up the restored state (e.g. run the start script again).");
+        // the access list comes back with the data: say who is let in, don't let it be a surprise
+        const access = new AccessStore();
+        const people = access.list();
+        if (access.lanEnabled() || people.length) {
+          console.log(
+            `Restored access settings: LAN ${access.lanEnabled() ? "ON" : "off"}, ${people.length} token(s)` +
+              `${people.length ? ` (${people.map((t) => `${t.label}:${t.role}`).join(", ")})` : ""}. Check with: ao token list`,
+          );
+        }
+        if (flag(rest, "--no-restart")) {
+          console.log("Not restarting (--no-restart): restart the daemon to load the restored data.");
+        } else {
+          const { cmd, args } = restartCommand();
+          const r = defaultRun(cmd, args);
+          console.log(
+            r.status === 0
+              ? "Service restarted with the restored data."
+              : `Could not restart the service. Restart it yourself: ${[cmd, ...args].join(" ")}` +
+                  (process.platform === "win32" ? "\n(Windows: if restore failed on a locked file, stop the AgentOfficeDaemon task first.)" : ""),
+          );
+        }
         return 0;
       } catch (error) {
         console.error(`restore failed (nothing was changed): ${error.message}`);

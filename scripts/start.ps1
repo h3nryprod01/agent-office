@@ -42,6 +42,10 @@ if ($Command -in @("doctor", "update", "backup", "restore", "lan", "token")) {
     & node (Join-Path $Repo "scripts\ao.mjs") $Command @Rest
     exit $LASTEXITCODE
 }
+if ($Command -ne "start") {
+    Write-Error "unknown command '$Command' - use: doctor, update, backup, restore, lan, token (or no argument to start)"
+    exit 2
+}
 & node (Join-Path $Repo "scripts\ao.mjs") doctor --preflight
 if ($LASTEXITCODE -ne 0) { exit 1 }
 

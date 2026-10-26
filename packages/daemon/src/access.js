@@ -34,10 +34,12 @@ export const COOKIE_NAME = "ao_session";
 export const TOKEN_PARAM = "ao_token";
 const COOKIE_MAX_AGE_S = 30 * 24 * 3600;
 const ROLE_KEY = "aoRole";
+const TOKEN_ID_KEY = "aoTokenId";
+const WEBHOOK_MAX_BYTES = 64 * 1024;
 
 /** Routes that act on the HOST machine's desktop; remote managers do not get them. */
 const OWNER_ONLY_PATHS = new Set(["/open"]);
-/** Zalo's servers call this and cannot carry a token; zalo.js checks the sender itself. */
+/** Zalo's servers call this and cannot carry a token; zalo.js checks the sender itself. Only while Zalo is configured. */
 const PUBLIC_POST_PATHS = new Set(["/zalo/webhook"]);
 /** Headers a proxy or tunnel adds; their presence means the peer address is not the real client. */
 const PROXY_HEADERS = ["x-forwarded-for", "x-forwarded-host", "forwarded", "x-real-ip", "cf-connecting-ip"];
@@ -66,7 +68,7 @@ export function hashToken(token) {
 const HEX64 = /^[0-9a-f]{64}$/;
 
 function sanitize(raw) {
-  const out = { version: 1, lan: false, tokens: [] };
+  const out = { version: 1, lan: false, tokens: [], corrupt: false };
   if (!raw || typeof raw !== "object") return out;
   out.lan = raw.lan === true;
   if (!Array.isArray(raw.tokens)) return out;
@@ -106,13 +108,17 @@ export class AccessStore {
     try {
       data = sanitize(JSON.parse(fs.readFileSync(this.file, "utf8")));
     } catch {
-      data = sanitize(null); // unreadable → fail closed: nobody remote gets in
+      data = { ...sanitize(null), corrupt: true }; // unreadable → fail closed: nobody remote gets in
     }
     this.cache = { sig, data };
     return data;
   }
 
   #save(data) {
+    // never overwrite a file we could not read: that would silently drop every token in it
+    if (data.corrupt) throw new Error(`${this.file} is unreadable; fix or move it aside first`);
+    const { corrupt: _corrupt, ...clean } = data;
+    data = clean;
     const dir = path.dirname(this.file);
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     const tmp = `${this.file}.${process.pid}.tmp`;
@@ -166,6 +172,11 @@ export class AccessStore {
     if (keep.length === data.tokens.length) return false;
     this.#save({ ...data, tokens: keep });
     return true;
+  }
+
+  /** Is a token with this id still valid? (used to drop live sockets after a revoke) */
+  hasId(id) {
+    return this.#load().tokens.some((t) => t.id === id);
   }
 
   /** @returns {{id: string, label: string, role: string} | null} */
@@ -237,10 +248,17 @@ const DENIED_PAGE =
  * @param {{store: AccessStore, isLoopback?: (req) => boolean}} opts
  * @returns {{http: (req, res) => boolean, ws: (info) => boolean}}
  */
-export function createAccessGuard({ store, isLoopback = isLoopbackRequest }) {
+export function createAccessGuard({
+  store,
+  isLoopback = isLoopbackRequest,
+  // the webhook is only a public door while the Zalo bridge is actually configured
+  publicWebhookEnabled = () => Boolean(process.env.ZALO_OA_TOKEN && process.env.ZALO_ALLOWED_USER),
+}) {
   const resolve = (req) => {
     if (isLoopback(req)) return "owner";
-    return store.verify(extractToken(req))?.role ?? null;
+    const entry = store.verify(extractToken(req));
+    req[TOKEN_ID_KEY] = entry?.id;
+    return entry?.role ?? null;
   };
 
   const reject = (req, res, status, message) => {
@@ -262,6 +280,9 @@ export function createAccessGuard({ store, isLoopback = isLoopbackRequest }) {
     let parsed;
     try {
       parsed = new URL(String(req.url ?? "/"), "http://localhost");
+      // the router parses with the Host header as base and THROWS on a bad one; an
+      // unhandled throw there kills the whole daemon, so refuse such requests here
+      new URL(String(req.url ?? "/"), `http://${req.headers?.host ?? "localhost"}`);
     } catch {
       return reject(req, res, 400, "bad request");
     }
@@ -277,19 +298,36 @@ export function createAccessGuard({ store, isLoopback = isLoopbackRequest }) {
       // collapse leading slashes: "//host" would be a redirect off-site
       const location = `/${rawPath.replace(/^\/+/, "")}${rest ? `?${rest}` : ""}`;
       const secure = req.socket?.encrypted || req.headers?.["x-forwarded-proto"] === "https";
-      res.writeHead(302, {
-        location,
+      // 200 + client-side redirect, not a 302: a click that comes from another site
+      // (webmail, a chat web app) is cross-site, so a SameSite=Strict cookie is not sent
+      // on the redirected request. The page then navigates same-site and the cookie is.
+      const target = JSON.stringify(location).replace(/</g, "\\u003c");
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
         "set-cookie": `${COOKIE_NAME}=${linkToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${COOKIE_MAX_AGE_S}${secure ? "; Secure" : ""}`,
         "cache-control": "no-store",
+        "referrer-policy": "no-referrer",
       });
-      res.end();
+      res.end(
+        `<!doctype html><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>Agent Office</title>` +
+          `<noscript><meta http-equiv="refresh" content="0;url=${location.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}"></noscript>` +
+          `<script>location.replace(${target})</script><p>Signing you in…</p>`,
+      );
       return false;
     }
 
     const role = resolve(req);
     req[ROLE_KEY] = role;
     if (!role) {
-      if (method === "POST" && PUBLIC_POST_PATHS.has(rawPath)) return true;
+      if (method === "POST" && PUBLIC_POST_PATHS.has(rawPath) && publicWebhookEnabled()) {
+        // unauthenticated door: cap what it will buffer (zalo.js reads the whole body)
+        let seen = 0;
+        req.on("data", (chunk) => {
+          seen += chunk.length;
+          if (seen > WEBHOOK_MAX_BYTES) req.destroy();
+        });
+        return true;
+      }
       return reject(req, res, 401, "unauthorized: access token required");
     }
     if (role === "viewer") {
@@ -317,4 +355,24 @@ export function combineGuards(...guards) {
     http: (req, res) => guards.every((g) => g.http(req, res)),
     ws: (info) => guards.every((g) => g.ws(info)),
   };
+}
+
+/**
+ * Close live WebSockets whose token has been revoked. The upgrade is checked once, so
+ * without this a revoked viewer would keep receiving the stream until it disconnects.
+ * @returns {() => void} stop
+ */
+export function watchRevocations({ store, wss, intervalMs = 3000 }) {
+  const tokenIds = new WeakMap();
+  wss.on("connection", (socket, req) => {
+    if (req[TOKEN_ID_KEY]) tokenIds.set(socket, req[TOKEN_ID_KEY]);
+  });
+  const timer = setInterval(() => {
+    for (const socket of wss.clients) {
+      const id = tokenIds.get(socket);
+      if (id && !store.hasId(id)) socket.close(4401, "access revoked");
+    }
+  }, intervalMs);
+  timer.unref();
+  return () => clearInterval(timer);
 }

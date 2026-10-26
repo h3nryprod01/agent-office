@@ -81,6 +81,9 @@ jobs:
       # catch a planted leak. This fails the job if any rule has gone blind.
       - run: node scripts/check-leaks.mjs --self-test
       - run: node scripts/check-leaks.mjs
-      # Commit messages and added lines of the PR (the tree scan above only sees the end state)
+      # Every commit of the PR / push, one by one (the tree scan above only sees the end
+      # state, so a secret added in one commit and removed in the next would pass it)
       - if: github.event_name == 'pull_request'
-        run: node scripts/check-leaks.mjs --range "origin/${{ github.base_ref }}...HEAD"
+        run: node scripts/check-leaks.mjs --range "origin/${{ github.base_ref }}..HEAD"
+      - if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        run: node scripts/check-leaks.mjs --range "${{ github.event.before }}..${{ github.sha }}"

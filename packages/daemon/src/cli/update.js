@@ -60,6 +60,25 @@ export async function waitForDaemon(port, { timeoutMs = 20000, intervalMs = 400 
 class UpdateError extends Error {}
 
 /**
+ * Put a finished build into place. Built beside `dist` and swapped in only now, so a
+ * failed build never empties the folder the running daemon is serving.
+ */
+export function swapDist(rendererDir) {
+  const dist = path.join(rendererDir, "dist");
+  const next = path.join(rendererDir, "dist.next");
+  const old = path.join(rendererDir, "dist.old");
+  fs.rmSync(old, { recursive: true, force: true });
+  if (fs.existsSync(dist)) fs.renameSync(dist, old);
+  try {
+    fs.renameSync(next, dist);
+  } catch (error) {
+    if (fs.existsSync(old)) fs.renameSync(old, dist);
+    throw error;
+  }
+  fs.rmSync(old, { recursive: true, force: true });
+}
+
+/**
  * @returns {Promise<{status: "updated" | "up-to-date" | "dry-run", from?: string, to?: string}>}
  */
 export async function runUpdate({
@@ -72,6 +91,8 @@ export async function runUpdate({
   run = defaultRun,
   backup = createBackup,
   health = waitForDaemon,
+  swap = swapDist,
+  cleanup = (dir) => fs.rmSync(path.join(dir, "dist.next"), { recursive: true, force: true }),
   homeExists = (p) => fs.existsSync(p),
   log = console.log,
 }) {
@@ -88,7 +109,7 @@ export async function runUpdate({
       "git pull --ff-only",
       `npm ci   (in ${daemonDir})`,
       `npm ci   (in ${rendererDir})`,
-      `npm run build   (in ${rendererDir})`,
+      `npm run build   (in ${rendererDir}; built beside dist/ and swapped in only if it succeeds)`,
       restartLine,
       `wait for http://127.0.0.1:${port} to answer`,
     ].forEach((step, i) => log(`  ${i + 1}. ${step}`));
@@ -123,17 +144,38 @@ export async function runUpdate({
   }
   log(`Updated ${from.slice(0, 7)} -> ${to.slice(0, 7)}`);
 
-  const rollback =
-    `\nThe running daemon was NOT restarted. To go back:\n  git checkout ${from}\n  (then run the start script again)\n` +
-    "Your data is in the backup listed above.";
+  // The tree was verified clean, so resetting to `from` loses nothing. The daemon was
+  // not restarted, but `npm ci` empties node_modules before installing: leaving a
+  // half-install behind would kill the next restart (crash, reboot, KeepAlive).
+  const restorePrevious = (why) => {
+    cleanup(rendererDir);
+    const steps = [
+      ["git", ["reset", "--hard", from], repo],
+      ["npm", ["ci"], daemonDir],
+      ["npm", ["ci"], rendererDir],
+    ];
+    const failed = steps.find(([cmd, args, cwd]) => run(cmd, args, { cwd }).status !== 0);
+    if (!failed) return `${why}\nThe previous version (${from.slice(0, 7)}) has been restored and the running daemon was not touched.`;
+    return (
+      `${why}\nRestoring the previous version failed too. By hand, in ${repo}:\n` +
+      `  git reset --hard ${from}\n  npm ci --prefix packages/daemon\n  npm ci --prefix packages/renderer\n  node scripts/ao.mjs doctor\n` +
+      "Your data is in the backup listed above."
+    );
+  };
   for (const [dir, label] of [[daemonDir, "daemon"], [rendererDir, "renderer"]]) {
     log(`Installing ${label} dependencies...`);
     const r = run("npm", ["ci"], { cwd: dir });
-    if (r.status !== 0) throw new UpdateError(`npm ci failed in packages/${label}.\n${r.stderr.trim().slice(-600)}${rollback}`);
+    if (r.status !== 0) throw new UpdateError(restorePrevious(`npm ci failed in packages/${label}.\n${r.stderr.trim().slice(-600)}`));
   }
   log("Building the renderer...");
-  const build = run("npm", ["run", "build"], { cwd: rendererDir });
-  if (build.status !== 0) throw new UpdateError(`renderer build failed.\n${build.stderr.trim().slice(-600)}${rollback}`);
+  cleanup(rendererDir);
+  const build = run("npm", ["run", "build", "--", "--outDir", "dist.next"], { cwd: rendererDir });
+  if (build.status !== 0) throw new UpdateError(restorePrevious(`renderer build failed.\n${build.stderr.trim().slice(-600)}`));
+  try {
+    swap(rendererDir);
+  } catch (error) {
+    throw new UpdateError(restorePrevious(`could not put the new build in place (${error.message}).`));
+  }
 
   log("Restarting the service...");
   const restarted = run(restart.cmd, restart.args);

@@ -34,7 +34,7 @@ import { createHarnessHttpHandler } from "./harness-probe.js";
 import { createStaticHttpHandler } from "./static-serve.js";
 import { createOriginGuard } from "./origin-guard.js";
 // lane L1: LAN access control (token auth for non-loopback requests)
-import { AccessStore, createAccessGuard, combineGuards, resolveBindHost } from "./access.js";
+import { AccessStore, createAccessGuard, combineGuards, resolveBindHost, watchRevocations } from "./access.js";
 
 const PROJECTS_ROOT =
   process.env.CLAUDE_PROJECTS_ROOT ?? path.join(os.homedir(), ".claude", "projects");
@@ -373,6 +373,9 @@ async function main() {
   });
 
   geminiTailer.start();
+
+  // lane L1: a revoked token also closes the sockets it already opened
+  watchRevocations({ store: accessStore, wss: server.wss });
 
   const shutdown = async () => {
     console.log("\n[daemon] shutting down");

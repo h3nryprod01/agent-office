@@ -89,6 +89,8 @@ test("restore refuses path traversal, absolute paths, symlinks and multi-root ar
     absolute: [{ name: "/tmp/evil.txt", data: "x" }],
     symlink: [{ name: ".agent-office/", type: "5" }, { name: ".agent-office/link", type: "2", linkname: "/etc" }],
     hardlink: [{ name: ".agent-office/", type: "5" }, { name: ".agent-office/h", type: "1", linkname: "/etc/passwd" }],
+    fifo: [{ name: ".agent-office/", type: "5" }, { name: ".agent-office/access.json", type: "6" }],
+    "char device": [{ name: ".agent-office/", type: "5" }, { name: ".agent-office/dev", type: "3" }],
     "two roots": [{ name: ".agent-office/a", data: "1" }, { name: "other/b", data: "2" }],
     empty: [],
   };

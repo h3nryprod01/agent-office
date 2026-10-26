@@ -58,11 +58,13 @@ function entropy(s) {
 const RULES = [
   {
     name: "home-path",
-    re: /(?:\/(?:Users|home)\/|[A-Za-z]:\\{1,2}Users\\{1,2})([A-Za-z0-9][A-Za-z0-9._-]*)/g,
+    re: /(?:\/(?:Users|home)\/|[A-Za-z]:\\{1,2}Users\\{1,2})([A-Za-z0-9][A-Za-z0-9._-]*)/gi,
     // 1-2 character names (`/Users/u`, `C:\\Users\\k`) are the fixtures' stand-ins, not accounts
     accept: (m) => m[1].length > 2 && !PLACEHOLDER_USERS.has(m[1].toLowerCase()),
   },
   { name: "private-ip", re: PRIVATE_IP },
+  // IPv6 unique-local (fd00::/8) and link-local (fe80::/10) addresses
+  { name: "private-ipv6", re: /(?<![0-9a-f:])(?:fe80|fd[0-9a-f]{2}):[0-9a-f:]{2,}/gi },
   {
     name: "hostname-local",
     re: /(?<![\w.-])(?:[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+\.local|[A-Za-z0-9-]+\.[A-Za-z0-9-]+\.ts\.net)(?![\w-]|\.\w)/g,
@@ -93,14 +95,10 @@ const RULES = [
 
 // ---------------------------------------------------------------------------
 
-function redactLine(line, start, end, rule) {
-  const out = `${line.slice(0, start)}[REDACTED:${rule}]${line.slice(end)}`.trim();
-  return out.length > 160 ? `${out.slice(0, 157)}...` : out;
-}
-
 /**
- * Scan text. Returns findings with 1-based line numbers; `excerpt` has the match
- * replaced so the output of this tool can be pasted into a public CI log.
+ * Scan text. Returns findings with 1-based line numbers. The offending line is
+ * deliberately NOT echoed: a line can hold a secret next to the thing that matched,
+ * and this tool's output goes to public CI logs. Open file:line to see it.
  * @param {string} text
  * @param {string} file label only
  * @param {{re: RegExp, label: string}[]} [denylist]
@@ -119,7 +117,6 @@ export function scanText(text, file, denylist = []) {
           line: i + 1,
           col: m.index + 1,
           rule: rule.name,
-          excerpt: redactLine(line, m.index, m.index + m[0].length, rule.name),
         });
       }
     }
@@ -131,7 +128,7 @@ export function scanText(text, file, denylist = []) {
         line: i + 1,
         col: m.index + 1,
         rule: "denylist",
-        excerpt: `(matches ${entry.label} in your local denylist)`,
+        detail: `(matches ${entry.label} of your local denylist)`,
       });
     }
   });
@@ -202,10 +199,16 @@ function listFiles(root) {
   return out;
 }
 
+/** A path can leak too (a client's name as a folder). Reported without echoing the path. */
+function scanName(name, denylist) {
+  return scanText(name, "(a file name)", denylist).map((f) => ({ ...f, line: 0, detail: f.detail ?? "(in the path itself)" }));
+}
+
 /** Whole-tree scan: tracked + untracked-not-ignored files (or a plain walk outside git). */
 export function scanTree(root, denylist = []) {
   const findings = [];
   for (const rel of listFiles(root)) {
+    findings.push(...scanName(rel, denylist));
     const text = readScannable(path.join(root, rel));
     if (text === null) continue;
     findings.push(...scanText(text, rel, denylist));
@@ -213,33 +216,32 @@ export function scanTree(root, denylist = []) {
   return findings;
 }
 
-/** Added lines of `git diff <range>` plus every commit message in the range. */
-export function scanRange(root, range, denylist = []) {
-  const findings = [];
-  const diff = git(root, ["diff", "--unified=0", "--no-color", "--no-renames", range]);
-  if (diff.status !== 0) throw new Error(`git diff ${range} failed: ${diff.stderr.trim()}`);
-  // Walk the diff by hunk line counts, not by prefix: an ADDED line "++ b/x" shows up
-  // as "+++ b/x" and must not be mistaken for a file header (that would let a
-  // commit hide what follows it).
+/**
+ * Walk a unified diff by hunk line counts, not by prefix: an ADDED line "++ b/x" shows
+ * up as "+++ b/x" and must not be mistaken for a file header (that would let a commit
+ * hide what follows it).
+ */
+function scanDiff(text, denylist, out, names) {
   let file = "(unparsed path)";
   let lineNo = 0;
   let oldLeft = 0;
   let newLeft = 0;
-  for (const raw of diff.stdout.split("\n")) {
+  for (const raw of text.split("\n")) {
     if (oldLeft > 0 || newLeft > 0) {
       if (raw.startsWith("+")) {
         newLeft -= 1;
         lineNo += 1;
-        for (const f of scanText(raw.slice(1), file, denylist)) findings.push({ ...f, line: lineNo });
+        for (const f of scanText(raw.slice(1), file, denylist)) out.push({ ...f, line: lineNo });
       } else if (raw.startsWith("-")) {
         oldLeft -= 1;
       } else if (raw.startsWith(" ")) {
         oldLeft -= 1;
         newLeft -= 1;
         lineNo += 1;
-      } // "\ No newline at end of file" consumes nothing
+      } // "\\ No newline at end of file" consumes nothing
     } else if (raw.startsWith("+++ ")) {
       file = raw.startsWith("+++ b/") ? raw.slice(6) : "(unparsed path)";
+      if (names && file !== "(unparsed path)") out.push(...scanName(file, denylist));
     } else if (raw.startsWith("@@")) {
       const m = /^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(raw);
       if (!m) continue;
@@ -248,12 +250,30 @@ export function scanRange(root, range, denylist = []) {
       lineNo = Number(m[2]) - 1;
     }
   }
-  const log = git(root, ["log", "--format=%h%x1f%B%x1e", range]);
-  if (log.status !== 0) throw new Error(`git log ${range} failed: ${log.stderr.trim()}`);
-  for (const record of log.stdout.split("\x1e")) {
-    const [sha, ...body] = record.replace(/^\n/, "").split("\x1f");
-    if (!sha) continue;
-    findings.push(...scanText(body.join("\x1f"), `commit message ${sha.trim()}`, denylist));
+}
+
+/**
+ * Every commit in `range` (A..B), one at a time: scanning only the end-to-end diff
+ * would miss a secret that one commit adds and the next removes, yet both are pushed
+ * and public. Per commit: added lines, file names, author/committer, message.
+ * Diff flags make sure .gitattributes or a user's diff driver cannot blind the scan.
+ */
+export function scanRange(root, range, denylist = []) {
+  const findings = [];
+  const revs = git(root, ["rev-list", "--reverse", range]);
+  if (revs.status !== 0) throw new Error(`git rev-list ${range} failed: ${revs.stderr.trim()}`);
+  for (const sha of revs.stdout.split("\n").filter(Boolean)) {
+    const short = sha.slice(0, 7);
+    const meta = git(root, ["log", "-1", "--format=%an <%ae>%n%cn <%ce>%n%B", sha]);
+    if (meta.status === 0) findings.push(...scanText(meta.stdout, `commit message ${short}`, denylist));
+    const diff = git(root, [
+      "diff-tree", "-p", "-r", "-m", "--root", "--unified=0", "--no-color", "--no-renames",
+      "--text", "--no-ext-diff", "--no-textconv", sha,
+    ]);
+    if (diff.status !== 0) throw new Error(`git diff-tree ${short} failed: ${diff.stderr.trim()}`);
+    const added = [];
+    scanDiff(diff.stdout, denylist, added, true);
+    findings.push(...added.map((f) => ({ ...f, detail: f.detail ?? `(commit ${short})` })));
   }
   return findings;
 }
@@ -263,6 +283,7 @@ const j = (...p) => p.join("");
 export const SELF_TEST_SAMPLES = {
   "home-path": ["/", "Users/", "someperson/code"].join(""),
   "private-ip": j("192", ".168", ".1", ".20"),
+  "private-ipv6": j("fd", "12:3456:789a::1"),
   "hostname-local": j("someones-macbook", ".local"),
   "token-anthropic": j("sk-ant-", "api03-", "A1b2C3d4E5f6G7h8I9j0K1l2M3"),
   "token-openai": j("sk-", "proj-", "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7"),
@@ -343,7 +364,7 @@ function main() {
     return 0;
   }
   for (const f of findings) {
-    console.log(`${f.file}:${f.line}:${f.col}  ${f.rule}  ${f.excerpt}`);
+    console.log(`${f.file}:${f.line}:${f.col}  ${f.rule}${f.detail ? `  ${f.detail}` : ""}`);
   }
   console.log(`\ncheck-leaks: ${findings.length} finding(s) in ${scope}. Fix them, or mark a documented fixture line with "leak-ok: <reason>".`);
   return 1;

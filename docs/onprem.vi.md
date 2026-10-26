@@ -103,9 +103,11 @@ node scripts/ao.mjs update
 ```
 
 Nếu bạn đã sửa file trong thư mục cài, nó từ chối chạy (không kéo đè lên thay đổi của
-bạn) và chỉ cách cất chúng đi. Nó sao lưu dữ liệu trước. Nếu build hỏng sau khi kéo mã
-mới, nó **không** khởi động lại dịch vụ lên một bản build hỏng; thông báo lỗi có sẵn
-lệnh `git checkout <commit-trước-đó>` để quay lại.
+bạn) và chỉ cách cất chúng đi. Nó sao lưu dữ liệu trước, và build bản mới *bên cạnh* bản
+cũ, chỉ thay vào khi build thành công. Nếu cài thư viện hoặc build hỏng sau khi kéo mã
+mới, nó tự đưa bản trước đó trở lại (`git reset --hard` về đúng commit ban đầu, cài lại
+thư viện) và **không** khởi động lại dịch vụ lên bản hỏng; nếu ngay cả bước đó cũng hỏng,
+thông báo lỗi liệt kê đúng các lệnh để chạy tay.
 
 ### Log và tên dịch vụ
 
@@ -168,7 +170,7 @@ mà không ảnh hưởng người khác:
 
 ```bash
 node scripts/ao.mjs token list
-node scripts/ao.mjs token revoke Mai        # có hiệu lực ngay, không cần khởi động lại
+node scripts/ao.mjs token revoke Mai        # không cần khởi động lại; kết nối đang mở bị đóng sau vài giây
 ```
 
 ### Tắt lại
@@ -200,8 +202,11 @@ những người đó vào lại.
 được mạng đó đều chép được. Chấp nhận được với mạng gia đình/văn phòng bạn tin cậy,
 **không** chấp nhận được với Wi-Fi công cộng hay bất cứ thứ gì đi qua internet. Với mọi
 thứ ngoài LAN tin cậy, hãy đặt sau VPN như Tailscale, hoặc reverse proxy HTTPS mà bạn
-cấu hình để thêm `X-Forwarded-For` (để yêu cầu bị coi là từ xa và cần token). Đừng mở
-cổng trên router ra internet.
+cấu hình để gửi `X-Forwarded-For` (để yêu cầu bị coi là từ xa và cần token) và giữ nguyên
+header `Host` gốc (nginx: `proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr;`).
+Thiếu cái đầu, mọi yêu cầu qua proxy trông như nội bộ và được coi là owner; thiếu cái sau,
+kiểm tra cross-origin sẽ từ chối chính các yêu cầu của ứng dụng. Đừng mở cổng trên router
+ra internet.
 
 Hãy coi daemon như một cái shell trên máy đó: owner hoặc manager trả lời được các yêu
 cầu phê duyệt của agent đang chạy ở đấy. Đừng bật chế độ LAN trên máy dùng chung nhiều
@@ -225,8 +230,9 @@ node scripts/ao.mjs backup                       # vào ~/agent-office-backups/
 node scripts/ao.mjs backup --out /đường/dẫn/thư-mục
 ```
 
-Lệnh tạo `agent-office-backup-<ngày>-<giờ>.tar.gz` chứa toàn bộ thư mục dữ liệu (dự án,
-đầu việc, `access.json` cùng bản băm token). File chỉ mình bạn đọc được; hãy giữ kín.
+Lệnh tạo `agent-office-backup-<ngày>-<giờ>.tar.gz` chứa toàn bộ thư mục dữ liệu
+(`~/.agent-office`: dự án và đầu việc của chúng, `access.json` cùng bản băm token).
+Danh sách nhân sự công ty ở `~/.claude/company` nằm ngoài thư mục này nên không có trong đó. File chỉ mình bạn đọc được; hãy giữ kín.
 `update` tự sao lưu một bản trước khi đổi bất cứ gì.
 
 Khôi phục:
@@ -238,7 +244,10 @@ node scripts/ao.mjs restore ~/agent-office-backups/agent-office-backup-<ngày>-<
 Khôi phục kiểm tra file trước và từ chối mọi thứ không an toàn (đường dẫn trèo ra ngoài
 thư mục, liên kết, nhiều hơn một thư mục gốc). Nó **không bao giờ xoá** dữ liệu hiện
 tại: dữ liệu đó được chuyển sang `…/.agent-office.pre-restore-<ngày>-<giờ>` ngay cạnh,
-nên luôn quay lại được. Sau đó khởi động lại daemon (chạy lại script khởi động).
+nên luôn quay lại được. Sau đó dịch vụ được khởi động lại để nạp dữ liệu vừa khôi phục
+(`--no-restart` để bỏ qua; trên Windows, nếu khôi phục lỗi vì file bị khoá thì dừng task
+`AgentOfficeDaemon` trước). `access.json` cũng được khôi phục theo, nên lệnh in ra ai đang
+có quyền; hãy kiểm tra nếu file sao lưu đến từ người khác.
 
 ## 6. Gỡ cài đặt
 
@@ -295,7 +304,10 @@ Chạy `doctor` trước. Nó bao quát phần lớn bảng này.
   `backup`/`restore`, `update` trên một bản clone tạm, và luồng token LAN với yêu cầu
   thật từ địa chỉ không phải loopback.
 * **Windows**: daemon và Scheduled Task đã được kiểm chứng trên máy ảo Windows 11 (xem
-  [windows-port.md](windows-port.md)). `start.ps1` và các lệnh mới đã parse không lỗi và
+  [windows-port.md](windows-port.md)). Một điều cần xác nhận trên máy thật: task chạy
+  `cmd.exe /c node …`, và `lan on|off` / `update` khởi động lại nó bằng
+  `Stop-ScheduledTask`; hãy kiểm tra bằng `Get-Process node` trước và sau để chắc
+  `node.exe` cũ thật sự bị tắt (nếu không, bản mới không chiếm được cổng). `start.ps1` và các lệnh mới đã parse không lỗi và
   chạy thử (dry-run) dưới PowerShell 7 trên macOS. **Chưa chạy trên máy Windows thật**:
   `start.ps1` đăng ký và khởi động task từ đầu đến cuối, `update` khởi động lại qua
   Scheduled Task, `backup`/`restore` với `tar.exe` có sẵn của Windows, hộp thoại tường

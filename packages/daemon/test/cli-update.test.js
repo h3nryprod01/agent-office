@@ -19,10 +19,12 @@ function harness({ platform = "linux", dirty = false, head = ["aaa111", "bbb222"
   };
   const logs = [];
   const backups = [];
+  const swaps = [];
   return {
     calls,
     logs,
     backups,
+    swaps,
     opts: {
       repo: "/repo",
       home: "/home/x/.agent-office",
@@ -32,6 +34,8 @@ function harness({ platform = "linux", dirty = false, head = ["aaa111", "bbb222"
       run,
       backup: (a) => (backups.push(a), { archive: "/b/x.tar.gz" }),
       health: async () => healthy,
+      swap: (dir) => swaps.push(dir),
+      cleanup: () => {},
       log: (m) => logs.push(m),
       homeExists: () => true,
     },
@@ -53,7 +57,7 @@ test("happy path: clean tree → backup → pull → npm ci x2 → build → res
       "git rev-parse HEAD",
       "npm ci",
       "npm ci",
-      "npm run build",
+      "npm run build -- --outDir dist.next",
       "systemctl --user restart agent-office-daemon",
     ],
   );
@@ -84,15 +88,40 @@ test("a failed pull stops cold and says nothing was changed", async () => {
   assert.ok(!h.calls.some((c) => c.line.startsWith("npm")));
 });
 
-test("build failure after the pull → no restart, and the error carries the exact rollback commands", async () => {
+test("build failure after the pull → previous version restored automatically, no swap, no restart", async () => {
   const h = harness({ failOn: "run build" });
   await assert.rejects(runUpdate(h.opts), (error) => {
     assert.match(error.message, /build failed/i);
-    assert.match(error.message, /git checkout aaa111/);
-    assert.match(error.message, /backup/i);
+    assert.match(error.message, /restored/i);
     return true;
   });
-  assert.ok(!h.calls.some((c) => c.line.includes("systemctl")), "never restart onto a broken build");
+  const lines = h.calls.map((c) => c.line);
+  assert.ok(lines.includes("git reset --hard aaa111"), "back to the commit it started from (on the same branch, no detached HEAD)");
+  assert.equal(lines.filter((l) => l === "npm ci").length, 4, "node_modules reinstalled for the old version too");
+  assert.deepEqual(h.swaps, [], "the served dist/ was never replaced");
+  assert.ok(!lines.some((l) => l.includes("systemctl")), "never restart onto a broken build");
+});
+
+test("npm ci failing halfway also restores (npm ci empties node_modules first)", async () => {
+  const h = harness();
+  let ciCalls = 0;
+  const run = h.opts.run;
+  h.opts.run = (cmd, args, o) => (cmd === "npm" && args[0] === "ci" && ++ciCalls === 2 ? { status: 1, stdout: "", stderr: "ENOSPC" } : run(cmd, args, o));
+  await assert.rejects(runUpdate(h.opts), /npm ci failed in packages\/renderer[\s\S]*restored/i);
+  assert.ok(h.calls.some((c) => c.line === "git reset --hard aaa111"));
+});
+
+test("if even the restore fails, the error spells out the manual steps", async () => {
+  const h = harness();
+  const run = h.opts.run;
+  h.opts.run = (cmd, args, o) => (args[0] === "run" ? { status: 1, stdout: "", stderr: "x" } : args[0] === "reset" ? { status: 1, stdout: "", stderr: "x" } : run(cmd, args, o));
+  await assert.rejects(runUpdate(h.opts), /git reset --hard aaa111[\s\S]*npm ci --prefix packages\/daemon/);
+});
+
+test("the new build is swapped in only after it succeeded, right before the restart", async () => {
+  const h = harness();
+  await runUpdate(h.opts);
+  assert.deepEqual(h.swaps, ["/repo/packages/renderer"]);
 });
 
 test("restart commands per platform", () => {
@@ -130,4 +159,21 @@ test("Windows: restart goes through the Scheduled Task", async () => {
   const h = harness({ platform: "win32" });
   await runUpdate(h.opts);
   assert.ok(h.calls.some((c) => c.line.startsWith("powershell") && c.line.includes("Start-ScheduledTask")));
+});
+
+test("swapDist: dist.next replaces dist atomically; a missing dist.next leaves dist untouched", async () => {
+  const fs = await import("node:fs");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const { swapDist } = await import("../src/cli/update.js");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ao-swap-"));
+  fs.mkdirSync(path.join(dir, "dist"));
+  fs.writeFileSync(path.join(dir, "dist", "index.html"), "old");
+  assert.throws(() => swapDist(dir));
+  assert.equal(fs.readFileSync(path.join(dir, "dist", "index.html"), "utf8"), "old");
+  fs.mkdirSync(path.join(dir, "dist.next"));
+  fs.writeFileSync(path.join(dir, "dist.next", "index.html"), "new");
+  swapDist(dir);
+  assert.equal(fs.readFileSync(path.join(dir, "dist", "index.html"), "utf8"), "new");
+  assert.deepEqual(fs.readdirSync(dir).sort(), ["dist"]);
 });

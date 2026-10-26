@@ -105,9 +105,12 @@ node scripts/ao.mjs update
 ```
 
 It refuses to run if you have edited files in the checkout (it will not pull over
-your changes) and tells you how to set them aside. It backs up your data first.
-If the build fails after the pull, it does **not** restart the service onto a broken
-build; the error contains the exact `git checkout <previous-commit>` to go back.
+your changes) and tells you how to set them aside. It backs up your data first, and
+builds the new app beside the old one, swapping it in only if the build succeeded.
+If installing or building fails after the pull, it puts the previous version back
+(`git reset --hard` to where it started, dependencies reinstalled) and does **not**
+restart the service onto a broken build; if even that fails, the error lists the
+exact commands to run by hand.
 
 ### Logs and service names
 
@@ -170,7 +173,7 @@ off without affecting the others:
 
 ```bash
 node scripts/ao.mjs token list
-node scripts/ao.mjs token revoke Mai        # takes effect immediately, no restart
+node scripts/ao.mjs token revoke Mai        # no restart needed; live connections are closed within a few seconds
 ```
 
 ### Switch it off again
@@ -202,8 +205,12 @@ This is plain HTTP. On the LAN a token travels in clear text, so anyone who can 
 that network can copy it. That is acceptable on a home or office network you trust
 and **not** acceptable on public Wi-Fi or anything routed over the internet. For
 anything beyond a trusted LAN, put it behind a VPN such as Tailscale, or an HTTPS
-reverse proxy that you configure to add `X-Forwarded-For` (so requests are treated
-as remote and need tokens). Do not forward the port from your router to the internet.
+reverse proxy that you configure to send `X-Forwarded-For` (so requests are treated
+as remote and need tokens) and to keep the original `Host` header (nginx:
+`proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr;`).
+Without the first, every proxied request looks local and is treated as the owner;
+without the second, the cross-origin check refuses the app's own requests. Do not
+forward the port from your router to the internet.
 
 Treat the daemon like a shell on that machine: an owner or manager can answer
 permission prompts for agents running there. Do not use LAN mode on a shared,
@@ -229,7 +236,8 @@ node scripts/ao.mjs backup --out /path/to/folder
 ```
 
 This writes `agent-office-backup-<date>-<time>.tar.gz` containing your whole data
-folder (projects, work items, `access.json` with its token hashes). It is created
+folder (`~/.agent-office`: projects and their work items, `access.json` with its token
+hashes). The company roster in `~/.claude/company` lives outside it and is not included. It is created
 readable by you only; keep it private. `update` makes one automatically before it
 changes anything.
 
@@ -242,7 +250,10 @@ node scripts/ao.mjs restore ~/agent-office-backups/agent-office-backup-<date>-<t
 Restore checks the archive first and refuses anything unsafe (paths that climb out of
 the folder, links, more than one top-level folder). It **never deletes** your current
 data: that is moved to `…/.agent-office.pre-restore-<date>-<time>` next to it, so you
-can always go back. Restart the daemon afterwards (run the start script again).
+can always go back. The service is then restarted so it loads the restored data
+(`--no-restart` skips that; on Windows, stop the `AgentOfficeDaemon` task first if the
+restore fails on a locked file). The restored `access.json` comes back too, so the
+command prints who has access; check it if the archive came from someone else.
 
 ## 6. Uninstall
 
@@ -299,7 +310,10 @@ Run `doctor` first. It covers most of this table.
   `backup`/`restore`, `update` against a throwaway clone, and the LAN token flow
   with real requests from a non-loopback address.
 * **Windows**: the daemon and its Scheduled Task were verified on a Windows 11 VM
-  (see [windows-port.md](windows-port.md)). `start.ps1` and the new verbs parse with
+  (see [windows-port.md](windows-port.md)). One thing to check on a real machine:
+  the task runs `cmd.exe /c node …`, and `lan on|off` / `update` restart it with
+  `Stop-ScheduledTask`; confirm that really ends the old `node.exe` (otherwise the new
+  one cannot take the port) with `Get-Process node` before and after. `start.ps1` and the new verbs parse with
   zero errors and were dry-run under PowerShell 7 on macOS. **Not yet run on a real
   Windows machine**: `start.ps1` registering and starting the task end to end, the
   `update` restart through the Scheduled Task, `backup`/`restore` with Windows'

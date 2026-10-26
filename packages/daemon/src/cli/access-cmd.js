@@ -63,7 +63,7 @@ export function runAccessCommand(argv, ctx) {
   if (group === "lan") {
     if (action === "status") {
       const tokens = store.list();
-      log(`LAN access: ${store.lanEnabled() ? "ON (bind 0.0.0.0, token required for other machines)" : "off (this machine only)"}`);
+      log(`LAN access (as configured in access.json; the daemon applies it at its next start): ${store.lanEnabled() ? "ON (bind 0.0.0.0, token required for other machines)" : "off (this machine only)"}`);
       log(`Tokens: ${tokens.length}${tokens.length ? ` (${tokens.map((t) => `${t.label}:${t.role}`).join(", ")})` : ""}`);
       return 0;
     }

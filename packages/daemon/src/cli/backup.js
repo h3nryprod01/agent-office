@@ -68,7 +68,8 @@ export function validateArchiveListing({ names, verbose }) {
   const entries = names.filter((n) => n !== "");
   if (entries.length === 0) throw new Error("archive is empty");
   for (const line of verbose) {
-    if (/^[lh]/.test(line)) throw unsafe("contains a link");
+    // only plain files and directories: a link, FIFO or device file has no business in a data folder
+    if (!/^[-d]/.test(line)) throw unsafe("contains a link or special file");
   }
   let root = null;
   for (const raw of entries) {

@@ -27,7 +27,7 @@ it — trusted networks only, or a VPN / HTTPS proxy in front.
 | HTTP + WebSocket (`:8787`) | Loopback bind by default; origin check always (a foreign web page is refused). In LAN mode: token required for every non-loopback request, roles `owner` / `manager` / `viewer`. |
 | `POST /approval-response` | Loopback or a `manager`/`owner` token. Whoever can call it can approve any pending agent action. |
 | `POST /open`, `GET /outputs` | `/open` is owner-only; both use whitelisted roots resolved with `realpath` so symlinks cannot escape. |
-| `POST /zalo/webhook` | Reachable without a token because Zalo's servers cannot send one; ignores every sender that is not `ZALO_ALLOWED_USER` and is disabled unless the Zalo env vars are set. |
+| `POST /zalo/webhook` | Reachable without a token **only while the Zalo env vars are set** (Zalo's servers cannot send one); body capped at 64 KB. It ignores every sender that is not `ZALO_ALLOWED_USER`, but the sender id comes from an unsigned body, so treat anyone who learns that id as able to prompt the PM. Request signature verification is not implemented. |
 | Telegram bridge | Ignores every update whose chat id is not `TELEGRAM_CHAT_ID`. |
 
 Known limits: a malicious web page can still try DNS rebinding against the loopback

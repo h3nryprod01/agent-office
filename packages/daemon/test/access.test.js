@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import net from "node:net";
 import WebSocket from "ws";
 import {
   ROLES,
@@ -19,6 +20,7 @@ import {
   combineGuards,
   resolveBindHost,
   isLoopbackRequest,
+  watchRevocations,
 } from "../src/access.js";
 import { createOriginGuard } from "../src/origin-guard.js";
 import { EventBroadcastServer } from "../src/ws-server.js";
@@ -29,7 +31,19 @@ function tmpFile() {
 }
 
 function fakeReq({ method = "GET", url = "/", headers = {}, remote = "192.0.2.50" } = {}) {
-  return { method, url, headers: { host: "192.0.2.10:8787", ...headers }, socket: { remoteAddress: remote } };
+  const listeners = {};
+  return {
+    method,
+    url,
+    headers: { host: "192.0.2.10:8787", ...headers },
+    socket: { remoteAddress: remote },
+    on: (event, fn) => (listeners[event] = fn),
+    emitData: (chunk) => listeners.data?.(chunk),
+    destroyed: false,
+    destroy() {
+      this.destroyed = true;
+    },
+  };
 }
 
 function fakeRes() {
@@ -48,11 +62,11 @@ function fakeRes() {
   return res;
 }
 
-function setup(roleByName = {}) {
+function setup(roleByName = {}, guardOpts = {}) {
   const store = new AccessStore({ file: tmpFile() });
   const tokens = {};
   for (const [name, role] of Object.entries(roleByName)) tokens[name] = store.addToken({ label: name, role }).token;
-  return { store, tokens, guard: createAccessGuard({ store }) };
+  return { store, tokens, guard: createAccessGuard({ store, publicWebhookEnabled: () => false, ...guardOpts }) };
 }
 
 // ---- tokens & store ------------------------------------------------------
@@ -224,29 +238,33 @@ test("browser navigation without a token gets a readable 401 page, not JSON", ()
   assert.match(res.body, /access link/i);
 });
 
-test("one-time link: ?ao_token= sets an HttpOnly SameSite=Strict cookie and redirects without the token", () => {
+test("one-time link: sets an HttpOnly SameSite=Strict cookie and navigates to the URL without the token", () => {
   const { guard, tokens } = setup({ v: "viewer" });
   const res = fakeRes();
   const req = fakeReq({ url: `/?tab=costs&ao_token=${tokens.v}` });
   assert.equal(guard.http(req, res), false, "the request is answered here, not passed on");
-  assert.equal(res.status, 302);
-  assert.equal(res.headers.location, "/?tab=costs");
-  assert.ok(!res.headers.location.includes(tokens.v));
+  // 200 + client redirect, not 302: a cross-site click would not send a Strict cookie on a redirect
+  assert.equal(res.status, 200);
+  assert.match(res.body, /location\.replace\("\/\?tab=costs"\)/);
+  assert.ok(!res.body.includes(tokens.v), "the token must not be echoed into the page");
   const cookie = res.headers["set-cookie"];
   assert.match(cookie, new RegExp(`^ao_session=${tokens.v}`));
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /SameSite=Strict/);
   assert.match(cookie, /Path=\//);
   assert.ok(!/Secure/.test(cookie), "plain http LAN: Secure would make the browser drop the cookie");
+  assert.equal(res.headers["referrer-policy"], "no-referrer");
 });
 
-test("one-time link cannot be turned into an open redirect", () => {
+test("one-time link cannot be turned into an open redirect or script injection", () => {
   const { guard, tokens } = setup({ v: "viewer" });
   const res = fakeRes();
   guard.http(fakeReq({ url: `//evil.example/x?ao_token=${tokens.v}` }), res);
-  assert.equal(res.status, 302);
-  assert.match(res.headers.location, /^\/(?!\/)/, "stays on this origin");
-  assert.ok(!res.headers.location.includes("evil.example"));
+  assert.match(res.body, /location\.replace\("\/x"\)/, "stays on this origin");
+  assert.ok(!res.body.includes("evil.example"));
+  const xss = fakeRes();
+  guard.http(fakeReq({ url: `/"</script><script>alert(1)</script>?ao_token=${tokens.v}` }), xss);
+  assert.ok(!xss.body.includes("<script>alert(1)"), "path characters are escaped");
 });
 
 test("one-time link: Secure is added when the request came over https", () => {
@@ -328,11 +346,72 @@ test("paths are judged after normalisation, the way the router sees them (no ../
   assert.equal(res.status, 400);
 });
 
-test("POST /zalo/webhook stays reachable without a token (Zalo's servers cannot send one; zalo.js checks the sender)", () => {
-  const { guard } = setup();
+test("POST /zalo/webhook is public ONLY while Zalo is configured, and only for that exact path", () => {
+  const off = setup({}, { publicWebhookEnabled: () => false }).guard;
+  assert.equal(off.http(fakeReq({ method: "POST", url: "/zalo/webhook" }), fakeRes()), false, "Zalo not configured → needs a token");
+  const { guard } = setup({}, { publicWebhookEnabled: () => true });
   assert.equal(guard.http(fakeReq({ method: "POST", url: "/zalo/webhook" }), fakeRes()), true);
   assert.equal(guard.http(fakeReq({ method: "GET", url: "/zalo/webhook" }), fakeRes()), false);
   assert.equal(guard.http(fakeReq({ method: "POST", url: "/zalo/webhook/../chat" }), fakeRes()), false);
+});
+
+test("the public webhook door caps how much a stranger can make the daemon buffer", () => {
+  const { guard } = setup({}, { publicWebhookEnabled: () => true });
+  const req = fakeReq({ method: "POST", url: "/zalo/webhook" });
+  assert.equal(guard.http(req, fakeRes()), true);
+  req.emitData(Buffer.alloc(40 * 1024));
+  assert.equal(req.destroyed, false);
+  req.emitData(Buffer.alloc(40 * 1024));
+  assert.equal(req.destroyed, true);
+});
+
+test("a request whose Host header the router cannot parse is refused here instead of crashing the daemon", () => {
+  const { guard, tokens } = setup({ v: "viewer" }, { publicWebhookEnabled: () => true });
+  for (const host of ["", "a b", "a%", "[::1", "a:99999"]) {
+    for (const [method, url] of [["POST", "/zalo/webhook"], ["GET", "/costs"]]) {
+      const res = fakeRes();
+      const req = fakeReq({ method, url, headers: { host, authorization: `Bearer ${tokens.v}` } });
+      assert.equal(guard.http(req, res), false, `${JSON.stringify(host)} ${method}`);
+      assert.equal(res.status, 400);
+    }
+  }
+});
+
+test("store: a corrupt access.json is never overwritten (that would silently drop every token)", () => {
+  const file = tmpFile();
+  fs.writeFileSync(file, "{broken");
+  const store = new AccessStore({ file });
+  assert.throws(() => store.addToken({ label: "x", role: "viewer" }), /unreadable/);
+  assert.throws(() => store.setLan(true), /unreadable/);
+  assert.equal(fs.readFileSync(file, "utf8"), "{broken");
+});
+
+test("watchRevocations closes a live socket once its token is revoked, leaves others alone", async () => {
+  const { store, tokens } = setup({ gone: "viewer", kept: "viewer" });
+  const guard = createAccessGuard({ store, isLoopback: () => false });
+  const srv = new EventBroadcastServer({ port: 0, originGuard: guard });
+  await srv.start();
+  const stop = watchRevocations({ store, wss: srv.wss, intervalMs: 50 });
+  const { port } = srv.server.address();
+  try {
+    const open = (token) =>
+      new Promise((resolve, reject) => {
+        const ws = new WebSocket(`ws://127.0.0.1:${port}`, { headers: { authorization: `Bearer ${token}` } });
+        ws.on("open", () => resolve(ws));
+        ws.on("error", reject);
+      });
+    const gone = await open(tokens.gone);
+    const kept = await open(tokens.kept);
+    const closed = new Promise((resolve) => gone.on("close", (code) => resolve(code)));
+    store.revoke("gone");
+    assert.equal(await closed, 4401);
+    await new Promise((r) => setTimeout(r, 150));
+    assert.equal(kept.readyState, WebSocket.OPEN);
+    kept.close();
+  } finally {
+    stop();
+    await srv.stop();
+  }
 });
 
 // ---- websocket ------------------------------------------------------------
@@ -432,5 +511,20 @@ test("e2e ws: upgrade is refused without a token and accepted with a cookie", as
       ws.on("error", reject);
     });
     assert.equal(got.id, "e1");
+  });
+});
+
+test("e2e: an empty Host header gets 400 and the daemon keeps serving (it used to throw inside the router)", async () => {
+  await withServer(async ({ port, base, tokens }) => {
+    const raw = await new Promise((resolve) => {
+      const c = net.connect(port, "127.0.0.1", () =>
+        c.write(`GET /transcript HTTP/1.1\r\nHost:\r\nAuthorization: Bearer ${tokens.viewer}\r\nConnection: close\r\n\r\n`),
+      );
+      let out = "";
+      c.on("data", (d) => (out += d));
+      c.on("close", () => resolve(out));
+    });
+    assert.match(raw, /^HTTP\/1\.1 400/);
+    assert.equal((await fetch(`${base}/transcript`, { headers: { authorization: `Bearer ${tokens.viewer}` } })).status, 200);
   });
 });

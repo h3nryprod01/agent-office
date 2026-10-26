@@ -42,8 +42,9 @@ const MDNS = ["someones-macbook", "local"].join(".");
 const ASSIGN = `api_key = "${["Zx9", "Qw8Er7Ty6Ui5Op4As3Df2Gh1Jk0"].join("")}"`;
 
 const POSITIVE = {
-  "home-path": [HOME_MAC, HOME_LINUX, HOME_WIN],
+  "home-path": [HOME_MAC, HOME_LINUX, HOME_WIN, ["c:", "users", "someperson", "x"].join("\\")],
   "private-ip": [IP_192, IP_10, IP_172, IP_TS],
+  "private-ipv6": [["fd", "12:3456:789a::1"].join(""), ["fe", "80::1c2d:3e4f"].join("")],
   "hostname-local": [MDNS],
   "token-anthropic": [ANTHROPIC],
   "token-github": [GITHUB],
@@ -181,4 +182,74 @@ test("--range: an added line that looks like a diff header cannot hide the lines
   });
   assert.equal(res.status, 1, res.stdout + res.stderr);
   assert.match(res.stdout, /a\.txt:4:/);
+});
+
+function gitRepo(prefix) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), `ao-${prefix}-`));
+  const git = (...a) => spawnSync("git", a, { cwd: root, encoding: "utf8" });
+  git("init", "-q");
+  git("config", "user.email", "t@example.com");
+  git("config", "user.name", "t");
+  return { root, git };
+}
+const runRange = (root, range, extra = []) =>
+  spawnSync(process.execPath, [SCRIPT, "--root", root, "--range", range, "--no-denylist", ...extra], { encoding: "utf8" });
+
+test("--range: a secret added in one commit and removed in the next is still caught", () => {
+  const { root, git } = gitRepo("range-undo");
+  fs.writeFileSync(path.join(root, "a.txt"), "hello\n");
+  git("add", ".");
+  git("commit", "-qm", "init");
+  const base = git("rev-parse", "HEAD").stdout.trim();
+  fs.writeFileSync(path.join(root, "a.txt"), `hello\n${GITHUB}\n`);
+  git("commit", "-qam", "oops");
+  fs.writeFileSync(path.join(root, "a.txt"), "hello\n");
+  git("commit", "-qam", "remove it");
+  const res = runRange(root, `${base}..HEAD`);
+  assert.equal(res.status, 1, res.stdout + res.stderr);
+  assert.match(res.stdout, /token-github/);
+  assert.ok(!res.stdout.includes(GITHUB));
+});
+
+test("--range: .gitattributes '-diff' / binary cannot blind the scan", () => {
+  const { root, git } = gitRepo("range-attr");
+  fs.writeFileSync(path.join(root, "a.txt"), "hello\n");
+  git("add", ".");
+  git("commit", "-qm", "init");
+  const base = git("rev-parse", "HEAD").stdout.trim();
+  fs.writeFileSync(path.join(root, ".gitattributes"), "*.txt -diff\n");
+  fs.writeFileSync(path.join(root, "a.txt"), `hello\nip ${IP_192}\n`);
+  git("add", ".");
+  git("commit", "-qm", "hide it");
+  assert.equal(runRange(root, `${base}..HEAD`).status, 1);
+});
+
+test("--range: author identity and file names are scanned too", () => {
+  const { root, git } = gitRepo("range-meta");
+  fs.writeFileSync(path.join(root, "a.txt"), "hello\n");
+  git("add", ".");
+  git("commit", "-qm", "init");
+  const base = git("rev-parse", "HEAD").stdout.trim();
+  const dir = path.join(root, "clients-acmecorp-private");
+  fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(dir, "notes.txt"), "x\n");
+  git("add", ".");
+  git("-c", "user.name=someone.private", "commit", "-qm", "add");
+  const deny = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "ao-deny-")), "d.txt");
+  fs.writeFileSync(deny, "acmecorp\nsomeone.private\n");
+  const res = spawnSync(process.execPath, [SCRIPT, "--root", root, "--range", `${base}..HEAD`, "--denylist", deny], { encoding: "utf8" });
+  assert.equal(res.status, 1);
+  assert.ok(!res.stdout.toLowerCase().includes("acmecorp"), "the matched term is never printed");
+  assert.ok(!res.stdout.includes("clients-acmecorp-private"), "nor the path that contained it");
+  assert.match(res.stdout, /commit message/);
+  assert.match(res.stdout, /\(a file name\)/);
+});
+
+test("output never echoes the line: a secret NEXT to a match is not printed either", () => {
+  const neighbour = ["wJalrXUtnFEMI", "K7MDENGbPxRfiCYEXAMPLEKEY"].join("/");
+  const root = tmpTree({ "cfg.ini": `aws_access_key_id=${AWS} aws_secret_access_key=${neighbour}\n` });
+  const res = spawnSync(process.execPath, [SCRIPT, "--root", root, "--no-denylist"], { encoding: "utf8" });
+  assert.equal(res.status, 1);
+  assert.ok(!res.stdout.includes(neighbour) && !res.stdout.includes(AWS));
+  assert.match(res.stdout, /cfg\.ini:1:/);
 });
