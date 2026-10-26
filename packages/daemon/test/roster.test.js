@@ -260,3 +260,15 @@ test("parseRoster: a junk `- - x` item and uneven indentation never drop what fo
   assert.equal(b.name, "b");
   assert.equal(roster.departments[1].members[0].name, "c");
 });
+
+test("parseRoster: lines under a junk `- - x` item do not end the list", () => {
+  const members = parseRoster(`departments:
+  d:
+    members:
+      - - x
+        role: r
+      - name: b
+      - name: c
+`).departments[0].members.filter((m) => m.name);
+  assert.deepEqual(members.map((m) => m.name), ["b", "c"]);
+});

@@ -271,7 +271,7 @@ function drainOutbox(dir, itemsFile, raw) {
       const parsed = JSON.parse(line);
       // lane L6: a chip's stray sopStep/parentItemId must not cost the whole item its place on the board
       const sopStep = Number.isInteger(parsed.sopStep) && parsed.sopStep >= 1 && parsed.sopStep <= 50 ? parsed.sopStep : null;
-      const parentItemId = typeof parsed.parentItemId === "string" && parsed.parentItemId.length <= 100 ? parsed.parentItemId : null;
+      const parentItemId = typeof parsed.parentItemId === "string" && parsed.parentItemId.length >= 1 && parsed.parentItemId.length <= 100 ? parsed.parentItemId : null;
       drained.push(makeItem({ ...parsed, sopStep, parentItemId, now: parsed.createdAt ?? new Date().toISOString() }));
     } catch (error) {
       console.warn(`[projects] outbox kept a malformed line (${error.message})`);

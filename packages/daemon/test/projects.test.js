@@ -388,7 +388,7 @@ test("parentItemId refuses a self-parent and a cycle; a stray outbox sopStep doe
   assert.equal(upd(b.id, null).parentItemId, null);
 
   const dir = path.join(s.projectsDir, "agent-office");
-  fs.appendFileSync(path.join(dir, "items-outbox.jsonl"), JSON.stringify({ title: "from a chip", source: "agent", sopStep: "3" }) + "\n");
+  fs.appendFileSync(path.join(dir, "items-outbox.jsonl"), JSON.stringify({ title: "from a chip", source: "agent", sopStep: "3", parentItemId: "" }) + "\n");
   const drained = readItems({ projectsDir: s.projectsDir, slug: "agent-office" }).find((i) => i.title === "from a chip");
   assert.equal(drained.sopStep, null);
   assert.equal(fs.existsSync(path.join(dir, "items-outbox.corrupt")), false);

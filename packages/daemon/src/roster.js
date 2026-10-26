@@ -158,8 +158,9 @@ function parseList(lines, i) {
     // (that is where the sibling keys sit) and let parseMap do the rest — that is what lets a
     // pair like `persona:` own a nested map without its keys leaking into the member.
     if (rest.startsWith("- ")) {
-      arr.push({}); // `- - x`: nothing we understand; skip the line, keep reading the list
+      arr.push({}); // `- - x`: nothing we understand; skip it and its deeper lines, keep reading the list
       i++;
+      while (i < lines.length && lines[i].indent > indent && !lines[i].text.startsWith("- ")) i++;
       continue;
     }
     const body = lines[i].text.slice(2);
