@@ -62,7 +62,14 @@ async function boot(): Promise<void> {
   try {
     office3d = createOffice3D({
       onPick: (agentId) => sidePanel.show(agentId),
-      onFurniture: (id) => { if (id === "filing_cabinet") outputsPanel.show(); },
+      onFurniture: (id) => {
+        // the props L8 made clickable open the panel they stand for (closures run at click time)
+        if (id === "filing_cabinet") outputsPanel.show();
+        else if (id === "reception") hiringHall?.open();
+        else if (id === "board_work") setView("kanban");
+        else if (id === "board_spend") setView("costs");
+        else if (id === "elevator") document.querySelector<HTMLElement>("#building .building-toggle")?.click();
+      },
     });
     document.querySelector<HTMLElement>("#app")!.appendChild(office3d.canvas);
     office3d.resize();
@@ -374,6 +381,7 @@ async function boot(): Promise<void> {
   // /projects. The "All" tab uses the shared style when every project agrees, else the dev floor.
   // An explicit ?room= stays a manual override.
   const roomByRepo = new Map<string, RoomStyle>();
+  const slugByRepo = new Map<string, string>(); // and the project the Board shows for that tab
   let activeRepo: string | null = null;
   const applyRoom = (): void => {
     if (!office3d || new URLSearchParams(location.search).has("room")) return;
@@ -390,8 +398,14 @@ async function boot(): Promise<void> {
       ]);
       const templateOf = new Map(projects.map((p) => [p.slug, p.template ?? null]));
       roomByRepo.clear();
-      for (const p of policies.projects ?? []) roomByRepo.set(p.repo, roomStyleForTemplate(templateOf.get(p.slug)));
+      slugByRepo.clear();
+      for (const p of policies.projects ?? []) {
+        roomByRepo.set(p.repo, roomStyleForTemplate(templateOf.get(p.slug)));
+        slugByRepo.set(p.repo, p.slug);
+      }
       applyRoom();
+      // the Board starts on the only project there is, when there is just one
+      if (projects.length === 1) kanban.setProject(projects[0].slug);
     } catch {
       // the office still works on the default floor
     }
@@ -406,6 +420,8 @@ async function boot(): Promise<void> {
     hiringHall?.setRepo(repo);
     activeRepo = repo; // lane L8 wiring
     applyRoom();
+    const slug = repo ? slugByRepo.get(repo) : undefined;
+    if (slug) kanban.setProject(slug); // the Board follows the office tab's project
   });
 
   // lane L2: approval modes + data rules (Settings block) and the mode badge on each office tab.

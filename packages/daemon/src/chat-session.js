@@ -46,6 +46,9 @@ export const PM_SYSTEM_PROMPT =
   "registry, the repo's active-context note, and git log. " +
   "ALWAYS reply in the language the user wrote in — Vietnamese in, Vietnamese out; " +
   "English in, English out. Keep it short, like a chat message. " +
+  "When you hand work to a roster member, call POST /assign {project, member, title, brief, parentItemId} " +
+  "on the Agent Office daemon (http://127.0.0.1:$DAEMON_WS_PORT, default 8787) and start the agent with the " +
+  "prompt it returns: it carries that member's persona and SOP (docs/company-protocol.md section 6). " +
   "You CANNOT approve permissions for another session — if asked, say plainly that " +
   "it has to be approved in that session's own app.";
 
@@ -57,6 +60,9 @@ export const GENERIC_PM_SYSTEM_PROMPT =
   "and which sessions are currently running in the repo. " +
   "ALWAYS reply in the language the user wrote in — Vietnamese in, Vietnamese out; " +
   "English in, English out. Keep it short, like a chat message. " +
+  "When you hand work to a roster member, call POST /assign {project, member, title, brief, parentItemId} " +
+  "on the Agent Office daemon (http://127.0.0.1:$DAEMON_WS_PORT, default 8787) and start the agent with the " +
+  "prompt it returns: it carries that member's persona and SOP (docs/company-protocol.md section 6). " +
   "You CANNOT approve permissions for another session — if asked, say plainly that " +
   "it has to be approved in that session's own app.";
 

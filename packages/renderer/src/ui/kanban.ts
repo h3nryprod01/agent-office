@@ -20,13 +20,13 @@ export interface KanbanItem {
 export const COLUMNS: Record<SubTab, [string, string][]> = {
   mine: [
     ["idea", t("kanban.ideas")],
-    ["done", "Xong"],
+    ["done", t("status.done")],
   ],
   agent: [
     ["idea", t("kanban.queued")],
     ["doing", t("wall.inProgress")],
     ["review", t("kanban.review")],
-    ["done", "Xong"],
+    ["done", t("status.done")],
   ],
 };
 
@@ -71,6 +71,8 @@ export function assignableId(it: KanbanItem): string | null {
 
 export interface KanbanHandle {
   refresh(): Promise<void>;
+  /** follow the project the office tab points at (coordinator wiring; was fixed to "agent-office") */
+  setProject(slug: string): void;
 }
 
 interface KanbanOpts {
@@ -90,12 +92,13 @@ interface KanbanOpts {
 export function mountKanban(root: HTMLElement, opts: KanbanOpts): KanbanHandle {
   root.classList.add("kanban");
   const fetchItems = opts.fetchItems;
+  let project = opts.project;
   let items: KanbanItem[] = [];
   let tab: SubTab = "mine";
 
   if (!fetchItems) {
     root.innerHTML = `<p class="kanban-placeholder">${t("kanban.liveOnly")}</p>`;
-    return { refresh: async () => {} };
+    return { refresh: async () => {}, setProject: () => {} };
   }
   // Rebind to a non-optional type so the narrowing survives into the closures
   // below (TS drops narrowing from the early-return guard inside nested functions).
@@ -106,7 +109,7 @@ export function mountKanban(root: HTMLElement, opts: KanbanOpts): KanbanHandle {
   root.addEventListener("click", (ev) => {
     const docEl = (ev.target as HTMLElement).closest<HTMLElement>("[data-doc]");
     if (docEl?.dataset.doc) {
-      opts.onOpenDoc?.(opts.project, docEl.dataset.doc);
+      opts.onOpenDoc?.(project, docEl.dataset.doc);
       return;
     }
     const assignEl = (ev.target as HTMLElement).closest<HTMLElement>("[data-assign]");
@@ -128,7 +131,7 @@ export function mountKanban(root: HTMLElement, opts: KanbanOpts): KanbanHandle {
     const title = input.value.trim();
     if (!title || !opts.addItem) return;
     input.value = "";
-    opts.addItem({ project: opts.project, title, source: "human" }).then(
+    opts.addItem({ project, title, source: "human" }).then(
       () => refresh(),
       (err) => console.error("[kanban] addItem failed:", err),
     );
@@ -136,7 +139,7 @@ export function mountKanban(root: HTMLElement, opts: KanbanOpts): KanbanHandle {
 
   async function refresh(): Promise<void> {
     try {
-      const data = await loadItems(opts.project);
+      const data = await loadItems(project);
       items = data?.items ?? [];
     } catch (err) {
       console.error("[kanban] fetchItems failed:", err);
@@ -178,7 +181,14 @@ export function mountKanban(root: HTMLElement, opts: KanbanOpts): KanbanHandle {
       body;
   }
 
-  return { refresh };
+  return {
+    refresh,
+    setProject: (slug: string) => {
+      if (slug === project) return;
+      project = slug;
+      void refresh();
+    },
+  };
 }
 
 /** First-run / empty board: guidance + the next action, not a bare column grid.

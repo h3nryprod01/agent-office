@@ -312,7 +312,7 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
         ctx.fillText(t("wall.daemonOffline"), 26, 128);
         return;
       }
-      ([[t("wall.queued"), s.todo, "#94a3b8"], [t("wall.inProgress"), s.inProgress, "#ff9100"], ["Xong", s.done, "#00e676"]] as const)
+      ([[t("wall.queued"), s.todo, "#94a3b8"], [t("wall.inProgress"), s.inProgress, "#ff9100"], [t("status.done"), s.done, "#00e676"]] as const)
         .forEach(([label, n, col], i) => {
           const x = 26 + i * 205;
           ctx.fillStyle = "#8fa0ba"; ctx.font = "26px ui-monospace, monospace"; ctx.fillText(label, x, 116);

@@ -348,3 +348,9 @@ test("both spawn paths pass the scrubbed environment", () => {
     if (prev === undefined) delete process.env.TELEGRAM_BOT_TOKEN; else process.env.TELEGRAM_BOT_TOKEN = prev;
   }
 });
+
+// coordinator (L6 join): both PM prompts point at /assign so persona + SOP reach the agents
+test("both PM system prompts tell the PM to hand work out through POST /assign", async () => {
+  const { PM_SYSTEM_PROMPT, GENERIC_PM_SYSTEM_PROMPT } = await import("../src/chat-session.js");
+  for (const p of [PM_SYSTEM_PROMPT, GENERIC_PM_SYSTEM_PROMPT]) assert.match(p, /POST \/assign/);
+});
