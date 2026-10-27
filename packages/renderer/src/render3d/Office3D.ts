@@ -32,7 +32,6 @@ const IS_MAC = typeof navigator !== "undefined" && /Mac/i.test(navigator.platfor
 /** "screen" is the shipped character (procedural, no asset); "robot" is a CC0 GLB
  *  alternate, loaded only if something calls setKind("robot"). A Mixamo-derived
  *  "human" kind was dropped: unreachable, unused, and its licence was unverified. */
-
 export type Kind = "screen" | "robot";
 
 export interface Office3DHandle {
