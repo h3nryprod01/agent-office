@@ -10,7 +10,7 @@
 
 import path from "node:path";
 import os from "node:os";
-import { statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 
 /** @param {string} [platform] defaults to the real platform */
 export function isWindows(platform = process.platform) {
@@ -66,7 +66,10 @@ export function commonBinDirs(platform = process.platform, env = process.env) {
 // "Open" may only open what cannot run: a folder or a known document. Anything else an agent
 // wrote (a script with no extension, an alias, an installer, a .exe) is selected instead.
 // ponytail: allow-list, so a type missing here is merely shown in its folder, never run.
-const OPENABLE_FILE_RE = /\.(txt|md|markdown|csv|tsv|log|json|ya?ml|xml|pdf|png|jpe?g|gif|webp|svg|heic|bmp|tiff?|mp3|m4a|wav|mp4|mov|webm|docx|xlsx|pptx|odt|ods|odp|rtf|html?)$/i;
+// html/svg stay: their scripts run in the browser sandbox, and agent-written reports are the
+// Outputs panel's main use. rtf and csv are out (OLE exploits, spreadsheet formulas/DDE);
+// docx/xlsx/pptx cannot carry macros.
+const OPENABLE_FILE_RE = /\.(txt|md|markdown|tsv|log|json|ya?ml|xml|pdf|png|jpe?g|gif|webp|svg|heic|bmp|tiff?|mp3|m4a|wav|mp4|mov|webm|docx|xlsx|pptx|odt|ods|odp|html?)$/i;
 // folders `open` would launch rather than show
 const MAC_BUNDLE_DIR_RE = /\.(app|appex|bundle|framework|plugin|prefpane|kext|xpc|pkg|mpkg|workflow|action|saver|qlgenerator)\/?$/i;
 
@@ -103,7 +106,9 @@ export function revealCommand(realPath, reveal, platform = process.platform, isD
   return { cmd: "open", args: select ? ["-R", realPath] : [realPath] };
 }
 
-const isMacBundle = (p, platform) => !isWindows(platform) && !isLinux(platform) && MAC_BUNDLE_DIR_RE.test(p);
+// a package Finder would launch: a bundle extension, or any folder shaped like one (Contents/Info.plist)
+const isMacBundle = (p, platform) =>
+  !isWindows(platform) && !isLinux(platform) && (MAC_BUNDLE_DIR_RE.test(p) || existsSync(path.join(p, "Contents", "Info.plist")));
 
 /**
  * Build the shell-out for a desktop notification. macOS returns a `{cmd:null}`
