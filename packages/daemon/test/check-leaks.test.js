@@ -321,3 +321,10 @@ test("--range: scripts/leak-history-ok.txt clears one reviewed finding by commit
   git("commit", "-qam", "wrong entry");
   assert.equal(runRange(root, `${base}..HEAD`).status, 1);
 });
+
+test("documented body: the code before the marker comment, trimmed", async () => {
+  const { documentedBody } = await import("../../../scripts/check-leaks.mjs");
+  assert.equal(documentedBody('  x = "fake"; // leak-ok: why\r'), 'x = "fake";');
+  assert.equal(documentedBody("ip = 10.0.0.1  # leak-ok"), "ip = 10.0.0.1");
+  assert.equal(documentedBody("no marker"), null);
+});

@@ -1,0 +1,3 @@
+# The reviewed-history list clears leak-gate findings: only the owner may change it.
+/scripts/leak-history-ok.txt @h3nryprod01
+/scripts/check-leaks.mjs @h3nryprod01

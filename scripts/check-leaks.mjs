@@ -262,20 +262,19 @@ export function documentedBody(line) {
   return at < 0 ? null : line.slice(0, at).replace(/(\/\/|#|\/\*|<!--|--)\s*$/, "").trim();
 }
 
-/** scripts/leak-history-ok.txt: pushed findings checked by hand, as "sha7\0file:line". */
-function reviewedHistory(root) {
-  const out = new Set();
-  let text = "";
-  try {
-    text = fs.readFileSync(path.join(root, "scripts", "leak-history-ok.txt"), "utf8");
-  } catch {
-    return out;
-  }
-  for (const line of text.split(/\r?\n/)) {
-    const m = /^([0-9a-f]{7,40})\s+(\S+:\d+)\s+\S/.exec(line);
-    if (m) out.add(`${m[1].slice(0, 7)}\0${m[2]}`);
-  }
-  return out;
+/**
+ * scripts/leak-history-ok.txt as committed at the tip (not the working copy): pushed findings
+ * checked by hand. Each entry clears the findings on one line of one commit. CODEOWNERS guards it.
+ */
+function reviewedHistory(root, tip) {
+  if (!tip) return [];
+  const res = git(root, ["show", `${tip}:scripts/leak-history-ok.txt`]);
+  if (res.status !== 0) return [];
+  return res.stdout
+    .split(/\r?\n/)
+    .map((line) => /^([0-9a-f]{7,40})\s+(\S+:\d+)\s+\S/.exec(line))
+    .filter(Boolean)
+    .map((m) => ({ sha: m[1], where: m[2] }));
 }
 
 /**
@@ -308,7 +307,7 @@ export function scanRange(root, range, denylist = []) {
   if (revs.status !== 0) throw new Error(`git rev-list ${range} failed: ${revs.stderr.trim()}`);
   const shas = revs.stdout.split("\n").filter(Boolean);
   const documented = documentedAtTip(root, shas.at(-1));
-  const reviewed = reviewedHistory(root);
+  const reviewed = reviewedHistory(root, shas.at(-1));
   for (const sha of shas) {
     const short = sha.slice(0, 7);
     const meta = git(root, ["log", "-1", "--format=%an <%ae>%n%cn <%ce>%n%B", sha]);
@@ -322,7 +321,7 @@ export function scanRange(root, range, denylist = []) {
     scanDiff(diff.stdout, denylist, added);
     findings.push(
       ...added
-        .filter((f) => !documented.has(`${f.file}\0${f.text}`) && !reviewed.has(`${short}\0${f.file}:${f.line}`))
+        .filter((f) => !documented.has(`${f.file}\0${f.text}`) && !reviewed.some((r) => sha.startsWith(r.sha) && r.where === `${f.file}:${f.line}`))
         .map(({ text, ...f }) => ({ ...f, detail: f.detail ?? `(commit ${short})` })),
     );
     // names come from their own listing: an empty file has no +++ header and a
