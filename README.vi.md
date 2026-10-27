@@ -109,7 +109,7 @@ Một công cụ chạy được, nhưng vẫn là dự án cá nhân chứ chư
 - **Chỉ localhost, không có xác thực** — đọc [SECURITY.md](SECURITY.md) trước khi expose cổng đi đâu.
 - Chi phí quy ra USD chỉ đầy đủ với model có giá công bố; model khác đếm token nhưng không quy tiền, thay vì đoán bừa.
 - Animation dừng khi tab bị ẩn (trình duyệt tắt `requestAnimationFrame`); trạng thái vẫn đúng, nhân vật đuổi kịp khi tab hiện lại.
-- `waiting_permission` tức thì nếu bật hook tuỳ chọn; không có hook thì suy từ transcript, chậm vài giây.
+- `waiting_permission` cần hook: approve gateway (`PermissionRequest`) hoặc hook pilot báo ngay. Không có hook thì văn phòng không phân biệt được lúc agent chờ duyệt với lúc một lệnh chạy lâu.
 - Giọng đọc reply của PM cần một virtualenv cục bộ; không có thì tính năng đơn giản là tắt.
 
 Bộ test: 560 test trong 55 file, CI chạy trên Node 20 và 22.
