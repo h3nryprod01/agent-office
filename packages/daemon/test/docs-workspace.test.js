@@ -735,6 +735,7 @@ test("upload: a dropped file lands in inbox/, never overwrites, keeps a plain na
     }
     assert.equal((await post("/docs/upload", { name: "empty.txt", data: "" })).status, 400);
     assert.equal((await post("/docs/upload", { name: "junk.txt", data: "not base64!" })).status, 400);
+    assert.equal((await post("/docs/upload", { name: "نامه\u200Cها.txt", data: b64("x") })).status, 201);
     assert.equal((await post("/docs/upload", { name: "big.bin", data: Buffer.alloc(4 * 1024 * 1024 + 1).toString("base64") })).status, 413);
   });
   s.cleanup();

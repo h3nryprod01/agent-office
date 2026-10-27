@@ -96,5 +96,6 @@ test("revealCommand: a bundle-looking folder is selected, never launched; a comm
   // Outputs' "Open" on a file still opens it; a dotted folder name is not a bundle
   assert.deepEqual(revealCommand("/x/report.pdf", false, "darwin").args, ["/x/report.pdf"]);
   assert.deepEqual(revealCommand("/x/me.github.io", false, "darwin").args, ["/x/me.github.io"]);
+  assert.deepEqual(revealCommand("/x/run.command", false, "darwin").args, ["-R", "/x/run.command"]);
   assert.deepEqual(revealCommand("C:\\x\\a,b.txt", true, "win32"), { cmd: "explorer", args: ["C:\\x"] });
 });

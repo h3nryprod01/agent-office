@@ -62,6 +62,9 @@ export function commonBinDirs(platform = process.platform, env = process.env) {
   ];
 }
 
+// things `open` would run or install rather than show: a bundle, an installer, a Terminal script an agent wrote
+const MAC_BUNDLE_RE = /\.(app|appex|bundle|framework|plugin|prefpane|kext|xpc|pkg|mpkg|workflow|action|saver|qlgenerator|command|tool|terminal)\/?$/i;
+
 /**
  * Build the shell-out to reveal/open a file in the platform file manager.
  * macOS: `open -R <path>` (reveal) / `open <path>`. Windows: `explorer
@@ -72,8 +75,6 @@ export function commonBinDirs(platform = process.platform, env = process.env) {
  * @param {string} [platform]
  * @returns {{cmd: string, args: string[]}}
  */
-const MAC_BUNDLE_RE = /\.(app|appex|bundle|framework|plugin|prefpane|kext|xpc|pkg|mpkg|workflow|action)\/?$/i;
-
 export function revealCommand(realPath, reveal, platform = process.platform) {
   if (isWindows(platform)) {
     // explorer splits /select, on commas and quotes: such a file only gets its folder opened

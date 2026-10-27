@@ -283,7 +283,9 @@ test("timeout layering: daemon TTL < gateway fetch abort < the hook timeout in t
   const abort = Number(gateway.match(/FETCH_TIMEOUT_MS[^\n]*\?\? ([\d_]+)/)[1].replaceAll("_", ""));
   for (const name of ["multi-pm-telegram.md", "approve-spike-status.md"]) {
     const doc = readFileSync(new URL(`../../../docs/${name}`, import.meta.url), "utf8");
-    for (const [, secs] of doc.matchAll(/"timeout": (\d+)/g)) {
+    const found = [...doc.matchAll(/"timeout": (\d+)/g)];
+    assert.ok(found.length > 0, `${name} no longer states the hook timeout`);
+    for (const [, secs] of found) {
       const hook = Number(secs) * 1000;
       assert.ok(DEFAULT_TTL_MS < abort && abort < hook, `${name}: ${DEFAULT_TTL_MS} < ${abort} < ${hook}`);
     }
