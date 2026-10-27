@@ -74,7 +74,7 @@ const UPLOAD_NAME_RE = /^[^/\\\0:*?"<>|]{1,120}$/;
 const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
 // control and format chars (bidi overrides that make "txt.exe" read backwards, BOM...) except the joiners
 // Persian names and emoji need (U+200C/D), Windows device names, a trailing dot or space
-const UNSAFE_NAME_RE = /[\p{Cc}]|(?![\u200C\u200D])\p{Cf}|[. ]$|^(con|prn|aux|nul|conin\$|conout\$|com[\d¹²³]|lpt[\d¹²³])(\.|$)/iu;
+const UNSAFE_NAME_RE = /[\p{Cc}\p{Zl}\p{Zp}]|(?![\u200C\u200D])\p{Cf}|[. ]$|^(con|prn|aux|nul|conin\$|conout\$|com[\d¹²³]|lpt[\d¹²³])(\.|$)/iu;
 const safeUploadName = (name) => !UNSAFE_NAME_RE.test(name) && Buffer.byteLength(name) <= 200;
 const MAX_RAW_BYTES = 100 * 1024 * 1024;
 const MAX_HISTORY = 20;

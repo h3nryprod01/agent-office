@@ -63,7 +63,9 @@ export function commonBinDirs(platform = process.platform, env = process.env) {
 }
 
 // things `open` would run or install rather than show: a bundle, an installer, a Terminal script an agent wrote
-const MAC_BUNDLE_RE = /\.(app|appex|bundle|framework|plugin|prefpane|kext|xpc|pkg|mpkg|workflow|action|saver|qlgenerator|command|tool|terminal)\/?$/i;
+const MAC_BUNDLE_RE = /\.(app|appex|bundle|framework|plugin|prefpane|kext|xpc|pkg|mpkg|workflow|action|saver|qlgenerator|command|tool|terminal|jar|dmg|mobileconfig)\/?$/i;
+// the Windows equivalent: explorer <file> runs these
+const WIN_RUNNABLE_RE = /\.(exe|com|bat|cmd|ps1|vbs|vbe|js|jse|wsf|wsh|msi|msc|scr|lnk|url|reg|hta|cpl|jar)$/i;
 
 /**
  * Build the shell-out to reveal/open a file in the platform file manager.
@@ -78,8 +80,9 @@ const MAC_BUNDLE_RE = /\.(app|appex|bundle|framework|plugin|prefpane|kext|xpc|pk
 export function revealCommand(realPath, reveal, platform = process.platform) {
   if (isWindows(platform)) {
     // explorer splits /select, on commas and quotes: such a file only gets its folder opened
-    if (reveal && /[,"]/.test(realPath)) return { cmd: "explorer", args: [path.win32.dirname(realPath)] };
-    return { cmd: "explorer", args: [reveal ? `/select,${realPath}` : realPath] };
+    const select = reveal || WIN_RUNNABLE_RE.test(realPath);
+    if (select && /[,"]/.test(realPath)) return { cmd: "explorer", args: [path.win32.dirname(realPath)] };
+    return { cmd: "explorer", args: [select ? `/select,${realPath}` : realPath] };
   }
   if (isLinux(platform)) {
     return { cmd: "xdg-open", args: [reveal ? path.dirname(realPath) : realPath] };

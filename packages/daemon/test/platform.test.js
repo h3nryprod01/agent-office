@@ -97,5 +97,7 @@ test("revealCommand: a bundle-looking folder is selected, never launched; a comm
   assert.deepEqual(revealCommand("/x/report.pdf", false, "darwin").args, ["/x/report.pdf"]);
   assert.deepEqual(revealCommand("/x/me.github.io", false, "darwin").args, ["/x/me.github.io"]);
   assert.deepEqual(revealCommand("/x/run.command", false, "darwin").args, ["-R", "/x/run.command"]);
+  assert.deepEqual(revealCommand("C:\\x\\setup.exe", false, "win32").args, ["/select,C:\\x\\setup.exe"]);
+  assert.deepEqual(revealCommand("C:\\x\\notes.txt", false, "win32").args, ["C:\\x\\notes.txt"]);
   assert.deepEqual(revealCommand("C:\\x\\a,b.txt", true, "win32"), { cmd: "explorer", args: ["C:\\x"] });
 });
