@@ -1,0 +1,3 @@
+# Findings in commits that are already pushed and cannot be rewritten, each checked by hand.
+# Format: <commit, 7+ hex> <file>:<line> <why it is not a leak>
+deeada9 packages/daemon/test/docs-workspace.test.js:85 invented RFC 1918 address in a test fixture (later rewritten and marked leak-ok)

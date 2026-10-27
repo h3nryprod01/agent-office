@@ -281,3 +281,43 @@ test("output never echoes the line: a secret NEXT to a match is not printed eith
   assert.ok(!res.stdout.includes(neighbour) && !res.stdout.includes(AWS));
   assert.match(res.stdout, /cfg\.ini:1:/);
 });
+
+test("--range: a fixture marked leak-ok later is documented; a different line or file is not", () => {
+  const { root, git } = gitRepo("range-marked-later");
+  fs.writeFileSync(path.join(root, "a.txt"), "hello\n");
+  git("add", ".");
+  git("commit", "-qm", "init");
+  const base = git("rev-parse", "HEAD").stdout.trim();
+  fs.writeFileSync(path.join(root, "a.txt"), `const t = "${GITHUB}";\n`);
+  fs.writeFileSync(path.join(root, "b.txt"), `const t = "${GITHUB}";\n`);
+  git("add", ".");
+  git("commit", "-qm", "fixture");
+  fs.writeFileSync(path.join(root, "a.txt"), `const t = "${GITHUB}"; // leak-ok: invented fixture\n`);
+  fs.rmSync(path.join(root, "b.txt"));
+  git("add", "-A");
+  git("commit", "-qm", "mark it");
+  const res = runRange(root, `${base}..HEAD`);
+  assert.equal(res.status, 1, res.stdout + res.stderr);
+  assert.match(res.stdout, /b\.txt:1:\d+\s+token-github/);
+  assert.doesNotMatch(res.stdout, /a\.txt/);
+});
+
+test("--range: scripts/leak-history-ok.txt clears one reviewed finding by commit and line", () => {
+  const { root, git } = gitRepo("range-reviewed");
+  fs.writeFileSync(path.join(root, "a.txt"), "hello\n");
+  git("add", ".");
+  git("commit", "-qm", "init");
+  const base = git("rev-parse", "HEAD").stdout.trim();
+  fs.writeFileSync(path.join(root, "a.txt"), `${GITHUB}\n`);
+  git("commit", "-qam", "oops");
+  const sha = git("rev-parse", "--short=7", "HEAD").stdout.trim();
+  fs.mkdirSync(path.join(root, "scripts"));
+  fs.writeFileSync(path.join(root, "scripts", "leak-history-ok.txt"), `${sha} a.txt:1 checked by hand\n`);
+  fs.writeFileSync(path.join(root, "a.txt"), "hello\n");
+  git("add", "-A");
+  git("commit", "-qm", "remove + review");
+  assert.equal(runRange(root, `${base}..HEAD`).status, 0);
+  fs.writeFileSync(path.join(root, "scripts", "leak-history-ok.txt"), `${sha} a.txt:2 wrong line\n`);
+  git("commit", "-qam", "wrong entry");
+  assert.equal(runRange(root, `${base}..HEAD`).status, 1);
+});

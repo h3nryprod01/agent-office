@@ -236,7 +236,7 @@ function scanDiff(text, denylist, out) {
       if (raw.startsWith("+")) {
         newLeft -= 1;
         lineNo += 1;
-        for (const f of scanText(raw.slice(1), file, denylist)) out.push({ ...f, line: lineNo });
+        for (const f of scanText(raw.slice(1), file, denylist)) out.push({ ...f, line: lineNo, text: raw.slice(1).trim() });
       } else if (raw.startsWith("-")) {
         oldLeft -= 1;
       } else if (raw.startsWith(" ")) {
@@ -256,6 +256,46 @@ function scanDiff(text, denylist, out) {
   }
 }
 
+/** What a `leak-ok` line says before its marker comment: `x = "fake" // leak-ok: why` → `x = "fake"`. */
+export function documentedBody(line) {
+  const at = line.indexOf("leak-ok");
+  return at < 0 ? null : line.slice(0, at).replace(/(\/\/|#|\/\*|<!--|--)\s*$/, "").trim();
+}
+
+/** scripts/leak-history-ok.txt: pushed findings checked by hand, as "sha7\0file:line". */
+function reviewedHistory(root) {
+  const out = new Set();
+  let text = "";
+  try {
+    text = fs.readFileSync(path.join(root, "scripts", "leak-history-ok.txt"), "utf8");
+  } catch {
+    return out;
+  }
+  for (const line of text.split(/\r?\n/)) {
+    const m = /^([0-9a-f]{7,40})\s+(\S+:\d+)\s+\S/.exec(line);
+    if (m) out.add(`${m[1].slice(0, 7)}\0${m[2]}`);
+  }
+  return out;
+}
+
+/**
+ * Lines the tip commit marks `leak-ok`, as "file\0body". A fixture added in one commit and
+ * marked in a later one is documented: the range scan must not fail on the unmarked copy in
+ * history (pushed history cannot be rewritten). Only exact same file and same code count.
+ */
+function documentedAtTip(root, tip) {
+  const out = new Set();
+  if (!tip) return out;
+  const res = git(root, ["grep", "-I", "-n", "-z", "--fixed-strings", "leak-ok", tip]);
+  for (const rec of res.stdout.split("\n").filter(Boolean)) {
+    // tip:path\0line\0content
+    const [where, , content = ""] = rec.split("\0");
+    const body = documentedBody(content);
+    if (body) out.add(`${where.slice(tip.length + 1)}\0${body}`);
+  }
+  return out;
+}
+
 /**
  * Every commit in `range` (A..B), one at a time: scanning only the end-to-end diff
  * would miss a secret that one commit adds and the next removes, yet both are pushed
@@ -266,7 +306,10 @@ export function scanRange(root, range, denylist = []) {
   const findings = [];
   const revs = git(root, ["rev-list", "--reverse", range]);
   if (revs.status !== 0) throw new Error(`git rev-list ${range} failed: ${revs.stderr.trim()}`);
-  for (const sha of revs.stdout.split("\n").filter(Boolean)) {
+  const shas = revs.stdout.split("\n").filter(Boolean);
+  const documented = documentedAtTip(root, shas.at(-1));
+  const reviewed = reviewedHistory(root);
+  for (const sha of shas) {
     const short = sha.slice(0, 7);
     const meta = git(root, ["log", "-1", "--format=%an <%ae>%n%cn <%ce>%n%B", sha]);
     if (meta.status === 0) findings.push(...scanText(meta.stdout, `commit message ${short}`, denylist));
@@ -277,7 +320,11 @@ export function scanRange(root, range, denylist = []) {
     if (diff.status !== 0) throw new Error(`git diff-tree ${short} failed: ${diff.stderr.trim()}`);
     const added = [];
     scanDiff(diff.stdout, denylist, added);
-    findings.push(...added.map((f) => ({ ...f, detail: f.detail ?? `(commit ${short})` })));
+    findings.push(
+      ...added
+        .filter((f) => !documented.has(`${f.file}\0${f.text}`) && !reviewed.has(`${short}\0${f.file}:${f.line}`))
+        .map(({ text, ...f }) => ({ ...f, detail: f.detail ?? `(commit ${short})` })),
+    );
     // names come from their own listing: an empty file has no +++ header and a
     // non-ASCII name arrives quoted/escaped in the patch
     const names = git(root, ["diff-tree", "-r", "-m", "--root", "--name-only", "-z", "--no-renames", sha]);
