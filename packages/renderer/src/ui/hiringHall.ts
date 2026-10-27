@@ -13,12 +13,16 @@
 // path ApprovalsStore uses — so this opens no extra socket.
 
 import { t } from "../i18n";
+import { fetchSop, personaCardHtml, showSop, type Persona } from "./personas";
 export interface RosterMember {
   name: string;
   role: string | null;
   hired: string | null;
   source: string | null;
   cv: Record<string, unknown> | null;
+  /** lane L6: who this member is, and the SOP file (relative to the roster) that says how they work. */
+  persona?: Persona | null;
+  sop?: string | null;
 }
 
 export interface RosterDept {
@@ -104,7 +108,7 @@ export function rosterHtml(roster: RosterPayload): string {
             <td class="hh-name" title="${esc(tip)}">${esc(m.name)}</td>
             <td class="hh-role">${esc(m.role ?? "")}</td>
             <td class="hh-hired">${m.hired ? `📅 ${esc(m.hired)}` : ""}</td>
-          </tr>`;
+          </tr>${m.persona ? `<tr class="hh-persona-row"><td colspan="3">${personaCardHtml(m)}</td></tr>` : ""}`;
         })
         .join("");
       return `<section class="hh-dept">
@@ -141,6 +145,7 @@ export function mountHiringHall(
         <h2>${t("hiring.title")} <button class="hiring-close" title="${t("panel.close")}">✕</button></h2>
         <p class="hh-note">${t("hiring.note")}</p>
         <div class="hh-roster"><p class="empty">${t("hiring.loading")}</p></div>
+        <div class="hh-sop" hidden></div>
         <h3 class="hh-form-title">${t("hiring.newHire")}</h3>
         <form class="hh-form">
           <input type="text" placeholder="${t("hiring.gapPlaceholder")}" />
@@ -157,6 +162,7 @@ export function mountHiringHall(
   const input = form.querySelector<HTMLInputElement>("input")!;
   const submit = form.querySelector<HTMLButtonElement>("button")!;
   const status = root.querySelector<HTMLElement>(".hh-status")!;
+  const sopBox = root.querySelector<HTMLElement>(".hh-sop")!;
 
   const mountTs = Date.now();
   let snapshot: RosterPayload | null = null;
@@ -221,6 +227,16 @@ export function mountHiringHall(
   overlay.addEventListener("click", (ev) => {
     const target = ev.target as HTMLElement;
     if (target === overlay || target.closest(".hiring-close")) overlay.hidden = true;
+  });
+
+  // lane L6: "View SOP" on a persona card → the procedure of that member of the applied roster
+  rosterBox.addEventListener("click", (ev) => {
+    const button = (ev.target as HTMLElement).closest<HTMLElement>("[data-sop]");
+    const member = button?.dataset.sop;
+    if (!button || !member) return;
+    button.closest(".persona-card")?.after(sopBox); // open the procedure right under the card that asked for it
+    showSop(sopBox, () => fetchSop("company", null, member));
+    sopBox.scrollIntoView({ block: "nearest" });
   });
 
   return {

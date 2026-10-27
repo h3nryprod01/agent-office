@@ -104,12 +104,12 @@ The event protocol lives in `packages/protocol`. The daemon is the only writer a
 
 ## Status
 
-A working tool, used daily by its author, still a personal project rather than a product. Known limits:
+A working tool, still a personal project rather than a product. Known limits:
 
 - **Localhost only, no authentication** — read [SECURITY.md](SECURITY.md) before exposing the port anywhere.
 - Spend in USD is only complete for models with published pricing; others count tokens but not dollars rather than guessing.
 - Animation pauses in hidden browser tabs (browsers stop `requestAnimationFrame`); state stays correct and characters catch up when the tab is visible.
-- `waiting_permission` is instant with the optional hook pilot, and inferred from the transcript without it.
+- `waiting_permission` needs a hook: the approve gateway (`PermissionRequest`) or the hook pilot report it at once. Without one, the office cannot tell a permission prompt from a slow tool.
 - Text-to-speech for PM replies needs a local virtualenv; without it the feature is simply off.
 
 Test suite: 560 tests across 55 files, run on Node 20 and 22 in CI.

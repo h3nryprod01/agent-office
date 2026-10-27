@@ -30,6 +30,15 @@ import { cliSpawnOptions } from "./platform.js";
 
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // PM reads registry/git before answering
 
+// Channel credentials must not ride into a PM process: a PM runs tools a chat member can ask
+// it to run (`env`), so anything in its environment is readable by that member.
+const SECRET_ENV = ["TELEGRAM_BOT_TOKEN", "ZALO_OA_TOKEN", "ZALO_OA_SECRET"];
+export function pmEnv(env = process.env) {
+  const out = { ...env };
+  for (const key of SECRET_ENV) delete out[key];
+  return out;
+}
+
 export const PM_SYSTEM_PROMPT =
   "You are the PM for Agent Office, answering through the chat box in the office. " +
   "Act as the stateless PM described in docs/company-protocol.md and the company-pm " +
@@ -37,6 +46,9 @@ export const PM_SYSTEM_PROMPT =
   "registry, the repo's active-context note, and git log. " +
   "ALWAYS reply in the language the user wrote in — Vietnamese in, Vietnamese out; " +
   "English in, English out. Keep it short, like a chat message. " +
+  "When you hand work to a roster member, call POST /assign {project, member, title, brief, parentItemId} " +
+  `on the Agent Office daemon (http://127.0.0.1:${process.env.DAEMON_WS_PORT ?? 8787}) and start the agent with the ` +
+  "prompt it returns: it carries that member's persona and SOP (docs/company-protocol.md section 6). " +
   "You CANNOT approve permissions for another session — if asked, say plainly that " +
   "it has to be approved in that session's own app.";
 
@@ -48,6 +60,9 @@ export const GENERIC_PM_SYSTEM_PROMPT =
   "and which sessions are currently running in the repo. " +
   "ALWAYS reply in the language the user wrote in — Vietnamese in, Vietnamese out; " +
   "English in, English out. Keep it short, like a chat message. " +
+  "When you hand work to a roster member, call POST /assign {project, member, title, brief, parentItemId} " +
+  `on the Agent Office daemon (http://127.0.0.1:${process.env.DAEMON_WS_PORT ?? 8787}) and start the agent with the ` +
+  "prompt it returns: it carries that member's persona and SOP (docs/company-protocol.md section 6). " +
   "You CANNOT approve permissions for another session — if asked, say plainly that " +
   "it has to be approved in that session's own app.";
 
@@ -289,6 +304,7 @@ export class ChatSessionManager {
       child = this.spawnFn(this.claudeBin, args, {
         cwd,
         stdio: ["pipe", "pipe", "pipe"],
+        env: pmEnv(),
         ...cliSpawnOptions(process.platform),
       });
     } catch (error) {
@@ -378,6 +394,7 @@ export class ChatSessionManager {
       child = this.spawnFn(this.claudeBin, args, {
         cwd,
         stdio: ["pipe", "pipe", "pipe"],
+        env: pmEnv(),
         ...cliSpawnOptions(process.platform),
       });
     } catch {

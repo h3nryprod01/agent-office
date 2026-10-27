@@ -29,6 +29,12 @@ export interface Skin {
 export interface Built {
   inner: THREE.Group;
   legs: THREE.Object3D[];
+  /** joints for the pose system; only designs that have them (the screen-head) set these */
+  head?: THREE.Object3D;
+  /** [-x arm, +x arm] shoulder pivots — rotation.x swings forward, rotation.z raises outward */
+  arms?: [THREE.Object3D, THREE.Object3D];
+  /** where a chest badge goes (front of the torso, in inner's local space) */
+  chest?: THREE.Object3D;
 }
 export type RobotBuilder = (skin: Skin) => Built;
 
@@ -199,16 +205,31 @@ const screenHead: RobotBuilder = (s) => {
   const n = neon(s.accent), b = matte(s.body), m = metal();
   g.add(mesh(boxG(0.66, 0.8, 0.4), b, 0, 1.28, 0));       // torso
   g.add(mesh(boxG(0.2, 0.5, 0.06), n, 0, 1.28, 0.21));    // chest light strip
-  g.add(mesh(boxG(0.72, 0.5, 0.12), b, 0, 1.95, 0));      // monitor bezel
-  const face = mesh(boxG(0.6, 0.38, 0.02), lens(s.screen), 0, 1.95, 0.08);
-  g.add(face);
   g.add(mesh(cylG(0.05, 0.05, 0.14), m, 0, 1.72, 0));     // neck
-  [-0.43, 0.43].forEach((x) => g.add(mesh(boxG(0.14, 0.66, 0.2), n, x, 1.26, 0))); // arms
+  // the head is its own pivot at the neck, so the pose system can nod and tilt it
+  const head = new THREE.Group();
+  head.position.set(0, 1.7, 0);
+  head.add(mesh(boxG(0.72, 0.5, 0.12), b, 0, 0.25, 0));    // monitor bezel
+  const face = mesh(boxG(0.6, 0.38, 0.02), lens(s.screen), 0, 0.25, 0.08);
+  head.add(face);
+  g.add(head);
+  // arms hang from shoulder pivots (top of the old arm box), same silhouette at rest
+  const arm = (x: number): THREE.Group => {
+    const p = new THREE.Group();
+    p.position.set(x, 1.59, 0);
+    p.add(mesh(boxG(0.14, 0.66, 0.2), n, 0, -0.33, 0));
+    g.add(p);
+    return p;
+  };
+  const arms: [THREE.Object3D, THREE.Object3D] = [arm(-0.43), arm(0.43)];
+  const chest = new THREE.Group();
+  chest.position.set(-0.215, 1.48, 0.215); // left of the light strip, clear of it
+  g.add(chest);
   const legs = [-0.18, 0.18].map((x) => legPivot(x, 0.86, b, 0.22, 0.86, 0.24));
   legs.forEach((l) => g.add(l));
   const inner = finish(g, 1.24);
   inner.userData.face = face; // hook for drawing a face/status later
-  return { inner, legs };
+  return { inner, legs, head, arms, chest };
 };
 
 // ── 10. Cube — a floating cube with detached hands ──

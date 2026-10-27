@@ -47,6 +47,7 @@ export function reduce(state: OfficeState, event: OfficeEvent): OfficeState {
         cwd: event.cwd ?? null,
         repo,
         harness: event.harness ?? null,
+        lane: event.lane ?? null,
         status: "idle",
         statusDetail: null,
         statusSince: event.timestamp,
@@ -164,7 +165,9 @@ function updateAgent(
   fn: (agent: AgentModel) => AgentModel,
 ): OfficeState {
   const existing = state.agents.get(event.agentId) ?? implicitAgent(event);
-  return withAgent(state, fn(existing));
+  // lane L3: a worker's lane is only known once its model replies — adopt it from any later event
+  const known = !existing.lane && event.lane ? { ...existing, lane: event.lane } : existing;
+  return withAgent(state, fn(known));
 }
 
 function implicitAgent(event: OfficeEvent): AgentModel {
@@ -177,6 +180,7 @@ function implicitAgent(event: OfficeEvent): AgentModel {
     cwd: null,
     repo: "other",
     harness: null,
+    lane: null,
     status: "idle",
     statusDetail: null,
     statusSince: event.timestamp,

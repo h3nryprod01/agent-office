@@ -37,6 +37,8 @@ out; the agent updates it as links appear:
       "assignee": "mission-control",
       "sessionId": "<agent session id, if known>",
       "branch": "feat/mission-control",
+      "parentItemId": "wi-<the item this one came from> | null",
+      "sopStep": 3,
       "issueId": "PROJ-12 | null",
       "issueUrl": "https://... | null",
       "pr": "https://github.com/... | null",
@@ -47,6 +49,10 @@ out; the agent updates it as links appear:
   ]
 }
 ```
+
+`assignee` is the roster member the work was handed to; `sopStep` is the 1-based
+step of that member's SOP they are on (omit it for a member without an SOP).
+`parentItemId` links the item to the one it came from, up to the project goal.
 
 The daemon serves this over `GET /work-items`, re-read per request and never
 cached. The side panel renders a "Work item" section with deep links out to the
@@ -90,7 +96,8 @@ There is no long-lived PM session. Any session running `/company:pm` will:
    unreviewed? An agent silent for too long?
 3. **Act**: review and merge, or hand out new work — create the issue, add the
    registry entry, and spawn the agent with §3 and §5 injected into its prompt —
-   then update the active-context note.
+   then update the active-context note. When the agent is a roster member, the
+   prompt is the persona + SOP prompt from §6, not a hand-written one.
 4. **End the turn**, or loop. Dying costs nothing, because the whole brain lives
    in the tracker, the registry and the repo's memory.
 
@@ -108,3 +115,28 @@ Each of these was learned by getting it wrong first.
   session stopped.
 - A new decision gets appended to the repo's decision log with its date and,
   more importantly, its reason.
+
+## 6. Personas and SOPs
+
+A roster member may carry a `persona` (who they are) and an `sop` (how their
+position works). Format and validation: [company-templates.md](company-templates.md).
+
+When the PM hands work to such a member:
+
+1. Call `POST /assign {project, member, title, brief, parentItemId}` on the
+   daemon. It creates the project's work item (`assignee` = member,
+   `sopStep` = 1, `parentItemId`) and returns `{item, prompt, problems}`.
+2. Spawn the agent with exactly that `prompt`. It already carries the persona,
+   the SOP (inputs, numbered steps, definition of done, hand-over targets,
+   escalation triggers), the project goals, the task and the five-part report
+   contract of §3.
+3. The agent says which SOP step it is on in every progress message and in its
+   report; the PM records it with `POST /items/update {patch: {sopStep}}` (and in
+   the registry entry of §2).
+4. The agent hands over to the targets its SOP names and escalates to a human on
+   the SOP's triggers. A report that skips a line of the definition of done is
+   not accepted at face value (§3).
+
+A member without a persona or SOP is spawned the old way. If a SOP file is
+missing or malformed, `/assign` still returns the persona prompt and lists the
+problem — assigning work is never blocked by a documentation error.

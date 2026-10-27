@@ -121,3 +121,54 @@ describe("costsPanelHtml", () => {
     expect(html).toContain("123k");
   });
 });
+
+// lane L3: worker-lane table (transcript cost + scorecard)
+import { laneTableHtml, scorecardDays, type ScorecardPayload } from "../src/ui/costs";
+
+const LANE_ROWS = [
+  { ...row, harness: "claude-worker", lane: "deepseek", usd: 0.1234, tokens: 3_000_000 },
+  { ...row, harness: "claude-worker", lane: "kimi", usd: 0, tokens: 400_000 },
+];
+const SCORE: ScorecardPayload = {
+  windowDays: 30,
+  unattributedReviews: 0,
+  brokenLines: 0,
+  lanes: [
+    { lane: "deepseek", jobs: 12, errors: 1, timeouts: 0, seconds: 900, usd: 0.4567, tokens: { miss: 1, hit: 2, out: 3 }, reviews: 3, passed: 2, passRate: 2 / 3, rework: 1, critical: 0, high: 1 },
+    { lane: "mimo", jobs: 4, errors: 0, timeouts: 1, seconds: 100, usd: null, tokens: { miss: 0, hit: 0, out: 0 }, reviews: 0, passed: 0, passRate: null, rework: 0, critical: 0, high: 0 },
+  ],
+};
+
+describe("laneTableHtml", () => {
+  it("joins transcript cost and scorecard by lane; lanes seen in only one source still appear", () => {
+    const html = laneTableHtml(LANE_ROWS, SCORE);
+    for (const lane of ["DeepSeek", "Kimi", "MiMo"]) expect(html).toContain(lane);
+    expect(html).toContain("12"); // jobs
+    expect(html).toContain("67% (2/3)"); // pass rate
+    expect(html).toContain("$0.457"); // logged cost (exact)
+    expect(html).toContain("$0.123"); // transcript estimate
+  });
+
+  it("no review yet → dash, never a fake 0%", () => {
+    const html = laneTableHtml([], SCORE);
+    const mimo = html.slice(html.indexOf("MiMo"));
+    expect(mimo).not.toContain("0%");
+  });
+
+  it("empty on both sides renders nothing (a daemon without worker lanes shows no section)", () => {
+    expect(laneTableHtml([], undefined)).toBe("");
+    expect(laneTableHtml(undefined, { ...SCORE, lanes: [] })).toBe("");
+  });
+
+  it("costsPanelHtml includes the lane section only when there is something to show", () => {
+    const withLanes = costsPanelHtml({ ...PAYLOAD, byLane: LANE_ROWS }, [], SCORE);
+    expect(withLanes).toContain("Worker lanes");
+    expect(costsPanelHtml(PAYLOAD, [])).not.toContain("Worker lanes");
+  });
+});
+
+describe("scorecardDays", () => {
+  it("maps the Spend window to scorecard days", () => {
+    expect([scorecardDays("24h"), scorecardDays("7d"), scorecardDays("30d")]).toEqual([1, 7, 30]);
+  });
+});

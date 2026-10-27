@@ -187,3 +187,146 @@ test("http handler: routes /costs, validates window, ignores other paths", async
 function round(usd) {
   return Math.round(usd * 10000) / 10000;
 }
+
+// ── lane L3: worker model pricing (rates from the user's own exec_prices.py,
+// read 2026-10-19: MiMo pay-as-you-go table + DeepSeek pricing page) ──────────
+const TUE_PEAK = Date.UTC(2026, 9, 27, 7, 30); // Tue 07:30Z — inside 06–10 UTC
+const TUE_OFF = Date.UTC(2026, 9, 27, 12, 0);
+const SAT_07 = Date.UTC(2026, 9, 31, 7, 30); // Saturday: never peak
+
+test("deepseek flash: peak is double off-peak; cache write bills like fresh input", () => {
+  const usage = { input_tokens: 1e6, output_tokens: 1e6, cache_creation_input_tokens: 1e6, cache_read_input_tokens: 1e6 };
+  const peak = costUsd("deepseek-flash", usage, TUE_PEAK);
+  const off = costUsd("deepseek-flash", usage, TUE_OFF);
+  // (miss 0.30 + write 0.30 + hit 0.006 + out 1.20) peak; half of that off-peak
+  assert.ok(Math.abs(peak.usd - 1.806) < 1e-9);
+  assert.ok(Math.abs(off.usd - 0.903) < 1e-9);
+  assert.equal(peak.known, true);
+  assert.ok(Math.abs(costUsd("deepseek-flash[1m]", usage, SAT_07).usd - 0.903) < 1e-9);
+});
+
+test("deepseek without a timestamp is priced as peak (upper bound); pro tier by name", () => {
+  const usage = { input_tokens: 1e6 };
+  assert.ok(Math.abs(costUsd("deepseek-flash", usage).usd - 0.3) < 1e-9);
+  assert.ok(Math.abs(costUsd("deepseek-v4-pro", usage, TUE_PEAK).usd - 1.32) < 1e-9);
+  assert.ok(Math.abs(costUsd("deepseek-v4-pro", usage, TUE_OFF).usd - 0.66) < 1e-9);
+});
+
+test("mimo: flat price, flash vs pro", () => {
+  const usage = { input_tokens: 1e6, output_tokens: 1e6, cache_read_input_tokens: 1e6 };
+  assert.ok(Math.abs(costUsd("mimo-v2.6-pro", usage, TUE_PEAK).usd - (0.435 + 0.87 + 0.0036)) < 1e-9);
+  assert.ok(Math.abs(costUsd("mimo-v2.6-flash", usage, TUE_OFF).usd - (0.14 + 0.28 + 0.0028)) < 1e-9);
+});
+
+test("kimi (flat-fee plan) stays unpriced: tokens count, usd 0, known false", () => {
+  assert.deepEqual(costUsd("k3[1m]", { input_tokens: 1e6 }), { usd: 0, known: false });
+  assert.equal(priceFor("k3[1m]"), null);
+});
+
+test("existing Anthropic rows are unaffected by the optional timestamp", () => {
+  assert.deepEqual(priceFor("claude-opus-4-8", TUE_PEAK), priceFor("claude-opus-4-8"));
+});
+
+test("worker root: tailed as harness claude-worker, lane from model, priced; main root untouched", async () => {
+  const main = makeFixture();
+  const worker = makeFixture();
+  const now = Date.now();
+  writeFileSync(main.file, usageLine({ ts: now, id: "m", input: 1000, output: 100 }));
+  writeFileSync(
+    worker.file,
+    usageLine({ ts: now, id: "w1", model: "deepseek-flash", input: 1e6, output: 0, sessionId: "wk-1" }) +
+      usageLine({ ts: now, id: "w2", model: "k3[1m]", input: 500, output: 5, sessionId: "wk-2" }),
+  );
+
+  const index = new UsageCostIndex({
+    claudeRoots: [
+      { root: main.root, harness: "claude-code" },
+      { root: worker.root, harness: "claude-worker" },
+    ],
+    scanTtlMs: 0,
+  });
+  const day = await index.query("24h");
+
+  assert.deepEqual(day.byHarness.map((r) => r.harness).sort(), ["claude-code", "claude-worker"]);
+  const lanes = Object.fromEntries(day.byLane.map((r) => [r.lane, r]));
+  assert.deepEqual(Object.keys(lanes).sort(), ["deepseek", "kimi"]);
+  assert.equal(lanes.deepseek.harness, "claude-worker");
+  assert.equal(lanes.deepseek.tokens, 1e6);
+  assert.ok(lanes.deepseek.usd === 0.15 || lanes.deepseek.usd === 0.3, "off-peak 0.15 or peak 0.30"); // exact rate pinned in the fixed-time test below
+  assert.equal(lanes.kimi.usd, 0); // flat-fee plan: tokens only
+  assert.ok(day.unknownModels.some((u) => u.model === "k3[1m]"));
+  assert.equal(day.byAgent.find((a) => a.sessionId === "wk-1").harness, "claude-worker");
+
+  rmSync(main.root, { recursive: true, force: true });
+  rmSync(worker.root, { recursive: true, force: true });
+});
+
+test("hermes: tokens per session from state.db, cost as Hermes recorded it (not re-priced)", { skip: !(await import("./hermes-fixture.js")).hasSqlite && "node:sqlite unavailable" }, async () => {
+  const { makeHermesDb } = await import("./hermes-fixture.js");
+  const f = await makeHermesDb();
+  const now = Date.now() / 1000;
+  f.addSession({ id: "h1", started_at: now - 600, last_activity_at: now - 60, model: "gpt-5.5", input_tokens: 1000, output_tokens: 100, cache_read_tokens: 5000, estimated_cost_usd: 0, cost_status: "included" });
+  f.addSession({ id: "h2", started_at: now - 600, last_activity_at: now - 30, model: "gpt-5.5", input_tokens: 10, output_tokens: 1, actual_cost_usd: 0.25, cost_status: "actual" });
+  f.addSession({ id: "h-old", started_at: now - 40 * 86400, last_activity_at: now - 40 * 86400, input_tokens: 999999 });
+
+  const index = new UsageCostIndex({ claudeRoots: [], hermesDbPath: f.dbPath, scanTtlMs: 0 });
+  const day = await index.query("24h");
+  assert.equal(day.tokensTotal, 1000 + 100 + 5000 + 10 + 1);
+  assert.equal(day.totalUsd, 0.25);
+  assert.deepEqual(day.byHarness.map((r) => r.harness), ["hermes"]);
+  assert.equal(day.unknownModels.length, 0, "recorded cost counts as known even when gpt-5.5 has a table price");
+
+  // new writes show up without the main db file changing (WAL): every scan re-reads
+  f.addSession({ id: "h3", started_at: now - 10, last_activity_at: now - 5, input_tokens: 7 });
+  assert.equal((await index.query("24h")).tokensTotal, 6111 + 7);
+  f.db.close();
+  rmSync(f.dir, { recursive: true, force: true });
+});
+
+test("worker lane pricing is wired through the aggregation: a Saturday call bills off-peak, a Tuesday-07Z call peak", async () => {
+  const worker = makeFixture();
+  const sat = lastUtc(6, 12); // Saturday 12:00Z — never peak
+  const tue = lastUtc(2, 7); // Tuesday 07:00Z — peak
+  writeFileSync(
+    worker.file,
+    usageLine({ ts: sat, id: "s", model: "deepseek-flash", input: 1e6, output: 0 }) +
+      usageLine({ ts: tue, id: "t", model: "deepseek-flash", input: 1e6, output: 0 }),
+  );
+  const index = new UsageCostIndex({ claudeRoots: [{ root: worker.root, harness: "claude-worker" }], scanTtlMs: 0 });
+  const day = await index.query("30d");
+  assert.ok(Math.abs(day.totalUsd - (0.15 + 0.3)) < 1e-9, `got ${day.totalUsd}`);
+  rmSync(worker.root, { recursive: true, force: true });
+});
+
+test("main root: MiMo run from the main config dir lands in byLane too; Claude and codex ids do not", async () => {
+  const main = makeFixture();
+  writeFileSync(
+    main.file,
+    usageLine({ ts: Date.now(), id: "a", model: "mimo-v2.6-pro", input: 100, output: 10 }) +
+      usageLine({ ts: Date.now(), id: "b", model: "claude-sonnet-5", input: 100, output: 10 }),
+  );
+  const index = new UsageCostIndex({ claudeRoots: [{ root: main.root, harness: "claude-code" }], scanTtlMs: 0 });
+  const day = await index.query("24h");
+  assert.deepEqual(day.byLane.map((r) => [r.harness, r.lane]), [["claude-code", "mimo"]]);
+  rmSync(main.root, { recursive: true, force: true });
+});
+
+/** ms of the most recent UTC `weekday` (0=Sun) at `hour`:00, within the last 7 days. */
+function lastUtc(weekday, hour) {
+  const d = new Date();
+  d.setUTCHours(hour, 0, 0, 0);
+  while (d.getUTCDay() !== weekday || d.getTime() > Date.now()) d.setUTCDate(d.getUTCDate() - 1);
+  return d.getTime();
+}
+
+test("hermes: a session with NULL last_activity_at is placed by its newest message, not its start", { skip: !(await import("./hermes-fixture.js")).hasSqlite && "node:sqlite unavailable" }, async () => {
+  const { makeHermesDb } = await import("./hermes-fixture.js");
+  const f = await makeHermesDb();
+  const now = Date.now() / 1000;
+  f.addSession({ id: "old-start", started_at: now - 5 * 86400, input_tokens: 500 }); // last_activity_at NULL
+  f.addMessage({ session_id: "old-start", role: "user", content: "x", timestamp: now - 60 });
+  const index = new UsageCostIndex({ claudeRoots: [], hermesDbPath: f.dbPath, scanTtlMs: 0 });
+  assert.equal((await index.query("24h")).tokensTotal, 500);
+  f.db.close();
+  rmSync(f.dir, { recursive: true, force: true });
+});

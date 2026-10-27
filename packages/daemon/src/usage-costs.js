@@ -15,7 +15,8 @@
 
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { parseClaudeFile, parseCodexFile, parseGeminiFile } from "./usage-parsers.js";
+import { parseClaudeFile, parseCodexFile, parseGeminiFile, parseHermesDb } from "./usage-parsers.js";
+import { laneOfModel } from "./worker-lanes.js";
 
 const HOUR_MS = 3_600_000;
 export const WINDOWS_MS = { "24h": 24 * HOUR_MS, "7d": 7 * 24 * HOUR_MS, "30d": 30 * 24 * HOUR_MS };
@@ -28,25 +29,32 @@ export function overBudget(totalUsd, budgetUsd) {
 export class UsageCostIndex {
   /**
    * @param {Object} opts
-   * @param {string} opts.projectsRoot          ~/.claude/projects
+   * @param {string} [opts.projectsRoot]        ~/.claude/projects
+   * @param {{root:string, harness:string}[]} [opts.claudeRoots] several Claude-format roots
+   *   (main + worker); overrides `projectsRoot`
    * @param {string} [opts.codexSessionsRoot]   ~/.codex/sessions (omit to skip)
    * @param {string} [opts.geminiTmpRoot]       ~/.gemini/tmp (omit to skip)
+   * @param {string} [opts.hermesDbPath]        ~/.hermes/state.db (omit to skip)
    * @param {number} [opts.scanTtlMs]           min interval between directory rescans
    * @param {number} [opts.maxAgeMs]            files with mtime older than this are skipped
    * @param {number} [opts.maxAgents]           byAgent rows returned (top by USD)
    */
   constructor({
     projectsRoot,
+    claudeRoots,
     codexSessionsRoot,
     geminiTmpRoot,
+    hermesDbPath,
     scanTtlMs = 15_000,
     maxAgeMs = WINDOWS_MS["30d"],
     maxAgents = 20,
     budgetUsd = null,
   }) {
     this.projectsRoot = projectsRoot;
+    this.claudeRoots = claudeRoots ?? [{ root: projectsRoot, harness: "claude-code" }];
     this.codexSessionsRoot = codexSessionsRoot;
     this.geminiTmpRoot = geminiTmpRoot;
+    this.hermesDbPath = hermesDbPath;
     this.scanTtlMs = scanTtlMs;
     this.maxAgeMs = maxAgeMs;
     this.maxAgents = maxAgents;
@@ -78,6 +86,7 @@ export class UsageCostIndex {
     const byAgent = new Map();
     const byDay = new Map();
     const byHarness = new Map();
+    const byLane = new Map();
     const unknownModels = new Map();
     const total = emptyRow();
 
@@ -92,6 +101,11 @@ export class UsageCostIndex {
         );
         addRow(mapRow(byDay, dayOf(b.hour), { day: dayOf(b.hour) }), b);
         addRow(mapRow(byHarness, b.harness, { harness: b.harness }), b);
+        // Claude-format harnesses only (codex/gemini model ids are their own vendors, not worker lanes);
+        // the main root counts only known vendors, e.g. MiMo run from the main config dir
+        const claudeFormat = b.harness === "claude-worker" || b.harness === "claude-code";
+        const lane = claudeFormat ? laneOfModel(b.model, { strict: b.harness === "claude-code" }) : null;
+        if (lane) addRow(mapRow(byLane, `${b.harness}|${lane}`, { harness: b.harness, lane }), b);
         // zero-token unknowns (e.g. "<synthetic>" error placeholders) are noise
         if (!b.known && b.tokens > 0)
           unknownModels.set(b.model, (unknownModels.get(b.model) ?? 0) + b.tokens);
@@ -117,6 +131,7 @@ export class UsageCostIndex {
       byAgent: [...byAgent.values()].sort(desc).slice(0, this.maxAgents).map(roundRow),
       byDay: [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day)).map(roundRow),
       byHarness: [...byHarness.values()].sort(desc).map(roundRow),
+      byLane: [...byLane.values()].sort(desc).map(roundRow),
       unknownModels: [...unknownModels.entries()].map(([model, tokens]) => ({ model, tokens })),
     };
   }
@@ -127,23 +142,24 @@ export class UsageCostIndex {
     this.lastScan = now;
 
     const targets = [
-      ...(await claudeFiles(this.projectsRoot)),
+      ...(await Promise.all(this.claudeRoots.map((r) => claudeFiles(r.root, r.harness)))).flat(),
       ...(await codexFiles(this.codexSessionsRoot)),
       ...(await geminiFiles(this.geminiTmpRoot)),
+      ...hermesTargets(this.hermesDbPath),
     ];
 
     const seen = new Set();
-    for (const { filePath, parse } of targets) {
+    for (const { filePath, parse, alwaysParse } of targets) {
       let st;
       try {
         st = await stat(filePath);
       } catch {
         continue; // deleted between readdir and stat
       }
-      if (now - st.mtimeMs > this.maxAgeMs) continue;
+      if (!alwaysParse && now - st.mtimeMs > this.maxAgeMs) continue;
       seen.add(filePath);
       const cached = this.fileCache.get(filePath);
-      if (cached && cached.mtimeMs === st.mtimeMs && cached.size === st.size) continue;
+      if (!alwaysParse && cached && cached.mtimeMs === st.mtimeMs && cached.size === st.size) continue;
       this.stats.filesParsed += 1;
       const buckets = await parse();
       this.fileCache.set(filePath, { mtimeMs: st.mtimeMs, size: st.size, buckets });
@@ -155,13 +171,31 @@ export class UsageCostIndex {
   }
 }
 
-/** @typedef {{filePath:string, parse:() => Promise<Object[]>}} Target */
+/** @typedef {{filePath:string, parse:() => Promise<Object[]>, alwaysParse?:boolean}} Target */
+
+/**
+ * Hermes' live data sits in the SQLite WAL, so the main file's (mtime, size)
+ * stays put while sessions change: re-read on every scan (one cheap SELECT
+ * over a few rows) instead of trusting the cache key. A schema this code does
+ * not know yields no rows rather than failing all of /costs.
+ * @returns {Target[]}
+ */
+let hermesWarned = false;
+function warnHermesOnce(error) {
+  if (!hermesWarned) console.error("[costs] hermes state.db unreadable, its spend is omitted:", error.message);
+  hermesWarned = true;
+  return [];
+}
+
+function hermesTargets(dbPath) {
+  return dbPath ? [{ filePath: dbPath, parse: () => parseHermesDb(dbPath).catch(warnHermesOnce), alwaysParse: true }] : [];
+}
 
 /** @returns {Promise<Target[]>} */
-async function claudeFiles(root) {
+async function claudeFiles(root, harness) {
   if (!root) return [];
   const files = await walk(root, (name) => name.endsWith(".jsonl"));
-  return files.map((filePath) => ({ filePath, parse: () => parseClaudeFile(filePath) }));
+  return files.map((filePath) => ({ filePath, parse: () => parseClaudeFile(filePath, harness) }));
 }
 
 /** @returns {Promise<Target[]>} */

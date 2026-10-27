@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import fs from "node:fs";
+import os from "node:os";
 import {
   isWindows,
   binCandidates,
@@ -88,4 +90,34 @@ test("notifyCommand: linux → notify-send", () => {
     cmd: "notify-send",
     args: ["-a", "Agent Office", "Agent Office", "stuck >30s"],
   });
+});
+
+test("revealCommand: Open runs nothing — folders and known documents open, everything else is selected", () => {
+  const dir = true, file = false;
+  assert.deepEqual(revealCommand("/x/Tool.app", false, "darwin", dir).args, ["-R", "/x/Tool.app"]);
+  assert.deepEqual(revealCommand("/x/me.github.io", false, "darwin", dir).args, ["/x/me.github.io"]);
+  assert.deepEqual(revealCommand("/x/plain", false, "darwin", dir).args, ["/x/plain"]);
+  assert.deepEqual(revealCommand("/x/report.pdf", false, "darwin", file).args, ["/x/report.pdf"]);
+  assert.deepEqual(revealCommand("/x/report.html", false, "darwin", file).args, ["/x/report.html"]);
+  for (const f of ["/x/run", "/x/run.command", "/x/a.jar", "/x/link.webloc", "/x/Setup.pkg", "/x/a.rtf", "/x/a.csv"]) {
+    assert.deepEqual(revealCommand(f, false, "darwin", file).args, ["-R", f], f);
+  }
+  assert.deepEqual(revealCommand("C:\\x\\setup.exe", false, "win32", file).args, ["/select,C:\\x\\setup.exe"]);
+  assert.deepEqual(revealCommand("C:\\x\\a.pif", false, "win32", file).args, ["/select,C:\\x\\a.pif"]);
+  assert.deepEqual(revealCommand("C:\\x\\notes.txt", false, "win32", file).args, ["C:\\x\\notes.txt"]);
+  assert.deepEqual(revealCommand("C:\\x\\Tool.app", false, "win32", dir).args, ["C:\\x\\Tool.app"]);
+  assert.deepEqual(revealCommand("C:\\x\\a,b.txt", true, "win32", file), { cmd: "explorer", args: ["C:\\x"] });
+  assert.deepEqual(revealCommand("/x/run.sh", false, "linux", file).args, ["/x"]);
+  assert.deepEqual(revealCommand("/x/proj", false, "linux", dir).args, ["/x/proj"]);
+  // looked up on disk when not given: a folder opens, this .js file is selected, a disguised bundle is selected
+  assert.deepEqual(revealCommand(import.meta.dirname, false, "darwin").args, [import.meta.dirname]);
+  assert.deepEqual(revealCommand(import.meta.filename, false, "darwin").args, ["-R", import.meta.filename]);
+  const fake = fs.mkdtempSync(path.join(os.tmpdir(), "ao-bundle-"));
+  try {
+    fs.mkdirSync(path.join(fake, "Contents"));
+    fs.writeFileSync(path.join(fake, "Contents", "Info.plist"), "<plist/>");
+    assert.deepEqual(revealCommand(fake, false, "darwin").args, ["-R", fake]);
+  } finally {
+    fs.rmSync(fake, { recursive: true });
+  }
 });

@@ -57,6 +57,7 @@ export function mountTimelineBar(
   let playing = false;
   let lastTick = 0; // performance.now() of the previous clock tick
   let msgTimer: ReturnType<typeof setTimeout> | null = null;
+  let stopAtMs = Infinity; // lane L9: ?replay= may end playback early
 
   function message(text: string): void {
     msgEl.textContent = text;
@@ -183,23 +184,25 @@ export function mountTimelineBar(
   });
 
   function importFile(file: File): void {
-    file.text().then(
-      (text) => {
-        try {
-          const events = parseReplayFile(text);
-          if (events.length === 0) {
-            message(t("timeline.emptyFile"));
-            return;
-          }
-          playing = false;
-          enterReplay(events);
-          message(t("timeline.loaded", { n: events.length }));
-        } catch (err) {
-          message(err instanceof Error ? err.message : t("timeline.unreadableFile"));
-        }
-      },
-      () => message(t("timeline.unreadableFile")),
-    );
+    file.text().then(loadText, () => message(t("timeline.unreadableFile")));
+  }
+
+  function loadText(text: string): boolean {
+    stopAtMs = Infinity; // a new file plays to its own end, whatever ?to= an earlier one had
+    try {
+      const events = parseReplayFile(text);
+      if (events.length === 0) {
+        message(t("timeline.emptyFile"));
+        return false;
+      }
+      playing = false;
+      enterReplay(events);
+      message(t("timeline.loaded", { n: events.length }));
+      return true;
+    } catch (err) {
+      message(err instanceof Error ? err.message : t("timeline.unreadableFile"));
+      return false;
+    }
   }
 
   // replay clock + live-range tracking; 10 Hz is plenty (AgentLayer tweens
@@ -218,8 +221,9 @@ export function mountTimelineBar(
     const now = performance.now();
     cursorMs += (now - lastTick) * speed;
     lastTick = now;
-    if (cursorMs >= cursor.endMs) {
-      cursorMs = cursor.endMs;
+    const end = Math.min(cursor.endMs, stopAtMs);
+    if (cursorMs >= end) {
+      cursorMs = end;
       playing = false;
       syncButtons();
     }
@@ -227,6 +231,31 @@ export function mountTimelineBar(
   }, TICK_MS);
 
   syncButtons();
+
+  // lane L9: ?replay=<url>[&speed=N][&from=0..1][&to=0..1][&play=1] loads a replay and (optionally)
+  // starts it — how the launch timelapse is recorded. Goes through fetch, so in presentation mode the
+  // file arrives already masked.
+  const q = new URLSearchParams(location.search);
+  const replayUrl = q.get("replay");
+  if (replayUrl) {
+    fetch(replayUrl)
+      .then((r) => r.text())
+      .then((text) => {
+        if (!loadText(text) || !cursor) return;
+        const span = cursor.endMs - cursor.startMs;
+        const frac = (key: string, fallback: number): number => Math.min(1, Math.max(0, Number(q.get(key) ?? fallback) || 0));
+        cursorMs = cursor.startMs + span * frac("from", 0);
+        stopAtMs = cursor.startMs + span * frac("to", 1);
+        speed = Number(q.get("speed")) || speed;
+        emitView();
+        if (q.get("play") === "1") {
+          playing = true;
+          lastTick = performance.now();
+        }
+        syncButtons();
+      })
+      .catch(() => message(t("timeline.unreadableFile")));
+  }
 }
 
 function fmt(ms: number): string {

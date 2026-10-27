@@ -75,10 +75,15 @@ export function parseMessage(event) {
 export async function sendMessage(userId, text, { fetchFn = fetch, env = process.env } = {}) {
   const cfg = readConfig(env);
   if (!cfg) return;
+  await sendWithToken(cfg.token, userId, text, { fetchFn });
+}
+
+/** The raw OA call, for callers that hold a token without ZALO_ALLOWED_USER (lane L5's channel). */
+export async function sendWithToken(token, userId, text, { fetchFn = fetch } = {}) {
   try {
     await fetchFn(ZALO_SEND_API, {
       method: "POST",
-      headers: { "content-type": "application/json", access_token: cfg.token },
+      headers: { "content-type": "application/json", access_token: token },
       body: JSON.stringify({ recipient: { user_id: userId }, message: { text } }),
     });
   } catch {

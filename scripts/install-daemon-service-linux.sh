@@ -28,11 +28,13 @@ mkdir -p "$(dirname "$ENV_FILE")"
 # tab Chi phí hiện cảnh báo. Bỏ trống = tắt.
 #AGENT_OFFICE_BUDGET_USD=
 
-# Zalo (PLACEHOLDER — nhắn PM qua Zalo OA). Cần: (1) tạo Zalo OA + access token
-# (token hết hạn ~1 ngày → phải refresh bằng OAuth của Zalo); (2) expose công
-# khai POST /zalo/webhook qua HTTPS để Zalo gọi tới. Bỏ trống = tắt.
+# Zalo OA — kênh quản lý dự án (docs/multi-pm-telegram.md). Cần đủ 3 biến: access token
+# của OA (hết hạn ~1 ngày → refresh bằng OAuth của Zalo), App ID và OA secret (để kiểm chữ
+# ký webhook); và expose công khai POST /zalo/webhook qua HTTPS. Bỏ trống = tắt.
 #ZALO_OA_TOKEN=
-#ZALO_ALLOWED_USER=
+#ZALO_APP_ID=
+#ZALO_OA_SECRET=
+#ZALO_ALLOWED_USER=   # tuỳ chọn: chat Zalo riêng của chủ máy (kiểu cũ)
 
 # VieNeu TTS — giọng tiếng Việt đọc reply của PM. Cần python có 'vieneu' + 'torch':
 #   python3 -m venv ~/.venv-vieneu

@@ -16,6 +16,8 @@ export interface PendingApproval {
   tool: string;
   preview: string;
   expiresAt: number;
+  /** lane L2: present when the project's policy was involved (a forced ask says why). */
+  policy?: { project?: string; mode?: string; forced?: string | null; reasons?: string[] };
 }
 
 interface ApprovalRawEvent {
@@ -27,6 +29,7 @@ interface ApprovalRawEvent {
     preview?: string;
     expiresAt?: number;
     state?: string;
+    policy?: PendingApproval["policy"];
   } | null;
 }
 
@@ -49,6 +52,7 @@ export class ApprovalsStore {
         tool: e.tool ?? "unknown",
         preview: e.meta?.preview ?? "",
         expiresAt,
+        ...(e.meta?.policy ? { policy: e.meta.policy } : {}),
       });
     } else if (e.type === "approval_resolved") {
       this.items.delete(id);
@@ -69,16 +73,18 @@ export class ApprovalsStore {
   }
 
   /** ✓/✗ click. Optimistic removal; daemon TTL covers the failure cases. */
-  async respond(id: string, decision: "allow" | "deny"): Promise<void> {
+  async respond(id: string, decision: "allow" | "deny"): Promise<{ ok: boolean; status: number }> {
     this.items.delete(id);
     try {
-      await fetch(`${HTTP_BASE}/approval-response`, {
+      const res = await fetch(`${HTTP_BASE}/approval-response`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id, decision }),
       });
+      return { ok: res.ok, status: res.status };
     } catch {
       // POST failed → the hook's own timeout falls back to the normal dialog
+      return { ok: false, status: 0 };
     }
   }
 

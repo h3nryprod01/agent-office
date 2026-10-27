@@ -198,3 +198,29 @@ describe("friendly agent naming (coder-NN)", () => {
     expect(s.agents.get("m")!.name).toBe("marketing-01");
   });
 });
+
+describe("reduce — worker lane (lane L3)", () => {
+  it("spawn stores harness + lane", () => {
+    const s = reduce(
+      INITIAL_STATE,
+      make({ type: "agent_spawned", agentId: "w1", name: "w", role: null, harness: "claude-worker", lane: "mimo" }),
+    );
+    expect(s.agents.get("w1")).toMatchObject({ harness: "claude-worker", lane: "mimo" });
+  });
+
+  it("a lane that arrives on a later event fills an empty lane, and never overwrites a known one", () => {
+    let s = reduce(
+      INITIAL_STATE,
+      make({ type: "agent_spawned", agentId: "w1", name: "w", role: null, harness: "claude-worker", lane: null }),
+    );
+    s = reduce(s, make({ type: "tool_call_started", agentId: "w1", tool: "Read", detail: null, lane: "deepseek" }));
+    expect(s.agents.get("w1")!.lane).toBe("deepseek");
+    s = reduce(s, make({ type: "tool_call_started", agentId: "w1", tool: "Read", detail: null, lane: "glm" }));
+    expect(s.agents.get("w1")!.lane).toBe("deepseek");
+  });
+
+  it("agents without a lane stay null (every non-worker harness)", () => {
+    const s = spawnPm();
+    expect(s.agents.get(SESSION)!.lane).toBeNull();
+  });
+});

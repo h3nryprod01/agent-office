@@ -19,7 +19,7 @@
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 
-const PORT = process.env.AGENT_OFFICE_PORT ?? "8787";
+const PORT = process.env.AGENT_OFFICE_PORT ?? process.env.DAEMON_WS_PORT ?? "8787";
 const URL_BASE = `http://127.0.0.1:${PORT}`;
 
 const TOOL = {
@@ -36,30 +36,83 @@ const TOOL = {
   },
 };
 
-/** POST to the daemon's ApprovalBroker; returns "allow" | "deny" | "none". */
+/** POST to the daemon's ApprovalBroker; returns {decision: "allow"|"deny"|"none", message?}. */
+// lane L4: lets an agent ask "is anyone else writing this file?" before it edits.
+const WHO_IS_TOUCHING = {
+  name: "who_is_touching",
+  description:
+    "Before editing a file, ask Agent Office which OTHER agents have recently written it (last ~10 minutes), including agents working on the same file in a different git worktree. Returns a short plain-text answer; it never blocks anything.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      path: { type: "string", description: "File path, absolute or relative to the current directory" },
+      session_id: { type: "string", description: "Your own session id, if you know it, so you are left out of the answer" },
+    },
+    required: ["path"],
+  },
+};
+
 async function askOffice(toolName, input, fetchFn = fetch) {
   try {
     const res = await fetchFn(`${URL_BASE}/approval-request`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ tool: toolName, toolInput: input }),
+      // lane L2: cwd (claude's cwd = the PM's repo) resolves the project policy; role "pm" lets a project override it.
+      body: JSON.stringify({ tool: toolName, toolInput: input, cwd: process.cwd(), harness: "claude", role: "pm" }),
     });
     const body = await res.json();
-    return body?.decision ?? "none";
+    return { decision: body?.decision ?? "none", message: typeof body?.message === "string" ? body.message : undefined };
   } catch {
-    return "none";
+    return { decision: "none" };
   }
+}
+
+/** GET the radar's view of one path; returns the parsed answer or null when the office is unreachable. */
+async function askRadar(path, sessionId, fetchFn = fetch) {
+  try {
+    const qs = new URLSearchParams({ path, cwd: process.cwd() });
+    if (sessionId) qs.set("exclude", sessionId);
+    const res = await fetchFn(`${URL_BASE}/radar/touching?${qs}`, { signal: AbortSignal.timeout(2000) });
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** An agent's name derives from a folder it controls and is shown to OTHER agents: flatten and cap it. */
+export const cleanName = (s) => String(s ?? "").replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ").slice(0, 40);
+const ago = (ms) => (ms < 90_000 ? `${Math.round(ms / 1000)}s` : `${Math.round(ms / 60_000)}min`);
+
+/** Plain-text answer for the agent. Exported for the test. */
+export function describeTouching(answer, askerKnown = true) {
+  if (!answer) return "Agent Office is not reachable, so I cannot tell who else is touching this file.";
+  const line = (t) => `- ${cleanName(t.name)} (${t.harness ?? "unknown"}, repo ${t.repo ?? "?"}) via ${t.tool ?? "a write"}, ${ago(t.ageMs)} ago`;
+  const out = [];
+  if (answer.touching.length) {
+    out.push(`${answer.touching.length} other agent(s) wrote ${answer.path} recently:`, ...answer.touching.map(line));
+  }
+  if (answer.worktreeTwins.length) {
+    out.push(
+      "The same file (same repo-relative path) was written in another worktree — expect a merge conflict:",
+      ...answer.worktreeTwins.map((t) => `${line(t)} in ${t.cwd ?? "another worktree"}`),
+    );
+  }
+  const youNote = askerKnown ? "" : "\n(Without a session_id this list may include you.)";
+  return out.length
+    ? `${out.join("\n")}\nConsider waiting, or coordinate before editing.${youNote}`
+    : `Nobody else is writing ${answer.path} right now.`;
 }
 
 /**
  * Handle one JSON-RPC message. Returns the response object to write, or null
- * (notifications / no-id). `approve(toolName, input) => Promise<decision>` is
- * injectable for tests.
+ * (notifications / no-id). `approve(toolName, input) => Promise<decision | {decision, message}>`
+ * is injectable for tests.
  * @param {any} msg
  * @param {(toolName: string, input: object) => Promise<string>} [approve]
+ * @param {(path: string, sessionId?: string) => Promise<object|null>} [touching] lane L4: radar lookup
  * @returns {Promise<object|null>}
  */
-export async function handleMessage(msg, approve = askOffice) {
+export async function handleMessage(msg, approve = askOffice, touching = askRadar) {
   const { id, method, params } = msg ?? {};
   if (method === "initialize") {
     return {
@@ -73,20 +126,29 @@ export async function handleMessage(msg, approve = askOffice) {
     };
   }
   if (method === "tools/list") {
-    return { jsonrpc: "2.0", id, result: { tools: [TOOL] } };
+    return { jsonrpc: "2.0", id, result: { tools: [TOOL, WHO_IS_TOUCHING] } };
   }
   if (method === "tools/call") {
     const { name, arguments: args } = params ?? {};
+    if (name === "who_is_touching") {
+      if (typeof args?.path !== "string" || !args.path) {
+        return { jsonrpc: "2.0", id, error: { code: -32602, message: "path (string) is required" } };
+      }
+      const text = describeTouching(await touching(args.path, args.session_id), Boolean(args.session_id));
+      return { jsonrpc: "2.0", id, result: { content: [{ type: "text", text }] } };
+    }
     if (name !== "approval_prompt") {
       return { jsonrpc: "2.0", id, error: { code: -32601, message: `unknown tool: ${name}` } };
     }
-    const decision = await approve(args?.tool_name, args?.input);
+    const answer = await approve(args?.tool_name, args?.input);
+    const decision = typeof answer === "string" ? answer : answer?.decision;
+    const policyMessage = typeof answer === "object" && typeof answer?.message === "string" ? answer.message : null;
     // Claude's permission-prompt-tool contract: the tool result text is a JSON
     // {behavior:"allow", updatedInput} or {behavior:"deny", message}.
     const payload =
       decision === "allow"
         ? { behavior: "allow", updatedInput: args?.input ?? {} }
-        : { behavior: "deny", message: "Denied, or no office was open to approve it (Agent Office)." };
+        : { behavior: "deny", message: policyMessage ?? "Denied, or no office was open to approve it (Agent Office)." };
     return { jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(payload) }] } };
   }
   if (id == null) return null; // notification — no response

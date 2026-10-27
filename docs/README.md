@@ -21,6 +21,7 @@ after the fact would have meant rewriting a record, so they were left alone.
 |---|---|
 | [SPECS.md](SPECS.md) | The system in one place — architecture, event schema, components |
 | [install.md](install.md) | Install, run, troubleshoot, uninstall, per platform |
+| [onprem.md](onprem.md) · [vi](onprem.vi.md) | Run it on your own machines: prerequisites, `doctor`, LAN access with tokens and roles, backup, update |
 | [semantic-mapping.md](semantic-mapping.md) | How an agent event becomes a character walking to a station |
 | [company-protocol.md](company-protocol.md) | The contract between coordinator, agents, and the office |
 

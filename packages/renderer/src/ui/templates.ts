@@ -9,6 +9,8 @@
 // — reaches the DOM through textContent, never innerHTML.
 
 import { t } from "../i18n";
+import { esc, fetchSop, personaCardHtml, personaMeta, showSop } from "./personas";
+import type { RosterPayload } from "./hiringHall";
 export interface TemplateDept {
   name: string;
   memberCount: number;
@@ -20,6 +22,9 @@ export interface TemplateSummary {
   memberTotal: number;
   hasGoals: boolean;
   missingSkills: string[];
+  /** lane L6: how many members ship with a persona / an SOP (absent on older daemons). */
+  personaCount?: number;
+  sopCount?: number;
 }
 
 export interface ApplyResult {
@@ -120,6 +125,10 @@ export function mountTemplates(
   let armed: string | null = null;
   let busy = false;
   let cache: TemplateSummary[] = [];
+  // lane L6: which templates have their people expanded, and the SOP open in one of them
+  const peopleOpen = new Set<string>();
+  const people = new Map<string, RosterPayload | string>(); // roster, or an error message
+  let sopOpen: { tpl: string; member: string } | null = null;
 
   const el = (tag: string, cls: string, text?: string): HTMLElement => {
     const node = document.createElement(tag);
@@ -142,6 +151,16 @@ export function mountTemplates(
       const depts = tpl.departments.map((d) => `${d.name} (${d.memberCount})`).join(" · ");
       if (depts) card.append(el("p", "tpl-depts", depts));
 
+      const personas = personaMeta(tpl);
+      if (personas) {
+        card.dataset.tpl = tpl.name;
+        card.append(el("p", "tpl-meta", personas));
+        const toggle = el("button", "tpl-people-toggle", peopleOpen.has(tpl.name) ? t("templates.hidePeople") : t("templates.showPeople"));
+        toggle.dataset.people = tpl.name;
+        card.append(toggle);
+        if (peopleOpen.has(tpl.name)) card.append(peopleBlock(tpl.name));
+      }
+
       const warn = missingLabel(tpl.missingSkills);
       if (warn) card.append(el("p", "tpl-warn", warn));
 
@@ -154,6 +173,52 @@ export function mountTemplates(
       if (armed === tpl.name) card.append(el("p", "tpl-confirm", armWarning(tpl.name)));
       list.append(card);
     }
+  }
+
+  /** The expanded people of a template: persona cards by department, plus a box for the opened SOP. */
+  function peopleBlock(name: string): HTMLElement {
+    const box = el("div", "tpl-people");
+    const data = people.get(name);
+    if (data === undefined) {
+      box.append(el("p", "placeholder", t("templates.loading")));
+    } else if (typeof data === "string") {
+      box.append(el("p", "tpl-warn", t("templates.peopleFailed", { error: data })));
+    } else {
+      // personaCardHtml escapes every roster-sourced string; department names are escaped here
+      box.innerHTML = data.departments
+        .map((d) => {
+          const cards = d.members.map((m) => personaCardHtml(m)).join("");
+          return cards ? `<h4 class="tpl-dept">${esc(d.name)}</h4>${cards}` : "";
+        })
+        .join("");
+    }
+    const sop = el("div", "tpl-sop");
+    sop.hidden = true;
+    box.append(sop);
+    if (sopOpen?.tpl === name) {
+      const { member } = sopOpen;
+      showSop(sop, () => fetchSop("template", name, member));
+    }
+    return box;
+  }
+
+  function togglePeople(name: string): void {
+    if (peopleOpen.delete(name)) {
+      if (sopOpen?.tpl === name) sopOpen = null;
+      renderList();
+      return;
+    }
+    peopleOpen.add(name);
+    renderList();
+    if (people.has(name)) return;
+    fetch(`/roster-members?${new URLSearchParams({ source: "template", name })}`)
+      .then(async (res) => {
+        const body = (await res.json().catch(() => null)) as (RosterPayload & { error?: string }) | null;
+        if (!res.ok || !body) throw new Error(body?.error ?? `HTTP ${res.status}`);
+        people.set(name, body);
+      })
+      .catch((error: unknown) => people.set(name, error instanceof Error ? error.message : String(error)))
+      .finally(renderList);
   }
 
   function renderResult(name: string, r: ApplyResult): void {
@@ -214,6 +279,19 @@ export function mountTemplates(
     if (target === overlay || target.closest(".tpl-close")) {
       overlay.hidden = true;
       reset();
+      return;
+    }
+
+    const peopleToggle = target.closest<HTMLElement>("[data-people]")?.dataset.people;
+    if (peopleToggle) {
+      togglePeople(peopleToggle);
+      return;
+    }
+    const sopMember = target.closest<HTMLElement>("[data-sop]")?.dataset.sop;
+    const sopTpl = target.closest<HTMLElement>(".tpl-card")?.dataset.tpl;
+    if (sopMember && sopTpl) {
+      sopOpen = { tpl: sopTpl, member: sopMember };
+      renderList();
       return;
     }
     if (busy) return;

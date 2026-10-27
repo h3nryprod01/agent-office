@@ -57,8 +57,10 @@ powershell -ExecutionPolicy Bypass -File scripts\start.ps1
 | Log when launched from the `.app` | `~/Library/Logs/agent-office-app.log` | — |
 | App | `http://localhost:8787` — **one process, one port**: the daemon also serves the build | same as macOS |
 
-It listens on `127.0.0.1` only and is not exposed to the network. Before you
-change that, read [SECURITY.md](../SECURITY.md).
+It listens on `127.0.0.1` only and is not exposed to the network. To let other
+people on your network in (with tokens and roles), and for the full install /
+update / backup / uninstall guide, see [onprem.md](onprem.md). Before you change
+the bind address by hand, read [SECURITY.md](../SECURITY.md).
 
 ## When something breaks
 

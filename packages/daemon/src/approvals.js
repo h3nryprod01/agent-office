@@ -13,7 +13,9 @@
 
 import { randomUUID } from "node:crypto";
 
-const DEFAULT_TTL_MS = 25_000; // < hook fetch abort (27s) < hook registration timeout (30s)
+// long enough to answer from a phone (Telegram button), still < hook fetch abort (118s) <
+// hook registration timeout (120s): an unanswered request falls back to the normal dialog
+export const DEFAULT_TTL_MS = 115_000;
 const CORS_HEADERS = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET, POST, OPTIONS",
@@ -38,8 +40,10 @@ export class ApprovalBroker {
    * @param {number} [opts.ttlMs]
    * @param {(fields: object) => object} opts.makeEvent  event-schema factory
    */
-  constructor({ broadcast, hasClients, makeEvent, ttlMs = DEFAULT_TTL_MS, isOverBudget = () => false }) {
+  constructor({ broadcast, hasClients, makeEvent, ttlMs = DEFAULT_TTL_MS, isOverBudget = () => false, policy = null }) {
     this.broadcast = broadcast;
+    // lane L2: optional per-project policy engine (policy-engine.js). null = every request goes to a human, as before.
+    this.policy = policy;
     this.hasClients = hasClients;
     this.makeEvent = makeEvent;
     this.ttlMs = ttlMs;
@@ -51,10 +55,16 @@ export class ApprovalBroker {
   /**
    * Register a permission wait. Resolves with "allow" | "deny" | "none".
    * Never rejects — the hook's fail-open must not depend on our error paths.
-   * @param {{sessionId?: string, tool?: string, preview?: string, cwd?: string|null}} payload
-   * @returns {Promise<{id: string|null, decision: string}>}
+   * @param {{sessionId?: string, tool?: string, preview?: string, cwd?: string|null, toolInput?: object, harness?: string, lane?: string, role?: string}} payload
+   * @param {AbortSignal} [signal] aborted when the hook hung up (killed, timed out) — the card goes away
+   * @returns {Promise<{id: string|null, decision: string, source?: string, message?: string}>}
    */
-  request(payload) {
+  request(payload, signal) {
+    // lane L2: the project's policy may answer by itself (auto allow, read-only/deny deny).
+    // Checked BEFORE the "nobody is watching" shortcut: an auto-allowed call needs no office open.
+    const verdict = this.#evaluatePolicy(payload);
+    if (verdict && verdict.decision !== "ask") return Promise.resolve(this.#answerFromPolicy(payload, verdict));
+
     // Nobody is watching the office → don't make the terminal user wait.
     // The hook gets "none" immediately and the normal dialog shows.
     if (!this.hasClients()) {
@@ -70,6 +80,7 @@ export class ApprovalBroker {
       cwd: typeof payload.cwd === "string" ? payload.cwd : null,
       expiresAt: Date.now() + this.ttlMs,
       budgetExceeded: this.isOverBudget(),
+      ...(verdict ? { policy: policySummary(verdict) } : {}),
     };
 
     return new Promise((resolve) => {
@@ -80,22 +91,57 @@ export class ApprovalBroker {
         resolve: (decision) => resolve({ id, decision }),
       });
       this.#emit("approval_pending", item, { state: "pending" });
+      signal?.addEventListener("abort", () => this.#settle(id, "none", "gone"), { once: true });
     });
   }
 
   /**
-   * Office decision for one pending approval.
+   * Decision for one pending approval. `source` says who answered ("office", or a chat
+   * channel's "telegram:Name" — lane L5) and ends up in the approval_resolved event.
    * @returns {{ok: boolean, error?: string}}
    */
-  respond(id, decision) {
+  respond(id, decision, source = "office") {
     if (decision !== "allow" && decision !== "deny") {
       return { ok: false, error: "decision must be allow or deny" };
     }
     if (!this.pending.has(id)) {
       return { ok: false, error: "no such approval — it expired or was already answered" };
     }
-    this.#settle(id, decision, "office");
+    this.#settle(id, decision, source);
     return { ok: true };
+  }
+
+  /** lane L2. A throwing engine must never auto-answer: null = ask a human, the old behaviour. */
+  #evaluatePolicy(payload) {
+    if (!this.policy) return null;
+    try {
+      return this.policy.evaluate(payload) ?? null;
+    } catch (error) {
+      console.warn("[approvals] policy evaluation failed, asking a human:", error.message);
+      return null;
+    }
+  }
+
+  /** lane L2: a decision the policy made on its own — announce it like an answered approval. */
+  #answerFromPolicy(payload, verdict) {
+    const id = randomUUID();
+    const item = {
+      id,
+      sessionId: typeof payload.sessionId === "string" ? payload.sessionId : "",
+      tool: typeof payload.tool === "string" ? payload.tool : "unknown",
+      preview: typeof payload.preview === "string" ? payload.preview.slice(0, 500) : "",
+      cwd: typeof payload.cwd === "string" ? payload.cwd : null,
+      expiresAt: Date.now(),
+      budgetExceeded: this.isOverBudget(),
+      policy: policySummary(verdict),
+    };
+    this.#emit("approval_resolved", item, { state: "resolved", decision: verdict.decision, source: "policy" });
+    return {
+      id,
+      decision: verdict.decision,
+      source: "policy",
+      ...(verdict.message ? { message: verdict.message } : {}),
+    };
   }
 
   /** @returns {PendingApproval[]} for renderer late-join backfill */
@@ -133,6 +179,7 @@ export class ApprovalBroker {
             expiresAt: item.expiresAt,
             source: "approve-gateway",
             budgetExceeded: item.budgetExceeded,
+            ...(item.policy ? { policy: item.policy } : {}),
             ...extraMeta,
           },
         })
@@ -142,6 +189,21 @@ export class ApprovalBroker {
     }
   }
 }
+
+/** lane L2: the part of a policy verdict the office shows ("asked because: force-push"). */
+function policySummary(verdict) {
+  return {
+    project: verdict.project,
+    mode: verdict.mode,
+    source: verdict.source,
+    forced: verdict.forced,
+    reasons: verdict.reasons,
+  };
+}
+
+const ROLE_RE = /^[A-Za-z0-9_.-]{1,40}$/;
+const NAME_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
+const clean = (value, re) => (typeof value === "string" && re.test(value) ? value : undefined);
 
 /** One-line summary of a tool_input for the queue UI. Built daemon-side so
  * the hook stays dumb; input arrives already truncated by the hook. */
@@ -213,8 +275,18 @@ export function createApprovalHttpHandler(broker) {
           tool: parsed.tool,
           cwd: parsed.cwd,
           preview: previewToolInput(parsed.tool, parsed.toolInput),
+          // lane L2: what the policy engine needs. Names are charset-checked — they end up in a log and a UI.
+          toolInput: parsed.toolInput && typeof parsed.toolInput === "object" ? parsed.toolInput : {},
+          harness: clean(parsed.harness, NAME_RE),
+          lane: clean(parsed.lane, NAME_RE),
+          role: clean(parsed.role, ROLE_RE),
         };
-        broker.request(payload).then((result) => respond(200, result));
+        // the hook died or timed out before anyone answered: nobody is waiting for this card any more
+        const gone = new AbortController();
+        res.on("close", () => {
+          if (!res.writableEnded) gone.abort();
+        });
+        broker.request(payload, gone.signal).then((result) => respond(200, result));
         return;
       }
 

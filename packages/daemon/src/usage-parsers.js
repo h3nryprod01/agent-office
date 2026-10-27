@@ -65,12 +65,16 @@ class BucketSet {
       };
       this.map.set(key, b);
     }
-    const { usd } = costUsd(model, {
-      input_tokens: input,
-      output_tokens: output,
-      cache_creation_input_tokens: cacheWrite,
-      cache_read_input_tokens: cacheRead,
-    });
+    const { usd } = costUsd(
+      model,
+      {
+        input_tokens: input,
+        output_tokens: output,
+        cache_creation_input_tokens: cacheWrite,
+        cache_read_input_tokens: cacheRead,
+      },
+      ts,
+    );
     b.input += input;
     b.output += output;
     b.cacheWrite += cacheWrite;
@@ -111,10 +115,10 @@ async function* jsonlRecords(filePath, preFilter) {
  * copies observed) — count once.
  * @returns {Promise<Bucket[]>}
  */
-export async function parseClaudeFile(filePath) {
+export async function parseClaudeFile(filePath, harness = "claude-code") {
   const fallbackSession = path.basename(filePath, ".jsonl");
   const seenIds = new Set();
-  const buckets = new BucketSet("claude-code");
+  const buckets = new BucketSet(harness);
 
   for await (const o of jsonlRecords(filePath, (l) => l.includes('"usage"'))) {
     if (o.type !== "assistant") continue;
@@ -262,6 +266,59 @@ export async function parseGeminiFile(filePath, cwd) {
       output: (t.output ?? 0) + (t.thoughts ?? 0),
       cacheRead: cached,
     });
+  }
+  return buckets.values();
+}
+
+/**
+ * Hermes Agent (~/.hermes/state.db, table `sessions`). Hermes keeps running
+ * per-session token counters and its own cost, so one bucket per session:
+ * located at the session's last activity hour (last_activity_at, else ended_at,
+ * else its newest message — most real rows leave last_activity_at NULL; a long
+ * session is not spread over the hours it ran), tokens as recorded (input excludes the cached part —
+ * cache_read exceeds input in real rows), and usd as Hermes recorded it
+ * (actual, else estimated; subscription-"included" sessions record 0) rather
+ * than re-priced from our table. Needs node:sqlite; without it, no rows.
+ * @param {string} dbPath
+ * @returns {Promise<Bucket[]>}
+ */
+export async function parseHermesDb(dbPath) {
+  let DatabaseSync;
+  try {
+    ({ DatabaseSync } = await import("node:sqlite"));
+  } catch {
+    return [];
+  }
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  let rows;
+  try {
+    rows = db
+      .prepare(
+        `SELECT s.id, s.model, s.cwd, s.git_repo_root, s.started_at,
+                COALESCE(s.last_activity_at, s.ended_at,
+                         (SELECT MAX(m.timestamp) FROM messages m WHERE m.session_id = s.id), s.started_at) AS active_at,
+                s.input_tokens, s.output_tokens, s.cache_read_tokens, s.cache_write_tokens,
+                s.actual_cost_usd, s.estimated_cost_usd
+         FROM sessions s`,
+      )
+      .all();
+  } finally {
+    db.close();
+  }
+  const buckets = new BucketSet("hermes");
+  for (const r of rows) {
+    const b = buckets.add({
+      sessionId: r.id,
+      cwd: r.cwd ?? r.git_repo_root,
+      model: r.model ?? "unknown",
+      ts: r.active_at * 1000,
+      input: r.input_tokens ?? 0,
+      output: r.output_tokens ?? 0,
+      cacheWrite: r.cache_write_tokens ?? 0,
+      cacheRead: r.cache_read_tokens ?? 0,
+    });
+    b.usd = r.actual_cost_usd ?? r.estimated_cost_usd ?? 0;
+    b.known = true;
   }
   return buckets.values();
 }

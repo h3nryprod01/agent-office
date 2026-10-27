@@ -45,6 +45,26 @@ npm --prefix packages/renderer run build  # tsc --noEmit && vite build
 All three must pass. CI runs the same commands on Node 20 and 22, plus
 shellcheck over `scripts/*.sh`.
 
+## The leak gate
+
+This repository is public, so a leaked home path, private IP, hostname or token is
+permanent. CI runs `node scripts/check-leaks.mjs` (after a `--self-test` that plants
+one leak per rule, so a "clean" result is backed by proof the scanner can see). Run it
+yourself before pushing. Test fixtures use made-up names (`demo-app`, `/Users/you`).
+
+Names that are sensitive to *you* (a client, a private project) must not be written
+into the repo, so they cannot be in the scanner either. Put them, one per line
+(`#` comments, `re:<regex>` for a pattern), in `~/.agent-office/leak-denylist.txt`; the
+script reads that file when it exists and never prints the term it matched.
+
+To block a bad push locally you can install the optional hook by hand (it is never
+installed for you):
+
+```bash
+cp scripts/hooks/pre-push "$(git rev-parse --git-path hooks)/pre-push"
+chmod +x "$(git rev-parse --git-path hooks)/pre-push"
+```
+
 ## House style
 
 The existing code is the specification — match the file you are editing rather

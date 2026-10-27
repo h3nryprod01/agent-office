@@ -153,11 +153,22 @@ function parseList(lines, i) {
       i++;
       continue;
     }
-    // block map item: first pair on the `- ` line, more pairs on deeper lines
-    const item = {};
-    const first = splitKey(rest);
-    if (first.key !== null) item[first.key] = first.rest !== "" ? parseScalar(first.rest) : null;
-    i++;
+    // block map item: first pair on the `- ` line, more pairs on deeper lines.
+    // Re-aim the `- key: v` line as a plain map line at the column where its text really starts
+    // (that is where the sibling keys sit) and let parseMap do the rest — that is what lets a
+    // pair like `persona:` own a nested map without its keys leaking into the member.
+    if (rest.startsWith("- ")) {
+      arr.push({}); // `- - x`: nothing we understand; skip it and its deeper lines, keep reading the list
+      i++;
+      while (i < lines.length && lines[i].indent > indent && !lines[i].text.startsWith("- ")) i++;
+      continue;
+    }
+    const body = lines[i].text.slice(2);
+    const pairIndent = indent + 2 + (body.length - body.trimStart().length);
+    lines[i] = { indent: pairIndent, text: rest };
+    const [item, after] = parseMap(lines, i);
+    i = after;
+    // over/under-indented stray lines: keep their pairs flat, as this parser always did
     while (i < lines.length && lines[i].indent > indent && !lines[i].text.startsWith("- ")) {
       const { key, rest: value } = splitKey(lines[i].text);
       if (key !== null) item[key] = value !== "" ? parseScalar(value) : null;
@@ -187,6 +198,24 @@ export function parseRoster(text) {
   return normalizeRoster(doc);
 }
 
+/**
+ * lane L6: a member's `persona` map → `{ name, role, avatar, voice, tone, prompt, promptFile }`
+ * (absent fields → null). Anything that is not a map yields null: the member simply has no persona.
+ */
+export function normalizePersona(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const str = (v) => (v != null && typeof v !== "object" ? String(v) : null);
+  return {
+    name: str(raw.name),
+    role: str(raw.role),
+    avatar: str(raw.avatar),
+    voice: str(raw.voice),
+    tone: str(raw.tone),
+    prompt: str(raw.prompt),
+    promptFile: str(raw.prompt_file),
+  };
+}
+
 function normalizeRoster(doc) {
   const departments = [];
   const depts = doc && typeof doc === "object" ? doc.departments : null;
@@ -196,13 +225,20 @@ function normalizeRoster(doc) {
       const members = Array.isArray(d.members)
         ? d.members
             .filter((m) => m && typeof m === "object" && m.name != null)
-            .map((m) => ({
-              name: String(m.name),
-              role: m.role != null ? String(m.role) : null,
-              hired: m.hired != null ? String(m.hired) : null,
-              source: m.source != null ? String(m.source) : null,
-              cv: m.cv && typeof m.cv === "object" ? m.cv : null,
-            }))
+            .map((m) => {
+              const persona = normalizePersona(m.persona);
+              return {
+                name: String(m.name),
+                role: m.role != null ? String(m.role) : null,
+                hired: m.hired != null ? String(m.hired) : null,
+                source: m.source != null ? String(m.source) : null,
+                cv: m.cv && typeof m.cv === "object" ? m.cv : null,
+                // lane L6: present only when the roster sets them, so a roster
+                // without personas serializes exactly as before.
+                ...(persona ? { persona } : {}),
+                ...(typeof m.sop === "string" && m.sop !== "" ? { sop: m.sop } : {}),
+              };
+            })
         : [];
       departments.push({
         name,

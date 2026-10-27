@@ -16,6 +16,8 @@ export interface WorkItem {
   status?: string | null;
   /** The parent work item. null/undefined means this is the root of the chain. */
   parentItemId?: string | null;
+  /** lane L6: 1-based step of the member's SOP this item is on (the member itself is `assignee`). */
+  sopStep?: number | null;
 }
 
 export interface WorkItemsFile {
@@ -142,9 +144,19 @@ export function workItemSectionHtml(
     <div class="work-item">
       <div class="wi-title">${esc(item.title)}</div>
       <div class="wi-meta"><span class="status-chip status-${esc(status)}">${esc(status)}</span>${item.branch ? ` · <code>${esc(item.branch)}</code>` : ""}</div>
+      ${sopStepHtml(item)}
       ${workItemLinksHtml(item)}
       ${whyChainHtml(item, items)}
     </div>`;
+}
+
+/** lane L6: "linh · SOP step 3" — who holds the item and where they are in their procedure. Empty without a step. */
+export function sopStepHtml(item: WorkItem): string {
+  // the registry is a hand-edited JSON file: only a real positive integer may reach the markup
+  const n = Number(item.sopStep);
+  if (!Number.isInteger(n) || n < 1) return "";
+  const who = item.assignee ? `${esc(item.assignee)} · ` : "";
+  return `<div class="wi-sop">${who}${t("work.sopStep", { n })}</div>`;
 }
 
 function esc(s: string): string {

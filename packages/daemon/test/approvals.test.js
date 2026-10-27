@@ -263,3 +263,50 @@ test("gateway: never converts none into a decision", async () => {
     stub.close();
   }
 });
+
+// the hook was killed or timed out: its card must not linger asking for an answer nobody waits for
+test("an aborted request settles as none and clears the card", async () => {
+  const { broker, broadcasts } = mkBroker({ ttlMs: 60_000 });
+  const gone = new AbortController();
+  const p = broker.request({ sessionId: "s1", tool: "Bash" }, gone.signal);
+  assert.equal(broker.list().length, 1);
+  gone.abort();
+  assert.equal((await p).decision, "none");
+  assert.equal(broker.list().length, 0);
+  assert.equal(broadcasts.at(-1).meta.source, "gone");
+});
+
+test("timeout layering: daemon TTL < gateway fetch abort < the hook timeout in the docs", async () => {
+  const { DEFAULT_TTL_MS } = await import("../src/approvals.js");
+  const { readFileSync } = await import("node:fs");
+  const gateway = readFileSync(GATEWAY, "utf8");
+  const abort = Number(gateway.match(/FETCH_TIMEOUT_MS[^\n]*\?\? ([\d_]+)/)[1].replaceAll("_", ""));
+  for (const name of ["multi-pm-telegram.md", "approve-spike-status.md"]) {
+    const doc = readFileSync(new URL(`../../../docs/${name}`, import.meta.url), "utf8");
+    const found = [...doc.matchAll(/"timeout": (\d+)/g)];
+    assert.ok(found.length > 0, `${name} no longer states the hook timeout`);
+    for (const [, secs] of found) {
+      const hook = Number(secs) * 1000;
+      assert.ok(DEFAULT_TTL_MS < abort && abort < hook, `${name}: ${DEFAULT_TTL_MS} < ${abort} < ${hook}`);
+    }
+  }
+});
+
+test("HTTP: a hook that hangs up mid-wait takes its card with it", async () => {
+  const { broker } = mkBroker({ ttlMs: 60_000 });
+  const { srv, base } = await startServer(broker);
+  try {
+    const hook = new AbortController();
+    const waiting = fetch(`${base}/approval-request`, {
+      method: "POST", body: JSON.stringify({ sessionId: "s1", tool: "Bash" }), signal: hook.signal,
+    }).catch(() => null);
+    for (let i = 0; i < 50 && broker.list().length === 0; i++) await new Promise((r) => setTimeout(r, 20));
+    assert.equal(broker.list().length, 1);
+    hook.abort();
+    await waiting;
+    for (let i = 0; i < 50 && broker.list().length > 0; i++) await new Promise((r) => setTimeout(r, 20));
+    assert.equal(broker.list().length, 0);
+  } finally {
+    await srv.stop();
+  }
+});

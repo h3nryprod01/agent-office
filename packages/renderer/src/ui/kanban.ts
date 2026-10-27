@@ -13,19 +13,20 @@ export interface KanbanItem {
   title: string;
   source: string; // "human" | "agent"
   status: string; // idea|doing|review|done|dropped
+  links?: { doc?: string | null }; // lane L7: project-relative path of the document this card is about
 }
 
 /** [status, column label] per sub-tab. mine = a person's ideas; agent = chip work. */
 export const COLUMNS: Record<SubTab, [string, string][]> = {
   mine: [
     ["idea", t("kanban.ideas")],
-    ["done", "Xong"],
+    ["done", t("status.done")],
   ],
   agent: [
     ["idea", t("kanban.queued")],
     ["doing", t("wall.inProgress")],
     ["review", t("kanban.review")],
-    ["done", "Xong"],
+    ["done", t("status.done")],
   ],
 };
 
@@ -70,6 +71,8 @@ export function assignableId(it: KanbanItem): string | null {
 
 export interface KanbanHandle {
   refresh(): Promise<void>;
+  /** follow the project the office tab points at (coordinator wiring; was fixed to "agent-office") */
+  setProject(slug: string): void;
 }
 
 interface KanbanOpts {
@@ -78,6 +81,8 @@ interface KanbanOpts {
   addItem?: (body: { project: string; title: string; source: string }) => Promise<unknown>;
   /** "Giao cho PM" clicked on an assignable idea — pre-fill the PM chat. */
   onAssignToPM?: (item: KanbanItem) => void;
+  /** lane L7: a card's 📄 link was clicked — open that document in the Documents tab. */
+  onOpenDoc?: (project: string, path: string) => void;
 }
 
 /**
@@ -87,12 +92,13 @@ interface KanbanOpts {
 export function mountKanban(root: HTMLElement, opts: KanbanOpts): KanbanHandle {
   root.classList.add("kanban");
   const fetchItems = opts.fetchItems;
+  let project = opts.project;
   let items: KanbanItem[] = [];
   let tab: SubTab = "mine";
 
   if (!fetchItems) {
     root.innerHTML = `<p class="kanban-placeholder">${t("kanban.liveOnly")}</p>`;
-    return { refresh: async () => {} };
+    return { refresh: async () => {}, setProject: () => {} };
   }
   // Rebind to a non-optional type so the narrowing survives into the closures
   // below (TS drops narrowing from the early-return guard inside nested functions).
@@ -101,6 +107,11 @@ export function mountKanban(root: HTMLElement, opts: KanbanOpts): KanbanHandle {
   render();
 
   root.addEventListener("click", (ev) => {
+    const docEl = (ev.target as HTMLElement).closest<HTMLElement>("[data-doc]");
+    if (docEl?.dataset.doc) {
+      opts.onOpenDoc?.(project, docEl.dataset.doc);
+      return;
+    }
     const assignEl = (ev.target as HTMLElement).closest<HTMLElement>("[data-assign]");
     if (assignEl) {
       const found = items.find((it) => it.id === assignEl.dataset.assign);
@@ -120,17 +131,20 @@ export function mountKanban(root: HTMLElement, opts: KanbanOpts): KanbanHandle {
     const title = input.value.trim();
     if (!title || !opts.addItem) return;
     input.value = "";
-    opts.addItem({ project: opts.project, title, source: "human" }).then(
+    opts.addItem({ project, title, source: "human" }).then(
       () => refresh(),
       (err) => console.error("[kanban] addItem failed:", err),
     );
   });
 
   async function refresh(): Promise<void> {
+    const asked = project;
     try {
-      const data = await loadItems(opts.project);
+      const data = await loadItems(asked);
+      if (asked !== project) return; // the tab changed while this was in flight: a newer refresh owns the Board
       items = data?.items ?? [];
     } catch (err) {
+      if (asked !== project) return;
       console.error("[kanban] fetchItems failed:", err);
       items = [];
     }
@@ -170,7 +184,14 @@ export function mountKanban(root: HTMLElement, opts: KanbanOpts): KanbanHandle {
       body;
   }
 
-  return { refresh };
+  return {
+    refresh,
+    setProject: (slug: string) => {
+      if (slug === project) return;
+      project = slug;
+      void refresh();
+    },
+  };
 }
 
 /** First-run / empty board: guidance + the next action, not a bare column grid.
@@ -203,10 +224,14 @@ function card(it: KanbanItem): string {
   const assign = assignableId(it)
     ? `<button class="kanban-assign" type="button" data-assign="${esc(it.id)}">Giao cho PM</button>`
     : "";
+  const doc = it.links?.doc
+    ? `<button class="kanban-doc" type="button" data-doc="${esc(it.links.doc)}" title="${esc(t("kanban.openDoc"))}">📄 ${esc(it.links.doc)}</button>`
+    : "";
   return (
     `<article class="kanban-card">` +
     `<span class="kanban-source" aria-hidden="true">${badge}</span>` +
     `<span class="kanban-title">${esc(it.title)}</span>` +
+    doc +
     assign +
     `</article>`
   );

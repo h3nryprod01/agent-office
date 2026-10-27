@@ -43,13 +43,24 @@ export function missingSkills(names, installed) {
   return names.filter((n) => !installed.has(n));
 }
 
-/** Member names whose `source` is a plugin (same line). Can't be checked on disk → treated as installed. */
+/**
+ * Member names that can't be checked against ~/.claude/{skills,agents}: `source` is a plugin (lives in the
+ * plugin cache) or `builtin` (a position with no installed skill behind it — the persona + SOP ARE the member).
+ * Handles both roster shapes: `source` on the flow line, or on a later line of a block member.
+ */
 export function pluginMemberNames(text) {
   const set = new Set();
-  const re =
-    /^[ \t]*-[ \t]*\{?[ \t]*name:[ \t]*(?:"([^"]+)"|'([^']+)'|([^,\s}]+)).*source:[ \t]*"plugin/gm;
-  let m;
-  while ((m = re.exec(text)) !== null) set.add(m[1] ?? m[2] ?? m[3]);
+  const uncheckable = /source:[ \t]*["']?(?:plugin|builtin)/;
+  let current = null; // block form: the member whose keys we are reading
+  for (const line of text.split(/\r?\n/)) {
+    const m = /^[ \t]*-[ \t]*\{?[ \t]*name:[ \t]*(?:"([^"]+)"|'([^']+)'|([^,\s}]+))(.*)$/.exec(line);
+    if (m) {
+      current = m[1] ?? m[2] ?? m[3];
+      if (uncheckable.test(m[4])) set.add(current);
+    } else if (current && /^[ \t]+source:/.test(line) && uncheckable.test(line)) {
+      set.add(current);
+    }
+  }
   return set;
 }
 
@@ -125,11 +136,32 @@ export function readGoals(templateDir) {
 const backupPathFor = (rosterPath) =>
   `${rosterPath}.${new Date().toISOString().replace(/[:.]/g, "-")}.bak`;
 
+// A template's persona/SOP files live in these directories next to roster.yaml.
+const ASSET_DIRS = ["sops", "personas"];
+
+/**
+ * Copy a template's `sops/` and `personas/` next to a roster. An existing directory of the same name is renamed
+ * to `<dir>.<timestamp>.bak` first — the same promise the roster itself gets: nothing the user wrote is lost.
+ * Templates without these directories (every pre-persona template) copy nothing.
+ */
+export function copyCompanyAssets(templateDir, destDir) {
+  const counts = { sops: 0, personas: 0 };
+  for (const name of ASSET_DIRS) {
+    const src = path.join(templateDir, name);
+    if (!fs.statSync(src, { throwIfNoEntry: false })?.isDirectory()) continue;
+    const dest = path.join(destDir, name);
+    if (fs.existsSync(dest)) fs.renameSync(dest, backupPathFor(dest));
+    fs.cpSync(src, dest, { recursive: true });
+    counts[name] = fs.readdirSync(dest).length;
+  }
+  return counts;
+}
+
 /**
  * Back up the current roster (if any), overwrite it with the template's, and
  * report what the caller must still do. Never installs a skill — missing ones
  * go through the company-hire skill (mandatory safety scan).
- * @returns {{name: string, rosterPath: string, backupPath: string|null, missingSkills: string[], goals: string|null}}
+ * @returns {{name: string, rosterPath: string, backupPath: string|null, missingSkills: string[], goals: string|null, assets: {sops: number, personas: number}}}
  */
 export function applyTemplate({ templatesDir, companyDir, homeDir, name }) {
   const templateDir = resolveTemplateDir(templatesDir, name);
@@ -145,6 +177,9 @@ export function applyTemplate({ templatesDir, companyDir, homeDir, name }) {
   const rosterPath = path.join(companyDir, "roster.yaml");
   fs.mkdirSync(companyDir, { recursive: true });
 
+  // assets first: if copying them throws, the roster is still the old one and the two stay a matching pair
+  const assets = copyCompanyAssets(templateDir, companyDir);
+
   let backupPath = null;
   if (fs.existsSync(rosterPath)) {
     backupPath = backupPathFor(rosterPath);
@@ -153,6 +188,8 @@ export function applyTemplate({ templatesDir, companyDir, homeDir, name }) {
   fs.copyFileSync(srcRoster, rosterPath);
 
   return {
+    assets,
+    personaCount: (rosterText.match(/^[ \t]+persona:[ \t]*$/gm) ?? []).length,
     name,
     rosterPath,
     backupPath,

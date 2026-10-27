@@ -3,6 +3,8 @@ import { statusLabel, type AgentModel, type OfficeState, type TimelineEntry } fr
 import { toBusiness } from "./activityLog";
 import { formatSince } from "../sim/selectors";
 import { workItemSectionHtml, type WorkItem, type WorkItemsFile } from "./workItems";
+import { vendorBadgeHtml } from "./vendor";
+import { openTerminalFor, sessionActionsHtml } from "./sessionActions"; // lane L4
 
 /** One transcript line from the daemon's GET /transcript endpoint. */
 export interface TranscriptLine {
@@ -88,6 +90,14 @@ export function mountSidePanel(
         });
       return;
     }
+    // lane L4: "Open terminal here" — the daemon opens it at the cwd it saw for this agent
+    const termBtn = target.closest<HTMLElement>("[data-open-terminal]");
+    if (termBtn?.dataset.openTerminal) {
+      openTerminalFor(termBtn.dataset.openTerminal).then((ok) => {
+        termBtn.textContent = ok ? "✓" : t("session.terminalFailed");
+      });
+      return;
+    }
     const timelineToggle = target.closest<HTMLElement>("[data-toggle-timeline-ts]");
     if (timelineToggle?.dataset.toggleTimelineTs) {
       const ts = Number(timelineToggle.dataset.toggleTimelineTs);
@@ -165,6 +175,7 @@ export function mountSidePanel(
       agent.status,
       agent.statusDetail,
       agent.currentTool,
+      agent.lane, // lane L3: the vendor badge appears once the worker's first reply names its model
       agent.timeline.length,
       transcript?.length ?? -1,
       workItemSection,
@@ -236,6 +247,8 @@ function panelHtml(
         ]
       : []),
     [t("panel.status"), `<span class="status-chip status-${a.status}">${esc(statusLabel(a.status))}</span> · <span data-since>${formatSince(a.statusSince, now)}</span>`],
+    // lane L3: plain Claude agents keep the panel exactly as before; only other vendors get a row
+    ...(a.harness !== "claude-code" || a.lane ? [[t("panel.vendor"), vendorBadgeHtml(a.harness, a.lane)]] : []),
     [t("panel.detail"), a.statusDetail ? esc(a.statusDetail) : "—"],
     [t("wall.inProgress"), a.currentTool ? esc(toBusiness({ tool: a.currentTool })) : "—"],
     [t("panel.cwd"), a.cwd ? `<code>${esc(a.cwd)}</code>` : "—"],
@@ -251,6 +264,7 @@ function panelHtml(
       <button data-close title="${t("panel.close")}">×</button>
     </header>
     ${rows}
+    ${sessionActionsHtml(a)}
     <h3>Work item</h3>
     ${workItemSection}
     <h3>${t("panel.recentActivity")}</h3>

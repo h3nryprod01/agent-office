@@ -19,7 +19,11 @@ import os from "node:os";
 import path from "node:path";
 
 const API_BASE = "https://api.telegram.org";
-const DEFAULT_OFFSET_FILE = path.join(os.homedir(), ".agent-office", "telegram-offset.json");
+// lane L1: AGENT_OFFICE_HOME relocates the whole data folder (default ~/.agent-office)
+const DEFAULT_OFFSET_FILE = path.join(
+  process.env.AGENT_OFFICE_HOME ?? path.join(os.homedir(), ".agent-office"),
+  "telegram-offset.json",
+);
 
 /**
  * @param {NodeJS.ProcessEnv} env
@@ -56,7 +60,7 @@ export async function sendMessage(text, { fetchFn = fetch, env = process.env } =
   }
 }
 
-function readOffset(offsetFile) {
+export function readOffset(offsetFile) {
   try {
     const parsed = JSON.parse(fs.readFileSync(offsetFile, "utf8"));
     return typeof parsed?.offset === "number" ? parsed.offset : 0;
@@ -65,7 +69,7 @@ function readOffset(offsetFile) {
   }
 }
 
-function writeOffset(offsetFile, offset) {
+export function writeOffset(offsetFile, offset) {
   try {
     fs.mkdirSync(path.dirname(offsetFile), { recursive: true });
     fs.writeFileSync(offsetFile, JSON.stringify({ offset }));

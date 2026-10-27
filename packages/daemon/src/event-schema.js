@@ -44,6 +44,10 @@ export const SCHEMA_VERSION = 1;
  * @property {string} harness      which CLI produced this agent's transcript
  *                                 ("claude-code" | "codex" | "gemini") — lets the
  *                                 renderer pick a different character skin per harness
+ * @property {string|null} lane    (additive, lane L3) model vendor behind a "claude-worker"
+ *                                 agent ("deepseek" | "mimo" | "glm" | "kimi" | ...), null
+ *                                 for every other harness or while the model is unknown.
+ *                                 harness also gains "claude-worker" and "hermes".
  * @property {number} ts           event time, ms since epoch
  * @property {string} agent        display label for the acting agent (cwd-derived project name)
  * @property {string|null} tool    tool name for tool_call events, else null
@@ -69,6 +73,7 @@ export function makeEvent(fields) {
     cwd: fields.cwd ?? null,
     repo: fields.repo ?? deriveRepo(fields.cwd),
     harness: fields.harness ?? "claude-code",
+    lane: fields.lane ?? null,
     ts: fields.ts ?? Date.now(),
     agent: fields.agent ?? deriveAgentLabel(fields.cwd),
     tool: fields.tool ?? null,

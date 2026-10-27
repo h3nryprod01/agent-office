@@ -22,6 +22,8 @@ interface DaemonV1Event {
   agentId?: string;
   parentId?: string | null;
   harness?: string;
+  /** additive (lane L3): model vendor of a claude-worker agent */
+  lane?: string | null;
   cwd: string | null;
   /** additive (Round 4): repo derived from cwd by the daemon */
   repo?: string;
@@ -54,6 +56,9 @@ export function createDaemonV1Adapter(nowFn: () => number = Date.now) {
     const e = raw as DaemonV1Event;
     if (!e || e.v !== 1 || typeof e.sessionId !== "string") return [];
     if (nowFn() - e.ts > RECENT_WINDOW_MS) return [];
+    // lane L5: project-PM chat lines and status pings are not agent activity — without this
+    // every project would sprout a ghost character (and an office tab) named after its repo.
+    if ((e.type as string) === "pm_message" || (e.type as string) === "pm_status") return [];
 
     const agentId = e.agentId ?? e.sessionId;
     const base = {
@@ -62,6 +67,7 @@ export function createDaemonV1Adapter(nowFn: () => number = Date.now) {
       sessionId: e.sessionId,
       agentId,
       parentId: e.parentId ?? null,
+      lane: e.lane ?? null,
     };
 
     const out: OfficeEvent[] = [];

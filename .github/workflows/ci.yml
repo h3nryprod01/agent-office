@@ -65,3 +65,32 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
           # SC1091: sourced files that only exist on a user's machine
           shellcheck --severity=warning --exclude=SC1091 scripts/*.sh
+
+  # lane L1: the repo is public, so a leaked path / private IP / token is permanent.
+  leaks:
+    name: leak gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # Positive control first: "clean" means nothing from a scanner that cannot
+      # catch a planted leak. This fails the job if any rule has gone blind.
+      - run: node scripts/check-leaks.mjs --self-test
+      - run: node scripts/check-leaks.mjs
+      # Every commit of the PR / push, one by one (the tree scan above only sees the end
+      # state, so a secret added in one commit and removed in the next would pass it)
+      - if: github.event_name == 'pull_request'
+        run: node scripts/check-leaks.mjs --range "origin/${{ github.base_ref }}..HEAD"
+      - if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        run: |
+          # after a force-push the old tip is not in the clone: say so instead of failing on it
+          if git cat-file -e "${{ github.event.before }}^{commit}" 2>/dev/null; then
+            node scripts/check-leaks.mjs --range "${{ github.event.before }}..${{ github.sha }}"
+          else
+            # fall back to everything this ref adds over the default branch
+            node scripts/check-leaks.mjs --range "origin/${{ github.event.repository.default_branch }}..${{ github.sha }}"
+          fi

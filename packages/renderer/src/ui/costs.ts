@@ -5,6 +5,7 @@
 // without a browser.
 
 import { t } from "../i18n";
+import { vendorBadgeHtml } from "./vendor";
 import type { WorkItem, WorkItemsFile } from "./workItems";
 
 export type CostWindow = "24h" | "7d" | "30d";
@@ -25,10 +26,42 @@ export interface CostsPayload {
   byDay: (CostRow & { day: string })[];
   /** claude-code / codex / gemini. Absent while a pre-multiharness daemon is still running. */
   byHarness?: (CostRow & { harness: string })[];
+  /** Worker lanes (lane L3): Claude Code driving DeepSeek/MiMo/GLM/Kimi. Absent on an older daemon. */
+  byLane?: (CostRow & { harness: string; lane: string })[];
   unknownModels: { model: string; tokens: number }[];
   /** Budget guard (Feature C). Absent while a pre-budget daemon runs. */
   budgetUsd?: number | null;
   overBudget?: boolean;
+}
+
+/** GET /scorecard (lane L3): per-lane aggregates of the owner's worker-run + review logs. */
+export interface ScorecardLane {
+  lane: string;
+  jobs: number;
+  errors: number;
+  timeouts: number;
+  seconds: number;
+  /** Exact cost reported by the runs, null when no run reported one. */
+  usd: number | null;
+  tokens: { miss: number; hit: number; out: number };
+  reviews: number;
+  passed: number;
+  /** passed / reviews, null with no reviews (never a fake 0%). */
+  passRate: number | null;
+  rework: number;
+  critical: number;
+  high: number;
+}
+export interface ScorecardPayload {
+  windowDays: number;
+  lanes: ScorecardLane[];
+  unattributedReviews: number;
+  brokenLines: number;
+}
+
+/** Spend window → days of scorecard history. */
+export function scorecardDays(w: CostWindow): number {
+  return w === "24h" ? 1 : w === "7d" ? 7 : 30;
 }
 
 /** "$12.34" above a dollar, more precision below so small sessions aren't all "$0.00". */
@@ -74,7 +107,47 @@ export function agentLabel(sessionId: string, items: WorkItem[]): string {
   return item?.assignee || item?.title || sessionId.slice(0, 8);
 }
 
-export function costsPanelHtml(data: CostsPayload, workItems: WorkItem[]): string {
+/**
+ * One row per worker lane, joining what the transcripts say (tokens, est. cost)
+ * with what the owner's logs say (headless runs, exact cost, review verdicts).
+ * A lane seen in only one source still gets its row; "—" marks "no data", never zero.
+ */
+export function laneTableHtml(
+  byLane: CostsPayload["byLane"],
+  scorecard: ScorecardPayload | undefined,
+): string {
+  const lanes = new Map<string, { cost?: NonNullable<CostsPayload["byLane"]>[number]; score?: ScorecardLane }>();
+  for (const r of byLane ?? []) lanes.set(r.lane, { ...lanes.get(r.lane), cost: r });
+  for (const r of scorecard?.lanes ?? []) lanes.set(r.lane, { ...lanes.get(r.lane), score: r });
+  if (lanes.size === 0) return "";
+  const dash = `<td class="cost-num cost-dim">—</td>`;
+  const lines = [...lanes.entries()]
+    .sort(([, a], [, b]) => (b.cost?.usd ?? 0) - (a.cost?.usd ?? 0) || (b.score?.jobs ?? 0) - (a.score?.jobs ?? 0))
+    .map(([lane, { cost, score }]) => {
+      const pass =
+        score && score.passRate !== null
+          ? `<td class="cost-num">${Math.round(score.passRate * 100)}% (${score.passed}/${score.reviews})</td>`
+          : dash;
+      const logged = score && score.usd !== null ? `<td class="cost-num">${fmtUsd(score.usd)}</td>` : dash;
+      const est = cost ? `<td class="cost-num">${fmtUsd(cost.usd)}</td>` : dash;
+      const tokens = cost ? `<td class="cost-num cost-dim">${fmtTokens(cost.tokens)}</td>` : dash;
+      const jobs = score ? `<td class="cost-num">${score.jobs}</td>` : dash;
+      return `<tr><td class="cost-label">${vendorBadgeHtml("claude-worker", lane)}</td>${jobs}${pass}${logged}${est}${tokens}</tr>`;
+    })
+    .join("");
+  return `<h3>${t("costs.lanes")}</h3>
+    <table class="cost-table lane-table">
+      <tr class="lane-head"><th></th><th>${t("costs.lanes.jobs")}</th><th>${t("costs.lanes.pass")}</th><th>${t("costs.lanes.logged")}</th><th>${t("costs.lanes.est")}</th><th>${t("costs.lanes.tokens")}</th></tr>
+      ${lines}
+    </table>
+    <p class="cost-dim lane-note">${t("costs.lanes.note")}</p>`;
+}
+
+export function costsPanelHtml(
+  data: CostsPayload,
+  workItems: WorkItem[],
+  scorecard?: ScorecardPayload,
+): string {
   const windows = COST_WINDOWS.map(
     (w) =>
       `<button class="cost-window${w === data.window ? " active" : ""}" data-window="${w}">${w}</button>`,
@@ -96,6 +169,7 @@ export function costsPanelHtml(data: CostsPayload, workItems: WorkItem[]): strin
     ${unknown}
     ${budget}
     ${costTableHtml("Theo harness", (data.byHarness ?? []).map((r) => ({ ...r, label: r.harness })))}
+    ${laneTableHtml(data.byLane, scorecard)}
     ${costTableHtml("Theo repo", data.byRepo.map((r) => ({ ...r, label: r.repo })))}
     ${costTableHtml("Theo agent", data.byAgent.map((r) => ({ ...r, label: agentLabel(r.sessionId, workItems) })))}
     ${costTableHtml(t("costs.byDay"), data.byDay.map((r) => ({ ...r, label: r.day })))}
@@ -106,6 +180,7 @@ export function mountCosts(
   root: HTMLElement,
   fetchCosts?: (window: CostWindow) => Promise<CostsPayload>,
   fetchWorkItems?: () => Promise<WorkItemsFile>,
+  fetchScorecard?: (days: number) => Promise<ScorecardPayload>, // lane L3
 ): { expand: () => void } {
   if (!fetchCosts) {
     // `root.hidden = true` was right when #costs was a corner widget in the
@@ -120,6 +195,7 @@ export function mountCosts(
   let selectedWindow: CostWindow = "24h";
   let data: CostsPayload | null = null;
   let workItems: WorkItem[] = [];
+  let scorecard: ScorecardPayload | undefined;
 
   function render(): void {
     const label = data
@@ -127,7 +203,7 @@ export function mountCosts(
       : t("nav.costs");
     const header = `<button class="costs-toggle">${label}</button>`;
     const body = open
-      ? `<div class="costs-panel">${data ? costsPanelHtml(data, workItems) : `<p class="placeholder">${t("costs.loading")}</p>`}</div>`
+      ? `<div class="costs-panel">${data ? costsPanelHtml(data, workItems, scorecard) : `<p class="placeholder">${t("costs.loading")}</p>`}</div>`
       : "";
     root.innerHTML = header + body;
   }
@@ -140,6 +216,14 @@ export function mountCosts(
       })
       .catch(() => {
         /* daemon unreachable — keep last known numbers */
+      });
+    fetchScorecard?.(scorecardDays(selectedWindow))
+      .then((payload) => {
+        scorecard = payload;
+        if (open) render();
+      })
+      .catch(() => {
+        /* older daemon without /scorecard — the lane table just has no review columns */
       });
     fetchWorkItems?.()
       .then((file) => {

@@ -21,7 +21,7 @@ Cơ chế đúng và an toàn 100% trên mọi đường test (không bao giờ 
   1. `allow` sau 2s → lệnh `touch` chạy thật, file xuất hiện.
   2. `deny` sau 1s → lệnh **không chạy**, model tự báo "DENIED-OK" đúng như prompt yêu cầu.
   3. Im lặng 60s + hook timeout 10s → hook bị Claude Code timeout, **dialog "Do you want to proceed?" hiện ra bình thường** — đúng fail-open, không hang, không tự allow.
-- **Timeout**: mặc định 600s cho hook `command`, cấu hình được per-hook qua `"timeout"` (giây). Gateway dùng `timeout: 30` + tự abort fetch ở 27s (lớp trong lớp ngoài, xem mục 2).
+- **Timeout**: mặc định 600s cho hook `command`, cấu hình được per-hook qua `"timeout"` (giây). Gateway dùng `timeout: 120` + tự abort fetch ở 118s, daemon TTL 115s (lớp trong lớp ngoài, xem mục 2; nâng từ 30s ngày 2026-10-27 để kịp duyệt qua Telegram).
 - **Matcher**: lọc theo tên tool, hỗ trợ `"Bash"`, `"Edit|Write"`, regex. Gateway đăng ký matcher `Bash|Edit|Write`.
 
 ## 2. Kiến trúc đã build
@@ -95,7 +95,7 @@ Renderer: `packages/renderer/src/ui/approvals.ts` (store, tap raw frame của `W
    ```json
    "PermissionRequest": [{
      "matcher": "Bash|Edit|Write",
-     "hooks": [{"type": "command", "command": "node \"<repo>/packages/daemon/hooks/approve-gateway.mjs\"", "timeout": 30}]
+     "hooks": [{"type": "command", "command": "node \"<repo>/packages/daemon/hooks/approve-gateway.mjs\"", "timeout": 120}]
    }]
    ```
 3. Dùng thật vài ngày, đo lại latency lúc máy đỡ tải hơn — nếu số liệu về gần ngưỡng ban đầu (~50-100ms) thì cân nhắc mở matcher rộng hơn hoặc nâng global; nếu vẫn cao thì đây là giới hạn thật của "spawn 1 tiến trình Node mỗi lần" trên máy nhiều session song song, cần nghĩ giải pháp khác (ví dụ daemon-side persistent hook process thay vì spawn mỗi lần).

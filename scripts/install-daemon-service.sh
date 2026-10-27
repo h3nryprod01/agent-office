@@ -48,5 +48,21 @@ ${CLAUDE:+  <key>EnvironmentVariables</key><dict><key>CHAT_CLAUDE_BIN</key><stri
 EOF
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-launchctl bootstrap "gui/$(id -u)" "$PLIST"
+# bootout returns before the old job is gone; bootstrapping too early fails with
+# "5: Input/output error" and leaves NO daemon running. Wait for it to go, then retry.
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1 || break
+  sleep 0.5
+done
+ok=0
+err=""
+for _ in 1 2 3 4 5; do
+  if err=$(launchctl bootstrap "gui/$(id -u)" "$PLIST" 2>&1); then ok=1; break; fi
+  sleep 1
+done
+if [ "$ok" != 1 ]; then
+  echo "launchctl bootstrap failed: $err" >&2
+  echo "finish by hand: launchctl bootstrap gui/$(id -u) '$PLIST'" >&2
+  exit 1
+fi
 echo "installed $LABEL (node: $NODE, claude: ${CLAUDE:-<not found, CHAT_CLAUDE_BIN unset>}, repo: $REPO, log: $LOG)"

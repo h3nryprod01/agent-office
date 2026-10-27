@@ -44,6 +44,8 @@ export interface AgentModel {
   repo: string;
   /** Source CLI ("claude-code" | "codex" | ...), null when unknown. */
   harness: string | null;
+  /** Model vendor of a "claude-worker" agent ("deepseek", "mimo"...), null otherwise or until known. */
+  lane: string | null;
   status: AgentStatus;
   statusDetail: string | null;
   /** When the current status began (for "waiting for 43s" readouts). */
