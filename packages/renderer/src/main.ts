@@ -24,6 +24,11 @@ import { mountNotifier } from "./ui/notify";
 import { mountOrgChart } from "./ui/orgchart";
 import { mountBuildingView } from "./ui/buildingView";
 import { ApprovalsStore } from "./ui/approvals";
+import { mountApprovalCards } from "./ui/approvalCards";
+import { mountAgentMenu } from "./ui/agentMenu";
+import { openProjectTerminal, revealAgentFile, revealAgentFolder, revealProject, uploadToInbox } from "./ui/officeActions";
+import { openTerminalFor, sessionActions } from "./ui/sessionActions";
+import { mountToast } from "./ui/toast";
 import { RadarStore } from "./ui/radar"; // lane L4
 import { mountInterventionStats, type InterventionSummary } from "./ui/interventionStats"; // lane L4
 import { mountOfficeTabs, TAB_ALL, type TabKey } from "./ui/officeTabs";
@@ -59,22 +64,19 @@ async function boot(): Promise<void> {
   // leaving a blank page. The office is the nice-to-have; those panels
   // are the job. So: degrade to a message and keep going.
   let office3d: Office3DHandle | null = null;
+  // What clicking a prop, a desk or a character does is wired at the END of boot, once every
+  // panel it opens exists; a click before that does nothing.
+  const late: {
+    furniture?: (id: string, mods?: { shiftKey: boolean }) => void;
+    seat?: (s: { agentId?: string; part: "screen" | "desk"; ceo: boolean }) => void;
+    menu?: (agentId: string, x: number, y: number) => void;
+  } = {};
   try {
     office3d = createOffice3D({
       onPick: (agentId) => sidePanel.show(agentId),
-      onFurniture: (id) => {
-        // the props L8 made clickable open the panel they stand for. A click during boot (before the
-        // panels exist) is simply ignored instead of throwing out of the 3D click handler.
-        try {
-          if (id === "filing_cabinet") outputsPanel.show();
-          else if (id === "reception") hiringHall?.open();
-          else if (id === "board_work") setView("kanban");
-          else if (id === "board_spend") setView("costs");
-          else if (id === "elevator") document.querySelector<HTMLElement>("#building .building-toggle")?.click();
-        } catch (err) {
-          if (!(err instanceof ReferenceError)) throw err; // only "that panel is not mounted yet" is expected
-        }
-      },
+      onFurniture: (id, mods) => late.furniture?.(id, mods),
+      onSeat: (seat) => late.seat?.(seat),
+      onAgentMenu: (agentId, x, y) => late.menu?.(agentId, x, y),
     });
     document.querySelector<HTMLElement>("#app")!.appendChild(office3d.canvas);
     office3d.resize();
@@ -756,6 +758,129 @@ async function boot(): Promise<void> {
     });
     paintMeet();
     controlsRoot.append(meetBtn);
+  }
+
+  // ── interactive office: props, desks, right-click, approval cards, drop-to-inbox ──
+  const toast = mountToast();
+  /** the project the office is showing: the active tab's, else the only one, else the remembered one */
+  const projectNow = (): string | null => {
+    const fromTab = activeRepo ? slugByRepo.get(activeRepo) : undefined;
+    if (fromTab) return fromTab;
+    const all = [...new Set(slugByRepo.values())];
+    return all.length === 1 ? all[0] : getActiveProject();
+  };
+  /** say why a host action did not happen; success needs no words (the window opens) */
+  const explain = (res: { ok: boolean; status: number }): void => {
+    if (res.ok) return;
+    if (res.status === 403) toast(isPresentationMode() ? t("office.toast.presenting") : t("office.toast.notOwner"));
+    else if (res.status === 404) toast(t("office.toast.notFound"));
+    else toast(t("office.toast.failed", { status: res.status || "offline" }));
+  };
+  const withProject = (run: (slug: string) => Promise<{ ok: boolean; status: number }>): void => {
+    const slug = projectNow();
+    if (!slug) {
+      toast(t("office.toast.noProject"));
+      return;
+    }
+    void run(slug).then(explain);
+  };
+
+  late.furniture = (id, mods) => {
+    if (id === "filing_cabinet") {
+      if (mods?.shiftKey || !useWs) outputsPanel.show();
+      else withProject(revealProject);
+    } else if (id === "reception") hiringHall?.open();
+    else if (id === "board_work") setView("kanban");
+    else if (id === "board_spend") setView("costs");
+    else if (id === "library") setView("docs");
+    else if (id === "server_rack") setView("settings");
+    else if (id === "meeting_table") document.querySelector<HTMLElement>("#orgchart .orgchart-toggle")?.click();
+    else if (id === "elevator") document.querySelector<HTMLElement>("#building .building-toggle")?.click();
+    else if (id === "arcade") withProject(openProjectTerminal);
+  };
+  late.seat = ({ agentId, part, ceo }) => {
+    if (ceo) {
+      // the CEO desk is the PM's: talk to this project's PM
+      const slug = projectNow();
+      if (slug) chatHandle?.selectProject(slug);
+      document.querySelector<HTMLElement>("#chat-box textarea, #chat-box input")?.focus();
+      return;
+    }
+    if (!agentId) withProject(revealProject);
+    else void (part === "screen" ? revealAgentFile(agentId) : revealAgentFolder(agentId)).then(explain);
+  };
+
+  const menu = mountAgentMenu((action, a) => {
+    if (action === "details") sidePanel.show(a.agentId);
+    else if (action === "folder") void revealAgentFolder(a.agentId).then(explain);
+    else if (action === "file") void revealAgentFile(a.agentId).then(explain);
+    else if (action === "terminal") void openTerminalFor(a.agentId).then((ok) => explain({ ok, status: ok ? 200 : 0 }));
+    else if (action === "resume" && a.resume) void navigator.clipboard?.writeText(a.resume).then(() => toast(t("office.toast.copied")));
+  });
+  late.menu = (agentId, x, y) => {
+    const agent = current().agents.get(agentId);
+    if (!agent) return;
+    // the detail often IS the tool name; say it once
+    const detail = agent.statusDetail && agent.statusDetail !== agent.currentTool ? agent.statusDetail : null;
+    const doing = agent.currentTool ? `${agent.currentTool}${detail ? `: ${detail}` : ""}` : detail;
+    menu.open(
+      { agentId, name: agent.name, doing: doing ?? null, resume: sessionActions({ agentId, sessionId: agent.sessionId, cwd: agent.cwd, harness: agent.harness, lane: agent.lane }).resume },
+      x,
+      y,
+    );
+  };
+
+  // Approve / Deny over the waiting character (the "Needs you" queue keeps working too)
+  if (approvals && office3d) {
+    const cardsRoot = document.createElement("div");
+    document.body.appendChild(cardsRoot);
+    const office = office3d;
+    mountApprovalCards(cardsRoot, {
+      store: approvals,
+      agentOf: (a) => {
+        const agents = current().agents;
+        const ag = agents.get(a.sessionId) ?? [...agents.values()].find((x) => x.sessionId === a.sessionId && !x.parentId);
+        return ag ? { agentId: ag.agentId, name: ag.name } : null;
+      },
+      screenPos: (id) => office.screenPos(id),
+      visible: () => (document.body.dataset.view ?? "office") === "office" && !replayView,
+    });
+  }
+
+  // Drag files from Finder / Explorer onto the office → <project>/inbox/, and a PM draft about them
+  if (useWs) {
+    const app = document.querySelector<HTMLElement>("#app")!;
+    app.dataset.dropHint = t("office.dropHint");
+    const hasFiles = (ev: DragEvent): boolean => [...(ev.dataTransfer?.types ?? [])].includes("Files");
+    app.addEventListener("dragover", (ev) => {
+      if (!hasFiles(ev)) return;
+      ev.preventDefault();
+      app.classList.add("drop-target");
+    });
+    app.addEventListener("dragleave", () => app.classList.remove("drop-target"));
+    app.addEventListener("drop", (ev) => {
+      if (!hasFiles(ev)) return;
+      ev.preventDefault();
+      app.classList.remove("drop-target");
+      const slug = projectNow();
+      if (!slug) {
+        toast(t("office.toast.noProject"));
+        return;
+      }
+      const files = [...(ev.dataTransfer?.files ?? [])];
+      void (async () => {
+        const saved: string[] = [];
+        for (const file of files) {
+          const res = await uploadToInbox(slug, file);
+          if ("path" in res) saved.push(res.path);
+          else toast(res.error === "too-large" ? t("office.toast.tooLarge", { name: file.name }) : t("office.toast.dropFailed", { name: file.name, error: res.error }));
+        }
+        if (saved.length === 0) return;
+        chatHandle?.selectProject(slug);
+        chatHandle?.prefill(t("drop.askPm", { paths: saved.join(", ") }));
+        toast(t("office.toast.dropped", { paths: saved.join(", ") }));
+      })();
+    });
   }
 
   source.start();

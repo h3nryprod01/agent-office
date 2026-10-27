@@ -60,6 +60,8 @@ export interface Office3DHandle {
   setTimeOfDay(hour: number | null): void;
   /** lane L8: dev floor / content studio / sales floor — same stations, different room */
   setRoomStyle(style: RoomStyle): void;
+  /** where an agent's head is on screen (client px), null when it is not in view — anchors HTML over a character */
+  screenPos(agentId: string): { x: number; y: number } | null;
   roomStyle(): RoomStyle;
   /** models load async; false until the GLB kinds are ready */
   hasKind(kind: Kind): boolean;
@@ -74,8 +76,12 @@ export interface Office3DHandle {
 export interface Office3DOpts {
   /** clicking an agent (or their desk) */
   onPick?: (agentId: string) => void;
-  /** clicking a tagged prop, e.g. "filing_cabinet" → outputs panel */
-  onFurniture?: (furnitureId: string) => void;
+  /** clicking a tagged prop, e.g. "filing_cabinet" → the project folder */
+  onFurniture?: (furnitureId: string, mods?: { shiftKey: boolean }) => void;
+  /** clicking a desk or its screen (not the character): the desk's agent, if one sits there */
+  onSeat?: (seat: { agentId?: string; part: "screen" | "desk"; ceo: boolean }) => void;
+  /** right-clicking a character or its desk */
+  onAgentMenu?: (agentId: string, clientX: number, clientY: number) => void;
   /** lane L8: which room to build (default: ?room=… or "dev") */
   roomStyle?: RoomStyle;
   /** lane L8: hand agents that carry no harness a demo uniform (default: on in ?mock=1 only) */
@@ -339,8 +345,7 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
   const MEET_CENTER = v3(PLAN.MEET_CENTER);
 
   // ── places you can click: tagged with a furnitureId, named in a hover tooltip ──
-  // Only "filing_cabinet" is wired to a panel today (main.ts onFurniture); the rest
-  // are named so the app can wire them: chat, providers, hiring, building view…
+  // main.ts wires each id to what it opens (folders, panels, a terminal); see late.furniture there
   const places: { id: string; obj: THREE.Object3D; tipY: number }[] = [];
   function place(obj: THREE.Object3D, id: string, tipY: number): void {
     obj.userData.furnitureId = id;
@@ -404,6 +409,7 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
     const sctx = sc.getContext("2d")!;
     const stex = new THREE.CanvasTexture(sc);
     const screenMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.86), new THREE.MeshBasicMaterial({ map: stex }));
+    screenMesh.name = "screen"; // clicking the monitor means "show the file it is on"
     screenMesh.position.set(0, 1.98, 0.97); g.add(screenMesh);
     // An office chair on a pedestal: the seat top sits where a seated agent's hips land
     // (standing hip height minus SIT_DROP), so sitting down reads as sitting down.
@@ -876,7 +882,7 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
   const raycaster = new THREE.Raycaster();
   const ptr = new THREE.Vector2();
   /** what's under this screen point: a tagged prop, an agent, or nothing */
-  function resolvePick(clientX: number, clientY: number): { agentId?: string; furnitureId?: string; hit?: string } {
+  function resolvePick(clientX: number, clientY: number): { agentId?: string; furnitureId?: string; hit?: string; seat?: { part: "screen" | "desk"; ceo: boolean } } {
     const r = canvas.getBoundingClientRect();
     ptr.x = ((clientX - r.left) / r.width) * 2 - 1;
     ptr.y = -((clientY - r.top) / r.height) * 2 + 1;
@@ -888,17 +894,24 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
     const hit = o.name || o.type;
     let agentId: string | undefined;
     let furnitureId: string | undefined;
-    while (o && !agentId && !furnitureId) {
+    let seat: { part: "screen" | "desk"; ceo: boolean } | undefined;
+    const part = hit === "screen" ? "screen" : "desk";
+    while (o && !agentId && !furnitureId && !seat) {
       if (typeof o.userData.furnitureId === "string") furnitureId = o.userData.furnitureId;
       else if (typeof o.userData.agentId === "string") agentId = o.userData.agentId;
-      else if (o.userData.seatIndex !== undefined) agentId = seats[o.userData.seatIndex as number].agentId;
+      else if (o.userData.seatIndex !== undefined) {
+        const i = o.userData.seatIndex as number;
+        agentId = seats[i].agentId ?? undefined;
+        seat = { part, ceo: i === CEO_SEAT };
+      }
       o = o.parent;
     }
-    return { agentId, furnitureId, hit };
+    return { agentId, furnitureId, hit, ...(seat ? { seat } : {}) };
   }
   function pick(ev: PointerEvent): void {
-    const { agentId, furnitureId } = resolvePick(ev.clientX, ev.clientY);
-    if (furnitureId) opts.onFurniture?.(furnitureId);
+    const { agentId, furnitureId, seat } = resolvePick(ev.clientX, ev.clientY);
+    if (furnitureId) opts.onFurniture?.(furnitureId, { shiftKey: ev.shiftKey });
+    else if (seat && opts.onSeat) opts.onSeat({ ...(agentId ? { agentId } : {}), ...seat });
     else if (agentId) opts.onPick?.(agentId);
   }
   const DRAG_PX = 4;
@@ -955,9 +968,16 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
   function onUp(ev: PointerEvent): void {
     canvas.style.cursor = "grab";
     if (ev.type === "pointerleave") { tip.visible = false; tipId = null; }
-    if (dragging && !moved) pick(ev);
+    // only a plain left click picks: a right click opens the menu, leaving the canvas is not a click
+    if (ev.type === "pointerup" && ev.button === 0 && dragging && !moved) pick(ev);
     dragging = false;
   }
+  canvas.addEventListener("contextmenu", (ev) => {
+    const { agentId } = resolvePick(ev.clientX, ev.clientY);
+    if (!agentId || !opts.onAgentMenu) return;
+    ev.preventDefault();
+    opts.onAgentMenu(agentId, ev.clientX, ev.clientY);
+  });
   canvas.addEventListener("pointerdown", onDown);
   canvas.addEventListener("pointermove", onMove);
   canvas.addEventListener("pointerup", onUp);
@@ -1240,6 +1260,17 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
     hasKind: (k) => k === "screen" || !!MODELS[k],
     resize,
     probePick: resolvePick,
+    screenPos: (agentId: string) => {
+      const ch = chars.get(agentId);
+      if (!ch || !ch.group.visible) return null;
+      const p = new THREE.Vector3();
+      ch.group.getWorldPosition(p);
+      p.y += 2.9; // just above the head (and its status mark)
+      p.project(camera);
+      if (p.z > 1 || p.x < -1.05 || p.x > 1.05 || p.y < -1.05 || p.y > 1.05) return null;
+      const r = canvas.getBoundingClientRect();
+      return { x: r.left + ((p.x + 1) / 2) * r.width, y: r.top + ((1 - p.y) / 2) * r.height };
+    },
     debug: () => [...chars.entries()].map(([id, c]) => ({
       id: id.slice(0, 8), state: c.state, home: c.home,
       x: Math.round(c.group.position.x * 10) / 10, z: Math.round(c.group.position.z * 10) / 10,
