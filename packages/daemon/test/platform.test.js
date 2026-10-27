@@ -113,8 +113,11 @@ test("revealCommand: Open runs nothing — folders and known documents open, eve
   assert.deepEqual(revealCommand(import.meta.dirname, false, "darwin").args, [import.meta.dirname]);
   assert.deepEqual(revealCommand(import.meta.filename, false, "darwin").args, ["-R", import.meta.filename]);
   const fake = fs.mkdtempSync(path.join(os.tmpdir(), "ao-bundle-"));
-  fs.mkdirSync(path.join(fake, "Contents"));
-  fs.writeFileSync(path.join(fake, "Contents", "Info.plist"), "<plist/>");
-  assert.deepEqual(revealCommand(fake, false, "darwin").args, ["-R", fake]);
-  fs.rmSync(fake, { recursive: true });
+  try {
+    fs.mkdirSync(path.join(fake, "Contents"));
+    fs.writeFileSync(path.join(fake, "Contents", "Info.plist"), "<plist/>");
+    assert.deepEqual(revealCommand(fake, false, "darwin").args, ["-R", fake]);
+  } finally {
+    fs.rmSync(fake, { recursive: true });
+  }
 });
