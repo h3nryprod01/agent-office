@@ -10,6 +10,7 @@
 
 import path from "node:path";
 import os from "node:os";
+import { statSync } from "node:fs";
 
 /** @param {string} [platform] defaults to the real platform */
 export function isWindows(platform = process.platform) {
@@ -62,34 +63,47 @@ export function commonBinDirs(platform = process.platform, env = process.env) {
   ];
 }
 
-// things `open` would run or install rather than show: a bundle, an installer, a Terminal script an agent wrote
-const MAC_BUNDLE_RE = /\.(app|appex|bundle|framework|plugin|prefpane|kext|xpc|pkg|mpkg|workflow|action|saver|qlgenerator|command|tool|terminal|jar|dmg|mobileconfig)\/?$/i;
-// the Windows equivalent: explorer <file> runs these
-const WIN_RUNNABLE_RE = /\.(exe|com|bat|cmd|ps1|vbs|vbe|js|jse|wsf|wsh|msi|msc|scr|lnk|url|reg|hta|cpl|jar)$/i;
+// "Open" may only open what cannot run: a folder or a known document. Anything else an agent
+// wrote (a script with no extension, an alias, an installer, a .exe) is selected instead.
+// ponytail: allow-list, so a type missing here is merely shown in its folder, never run.
+const OPENABLE_FILE_RE = /\.(txt|md|markdown|csv|tsv|log|json|ya?ml|xml|pdf|png|jpe?g|gif|webp|svg|heic|bmp|tiff?|mp3|m4a|wav|mp4|mov|webm|docx|xlsx|pptx|odt|ods|odp|rtf|html?)$/i;
+// folders `open` would launch rather than show
+const MAC_BUNDLE_DIR_RE = /\.(app|appex|bundle|framework|plugin|prefpane|kext|xpc|pkg|mpkg|workflow|action|saver|qlgenerator)\/?$/i;
+
+function isDirectory(p) {
+  try {
+    return statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Build the shell-out to reveal/open a file in the platform file manager.
  * macOS: `open -R <path>` (reveal) / `open <path>`. Windows: `explorer
  * /select,<path>` (reveal) / `explorer <path>`. The comma form `/select,C:\x`
- * is explorer's documented select syntax.
+ * is explorer's documented select syntax. An "open" of anything that could run
+ * (see OPENABLE_FILE_RE) becomes a reveal.
  * @param {string} realPath already realpath-resolved
  * @param {boolean} reveal
  * @param {string} [platform]
+ * @param {boolean} [isDir] looked up on disk unless given
  * @returns {{cmd: string, args: string[]}}
  */
-export function revealCommand(realPath, reveal, platform = process.platform) {
+export function revealCommand(realPath, reveal, platform = process.platform, isDir = isDirectory(realPath)) {
+  const select = reveal || (isDir ? isMacBundle(realPath, platform) : !OPENABLE_FILE_RE.test(realPath));
   if (isWindows(platform)) {
     // explorer splits /select, on commas and quotes: such a file only gets its folder opened
-    const select = reveal || WIN_RUNNABLE_RE.test(realPath);
     if (select && /[,"]/.test(realPath)) return { cmd: "explorer", args: [path.win32.dirname(realPath)] };
     return { cmd: "explorer", args: [select ? `/select,${realPath}` : realPath] };
   }
   if (isLinux(platform)) {
-    return { cmd: "xdg-open", args: [reveal ? path.dirname(realPath) : realPath] };
+    return { cmd: "xdg-open", args: [select ? path.dirname(realPath) : realPath] };
   }
-  // `open X.app` would launch the bundle instead of showing it — select it in Finder instead
-  return { cmd: "open", args: reveal || MAC_BUNDLE_RE.test(realPath) ? ["-R", realPath] : [realPath] };
+  return { cmd: "open", args: select ? ["-R", realPath] : [realPath] };
 }
+
+const isMacBundle = (p, platform) => !isWindows(platform) && !isLinux(platform) && MAC_BUNDLE_DIR_RE.test(p);
 
 /**
  * Build the shell-out for a desktop notification. macOS returns a `{cmd:null}`

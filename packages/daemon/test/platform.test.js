@@ -90,14 +90,21 @@ test("notifyCommand: linux → notify-send", () => {
   });
 });
 
-test("revealCommand: a bundle-looking folder is selected, never launched; a comma never reaches /select,", () => {
-  assert.deepEqual(revealCommand("/x/Tool.app", false, "darwin").args, ["-R", "/x/Tool.app"]);
-  assert.deepEqual(revealCommand("/x/plain", false, "darwin").args, ["/x/plain"]);
-  // Outputs' "Open" on a file still opens it; a dotted folder name is not a bundle
-  assert.deepEqual(revealCommand("/x/report.pdf", false, "darwin").args, ["/x/report.pdf"]);
-  assert.deepEqual(revealCommand("/x/me.github.io", false, "darwin").args, ["/x/me.github.io"]);
-  assert.deepEqual(revealCommand("/x/run.command", false, "darwin").args, ["-R", "/x/run.command"]);
-  assert.deepEqual(revealCommand("C:\\x\\setup.exe", false, "win32").args, ["/select,C:\\x\\setup.exe"]);
-  assert.deepEqual(revealCommand("C:\\x\\notes.txt", false, "win32").args, ["C:\\x\\notes.txt"]);
-  assert.deepEqual(revealCommand("C:\\x\\a,b.txt", true, "win32"), { cmd: "explorer", args: ["C:\\x"] });
+test("revealCommand: Open runs nothing — folders and known documents open, everything else is selected", () => {
+  const dir = true, file = false;
+  assert.deepEqual(revealCommand("/x/Tool.app", false, "darwin", dir).args, ["-R", "/x/Tool.app"]);
+  assert.deepEqual(revealCommand("/x/me.github.io", false, "darwin", dir).args, ["/x/me.github.io"]);
+  assert.deepEqual(revealCommand("/x/plain", false, "darwin", dir).args, ["/x/plain"]);
+  assert.deepEqual(revealCommand("/x/report.pdf", false, "darwin", file).args, ["/x/report.pdf"]);
+  for (const f of ["/x/run", "/x/run.command", "/x/a.jar", "/x/link.webloc", "/x/Setup.pkg"]) {
+    assert.deepEqual(revealCommand(f, false, "darwin", file).args, ["-R", f], f);
+  }
+  assert.deepEqual(revealCommand("C:\\x\\setup.exe", false, "win32", file).args, ["/select,C:\\x\\setup.exe"]);
+  assert.deepEqual(revealCommand("C:\\x\\a.pif", false, "win32", file).args, ["/select,C:\\x\\a.pif"]);
+  assert.deepEqual(revealCommand("C:\\x\\notes.txt", false, "win32", file).args, ["C:\\x\\notes.txt"]);
+  assert.deepEqual(revealCommand("C:\\x\\Tool.app", false, "win32", dir).args, ["C:\\x\\Tool.app"]);
+  assert.deepEqual(revealCommand("C:\\x\\a,b.txt", true, "win32", file), { cmd: "explorer", args: ["C:\\x"] });
+  assert.deepEqual(revealCommand("/x/run.sh", false, "linux", file).args, ["/x"]);
+  // looked up on disk when not given: this test file is a file, its folder a folder
+  assert.equal(revealCommand(import.meta.dirname, false, "darwin").args[0], import.meta.dirname);
 });
