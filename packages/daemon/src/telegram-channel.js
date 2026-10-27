@@ -97,23 +97,28 @@ export function createTelegramChannel({
     return body;
   }
 
-  async function sendOne(chatId, text) {
+  async function sendOne(chatId, text, replyMarkup) {
+    const payload = { chat_id: chatId, text, ...(replyMarkup ? { reply_markup: replyMarkup } : {}) };
     try {
-      await call("sendMessage", { chat_id: chatId, text });
+      await call("sendMessage", payload);
     } catch (err) {
       if (err.retryAfter && !stopped) {
         await sleepFn(Math.min(err.retryAfter, 30) * 1000);
-        await call("sendMessage", { chat_id: chatId, text });
+        await call("sendMessage", payload);
         return;
       }
       throw err;
     }
   }
 
-  async function send(chatId, text) {
+  /** @param {{buttons?: {text: string, data: string}[]}} [opts] buttons go under the LAST part */
+  async function send(chatId, text, opts = {}) {
     if (!enabled) return;
+    const buttons = Array.isArray(opts.buttons) ? opts.buttons.filter((b) => b?.text && b?.data && Buffer.byteLength(b.data) <= 64) : [];
+    const markup = buttons.length ? { inline_keyboard: [buttons.map((b) => ({ text: b.text, callback_data: b.data }))] } : null;
     try {
-      for (const part of splitMessage(String(text))) await sendOne(chatId, part);
+      const parts = splitMessage(String(text));
+      for (let i = 0; i < parts.length; i++) await sendOne(chatId, parts[i], i === parts.length - 1 ? markup : null);
       sendFailing = false;
     } catch (err) {
       // secondary path: a failed reply must never break the caller; say so once per outage
@@ -123,6 +128,20 @@ export function createTelegramChannel({
   }
 
   function toMessage(update) {
+    // a tap on one of our buttons: its data is the command the button stands for
+    const cq = update?.callback_query;
+    if (cq) {
+      if (typeof cq.data !== "string" || !cq.data || cq.from?.id == null || cq.from?.is_bot || cq.message?.chat?.id == null) return null;
+      return {
+        channel: "telegram",
+        chatId: String(cq.message.chat.id),
+        userId: String(cq.from.id),
+        name: cq.from.first_name || cq.from.username || "",
+        text: cq.data,
+        isGroup: cq.message.chat.type === "group" || cq.message.chat.type === "supergroup",
+        callbackId: String(cq.id),
+      };
+    }
     const m = update?.message;
     // a group became a supergroup: same room, new chat id
     if (m?.migrate_to_chat_id != null && m.chat?.id != null) {
@@ -151,7 +170,7 @@ export function createTelegramChannel({
         try {
           const body = await call(
             "getUpdates",
-            { offset, timeout: pollTimeoutSec, allowed_updates: ["message"] },
+            { offset, timeout: pollTimeoutSec, allowed_updates: ["message", "callback_query"] },
             controller.signal,
           );
           updates = Array.isArray(body?.result) ? body.result : [];
@@ -174,6 +193,8 @@ export function createTelegramChannel({
           } catch (err) {
             warn(`handler failed (${describe(err)})`);
           }
+          // stop the spinner on the tapped button; the router has already replied in the chat
+          if (msg.callbackId) await call("answerCallbackQuery", { callback_query_id: msg.callbackId }).catch(() => {});
         }
         offset = nextOffset(updates, offset);
         if (updates.length > 0) writeOffset(offsetFile, offset);

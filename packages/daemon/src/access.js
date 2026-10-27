@@ -38,7 +38,7 @@ const TOKEN_ID_KEY = "aoTokenId";
 const WEBHOOK_MAX_BYTES = 64 * 1024;
 
 /** Routes that act on the HOST machine's desktop; remote managers do not get them. */
-const OWNER_ONLY_PATHS = new Set(["/open", "/sessions/open-terminal"]);
+const OWNER_ONLY_PATHS = new Set(["/open", "/sessions/open-terminal", "/reveal"]);
 /** Zalo's servers call this and cannot carry a token; zalo.js checks the sender itself. Only while Zalo is configured. */
 const PUBLIC_POST_PATHS = new Set(["/zalo/webhook"]);
 /** Headers a proxy or tunnel adds; their presence means the peer address is not the real client. */

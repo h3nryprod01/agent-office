@@ -592,3 +592,11 @@ test("by default the Zalo webhook opens with L5's channel config (token + app id
     for (const k of keys) (saved[k] === undefined ? delete process.env[k] : (process.env[k] = saved[k]));
   }
 });
+
+test("/reveal is owner-only (it opens a window on the host desktop)", () => {
+  const { guard, tokens } = setup({ m: "manager", o: "owner" });
+  const res = fakeRes();
+  assert.equal(guard.http(fakeReq({ method: "POST", url: "/reveal", headers: { authorization: `Bearer ${tokens.m}` } }), res), false);
+  assert.equal(res.status, 403);
+  assert.equal(guard.http(fakeReq({ method: "POST", url: "/reveal", headers: { authorization: `Bearer ${tokens.o}` } }), fakeRes()), true);
+});

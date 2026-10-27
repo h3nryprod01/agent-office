@@ -1,5 +1,6 @@
 // "Open this agent's session": POST /sessions/open-terminal {agentId} opens a
-// terminal window at the working directory of that agent.
+// terminal window at the working directory of that agent; {project} opens one in the
+// project's own folder (the arcade machine in the office).
 //
 // The folder is NEVER taken from the request. The daemon looks the agent up in
 // what it observed itself (radar.agentCwd) — so a stray page can at worst open
@@ -42,7 +43,7 @@ export function terminalCommand(cwd, platform = process.platform, env = process.
  * @param {typeof execFile} [opts.execFileFn]
  * @param {string} [opts.platform]
  */
-export function createSessionOpenHandler({ resolveCwd, execFileFn = execFile, platform = process.platform }) {
+export function createSessionOpenHandler({ resolveCwd, resolveProjectCwd = () => null, execFileFn = execFile, platform = process.platform }) {
   return (req, res, url) => {
     if (url.pathname !== "/sessions/open-terminal") return false;
     const respond = (status, payload) => {
@@ -65,12 +66,13 @@ export function createSessionOpenHandler({ resolveCwd, execFileFn = execFile, pl
       } catch {
         parsed = null;
       }
-      const agentId = parsed?.agentId;
-      if (typeof agentId !== "string" || !agentId) {
-        respond(400, { error: "agentId required" });
+      const agentId = typeof parsed?.agentId === "string" && parsed.agentId ? parsed.agentId : null;
+      const project = typeof parsed?.project === "string" && parsed.project ? parsed.project : null;
+      if (!agentId && !project) {
+        respond(400, { error: "agentId or project required" });
         return;
       }
-      const cwd = resolveCwd(agentId);
+      const cwd = agentId ? resolveCwd(agentId) : resolveProjectCwd(project);
       let real;
       try {
         if (!cwd) throw new Error("unknown agent");

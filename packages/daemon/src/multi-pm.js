@@ -128,8 +128,8 @@ export function createMultiPm({
   // the other's keys (/use choices vs. which digests already went out).
   const state = new JsonState(path.join(stateDir, "channels-state.json"));
 
-  const send = async (channel, chatId, text) => {
-    await channels[channel]?.send(chatId, text);
+  const send = async (channel, chatId, text, opts) => {
+    await channels[channel]?.send(chatId, text, opts);
   };
   const router = new ChannelRouter({
     projectsDir,

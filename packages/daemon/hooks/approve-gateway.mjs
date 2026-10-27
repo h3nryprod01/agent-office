@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Agent Office — PermissionRequest gateway (spike R5②, wi-approve-spike).
 //
-// Registered as a PermissionRequest hook (matcher Bash|Edit|Write, timeout 30,
+// Registered as a PermissionRequest hook (matcher Bash|Edit|Write, timeout 120,
 // project-local pilot in .claude/settings.local.json). Fires ONLY when Claude
 // Code is about to show a permission dialog — auto-allowed tool calls never
 // invoke it, so normal tool traffic pays zero overhead by construction.
@@ -21,14 +21,14 @@
 //     click in the office, OR (lane L2) the project's own `auto`/`read-only` policy,
 //     which the daemon applies only after its danger list found nothing to ask about;
 //   - every error path is silence + exit 0 = the user's normal prompt;
-//   - timeout layering: daemon TTL 25s < fetch abort 27s < hook timeout 30s,
+//   - timeout layering: daemon TTL 115s < fetch abort 118s < hook timeout 120s,
 //     so the terminal dialog is delayed at most ~27s when an office is open
 //     but unattended, and ~50ms when no office is connected.
 
 import { readFileSync } from "node:fs";
 
 const PORT = process.env.AGENT_OFFICE_PORT ?? process.env.DAEMON_WS_PORT ?? "8787";
-const FETCH_TIMEOUT_MS = Number(process.env.APPROVE_GATEWAY_TIMEOUT_MS ?? 27_000);
+const FETCH_TIMEOUT_MS = Number(process.env.APPROVE_GATEWAY_TIMEOUT_MS ?? 118_000);
 const URL_BASE = `http://127.0.0.1:${PORT}`;
 
 // lane L2: the daemon's policy engine classifies the command and the path, so

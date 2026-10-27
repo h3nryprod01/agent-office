@@ -75,6 +75,7 @@ function safeStorage(): Storage | null {
 const BLOCKED_POSTS = new Set([
   "/open",
   "/sessions/open-terminal", // opens a real terminal at the real path, on the projector
+  "/reveal", // opens the real Finder/Explorer window, same reason
   // these send back text the page only holds masked (a document body, a quoted anchor): the
   // aliases would be restored but the blurred words cannot, and the real file would be overwritten
   "/docs/save",

@@ -11,6 +11,7 @@ export async function startFakeTelegram({ token = "123456:FAKE-TOKEN", holdMs = 
   let nextId = 1;
   const queue = [];
   const sent = [];
+  const answered = []; // answerCallbackQuery ids
   const polls = [];
   let failures = [];
   let drop = false; // simulate the network dying mid-poll
@@ -50,8 +51,12 @@ export async function startFakeTelegram({ token = "123456:FAKE-TOKEN", holdMs = 
           const f = failures.shift();
           return json(f.status ?? 429, f.body);
         }
-        sent.push({ chat_id: String(body.chat_id), text: body.text });
+        sent.push({ chat_id: String(body.chat_id), text: body.text, ...(body.reply_markup ? { reply_markup: body.reply_markup } : {}) });
         return json(200, { ok: true, result: { message_id: sent.length } });
+      }
+      if (m[2] === "answerCallbackQuery") {
+        answered.push(String(body.callback_query_id));
+        return json(200, { ok: true, result: true });
       }
       return json(404, { ok: false, description: "Not Found" });
     });
@@ -64,6 +69,22 @@ export async function startFakeTelegram({ token = "123456:FAKE-TOKEN", holdMs = 
     apiBase: `http://127.0.0.1:${port}`,
     sent,
     polls,
+    answered,
+    /** queue a tap on one of the bot's inline buttons, as Telegram delivers it */
+    tap({ chatId, userId, name = "Tester", data, group = false }) {
+      const update = {
+        update_id: nextId++,
+        callback_query: {
+          id: `cq-${nextId}`,
+          from: { id: Number(userId), first_name: name, is_bot: false },
+          message: { message_id: nextId, chat: { id: Number(chatId), type: group ? "supergroup" : "private" } },
+          data,
+        },
+      };
+      queue.push(update);
+      for (const release of [...waiting]) release();
+      return update;
+    },
     /** queue an inbound text message as Telegram would deliver it */
     say({ chatId, userId, name = "Tester", text, group = false, isBot = false }) {
       const update = {

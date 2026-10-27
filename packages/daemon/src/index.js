@@ -43,11 +43,12 @@ import { PolicyStore } from "./policy-store.js";
 import { PolicyEngine } from "./policy-engine.js";
 import { createPolicyHttpHandler } from "./policy-http.js";
 import { attachPolicyWatch } from "./policy-watch.js";
-import { DEFAULT_PROJECTS_DIR } from "./projects.js";
+import { DEFAULT_PROJECTS_DIR, readProject } from "./projects.js";
 // lane L4: collision radar, time-to-intervene metrics, open-the-session actions
 import { attachRadar, createRadarHttpHandler } from "./radar.js";
 import { attachInterventionMetrics, createMetricsHttpHandler } from "./intervention-metrics.js";
 import { createSessionOpenHandler } from "./session-open.js";
+import { createRevealHandler } from "./reveal.js"; // office props: show a folder / the last edited file
 import { createAssignmentsHttpHandler } from "./assignments.js"; // lane L6
 import { createMultiPm } from "./multi-pm.js"; // lane L5
 import { createDocsHttpHandler } from "./docs-workspace.js"; // lane L7
@@ -120,7 +121,7 @@ async function main() {
   // exists once `server` is constructed — same lazy-reference trick as
   // approvalBroker's hasClients above (assigned before any request can land).
   let outputsHttp;
-  let radarHttp, metricsHttp, sessionOpenHttp; // lane L4: built once the broadcast server exists
+  let radarHttp, metricsHttp, sessionOpenHttp, revealHttp; // lane L4: built once the broadcast server exists
   // Hiring Hall (wi-hiring-hall): company roster read from
   // ~/.claude/company/roster.yaml; file changes broadcast as the ADDITIVE
   // event type "roster_updated" (renderer diffs members → walk-in greeting).
@@ -200,6 +201,7 @@ async function main() {
       radarHttp(req, res, url) || // lane L4
       metricsHttp(req, res, url) || // lane L4
       sessionOpenHttp(req, res, url) || // lane L4
+      revealHttp(req, res, url) ||
       staticHttp(req, res, url), // static-serve LAST: catch-all GET, must not shadow an API route
     // reject cross-origin requests before any route runs (CSRF: a remote page
     // must not trip /harnesses?probe= or POST /templates/apply). Same-origin app
@@ -235,7 +237,16 @@ async function main() {
   const interventionMetrics = attachInterventionMetrics(server);
   radarHttp = createRadarHttpHandler(radar);
   metricsHttp = createMetricsHttpHandler(interventionMetrics);
-  sessionOpenHttp = createSessionOpenHandler({ resolveCwd: (id) => radar.agentCwd(id) });
+  // a project's folder comes from its own project.json, never from the request
+  const projectCwd = (slug) => {
+    try {
+      return readProject({ slug }).cwd ?? null;
+    } catch {
+      return null;
+    }
+  };
+  sessionOpenHttp = createSessionOpenHandler({ resolveCwd: (id) => radar.agentCwd(id), resolveProjectCwd: projectCwd });
+  revealHttp = createRevealHandler({ agentCwd: (id) => radar.agentCwd(id), agentLastFile: (id) => radar.agentLastFile(id) });
   attachNotifier(server); // macOS notification khi agent kẹt >30s (AGENT_OFFICE_NOTIFY=0 để tắt)
   attachPolicyWatch(server, { store: policyStore }); // lane L2: warn when a forbidden harness/lane runs in a project
   // lane L5: Telegram is now a multi-project, multi-member channel (telegram-channel.js): a

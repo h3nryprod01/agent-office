@@ -70,6 +70,8 @@ export class FileRadar {
     this.alerts = new Map();
     /** agentId/sessionId → cwd, kept past the TTL so "open terminal" still works for a quiet session */
     this.cwds = new Map();
+    /** agentId → the last file that agent wrote (what "show me what it just edited" opens) */
+    this.lastFiles = new Map();
     this.lastSweep = 0;
   }
 
@@ -172,6 +174,9 @@ export class FileRadar {
       this.#store(this.byRel, relKey, entry);
     }
     this.#store(this.byPath, absPath, entry);
+    this.lastFiles.delete(agent.agentId); // re-insert: Map order = recency
+    this.lastFiles.set(agent.agentId, absPath);
+    while (this.lastFiles.size > MAX_CWDS) this.lastFiles.delete(this.lastFiles.keys().next().value);
   }
 
   #store(index, key, entry) {
@@ -367,6 +372,11 @@ export class FileRadar {
   /** cwd of an agent the radar has seen — by agentId, else any agent of that session. */
   agentCwd(id) {
     return this.cwds.get(id) ?? null;
+  }
+
+  /** Absolute path of the last file this agent wrote, as the radar saw it; null if none. */
+  agentLastFile(id) {
+    return this.lastFiles.get(id) ?? null;
   }
 }
 

@@ -13,7 +13,9 @@
 
 import { randomUUID } from "node:crypto";
 
-const DEFAULT_TTL_MS = 25_000; // < hook fetch abort (27s) < hook registration timeout (30s)
+// long enough to answer from a phone (Telegram button), still < hook fetch abort (118s) <
+// hook registration timeout (120s): an unanswered request falls back to the normal dialog
+const DEFAULT_TTL_MS = 115_000;
 const CORS_HEADERS = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET, POST, OPTIONS",

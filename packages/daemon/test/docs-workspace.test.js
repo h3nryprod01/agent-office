@@ -717,3 +717,37 @@ test("createProject refuses a folder inside ~/.claude, but not a .claude folder 
   assert.equal(make("Nested", worktree).slug, "nested");
   s.cleanup();
 });
+
+// a file dragged onto the office lands in <project>/inbox/
+const b64 = (text) => Buffer.from(text).toString("base64");
+
+test("upload: a dropped file lands in inbox/, never overwrites, keeps a plain name", async () => {
+  const s = sandbox();
+  await withDocs(s, asRole("manager"), async ({ post }) => {
+    const first = await post("/docs/upload", { name: "brief.pdf", data: b64("%PDF one") });
+    assert.equal(first.status, 201);
+    assert.equal((await first.json()).path, "inbox/brief.pdf");
+    const second = await post("/docs/upload", { name: "brief.pdf", data: b64("%PDF two") });
+    assert.equal((await second.json()).path, "inbox/brief (2).pdf");
+    assert.equal(fs.readFileSync(path.join(s.cwd, "inbox", "brief.pdf"), "utf8"), "%PDF one");
+    for (const name of ["../x.md", "a/b.md", ".env", "..", "", "c:d.md"]) {
+      assert.equal((await post("/docs/upload", { name, data: b64("x") })).status, 400, JSON.stringify(name));
+    }
+    assert.equal((await post("/docs/upload", { name: "empty.txt", data: "" })).status, 400);
+    assert.equal((await post("/docs/upload", { name: "big.bin", data: Buffer.alloc(4 * 1024 * 1024 + 1).toString("base64") })).status, 413);
+  });
+  s.cleanup();
+});
+
+test("upload: a viewer cannot drop files, and an inbox link out of the project is refused", async () => {
+  const s = sandbox();
+  await withDocs(s, asRole("viewer"), async ({ post }) => {
+    assert.equal((await post("/docs/upload", { name: "a.txt", data: b64("x") })).status, 403);
+  });
+  fs.symlinkSync(s.homeDir, path.join(s.cwd, "inbox")); // inbox -> outside the project
+  await withDocs(s, asRole("owner"), async ({ post }) => {
+    assert.equal((await post("/docs/upload", { name: "pwn.txt", data: b64("x") })).status, 403);
+  });
+  assert.equal(fs.existsSync(path.join(s.homeDir, "pwn.txt")), false);
+  s.cleanup();
+});

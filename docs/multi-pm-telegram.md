@@ -77,11 +77,13 @@ When an agent in a project asks for a permission, the project's room gets
 `⚠ Approval needed … /approve a1b2c3d4 · /deny a1b2c3d4`. Without a bound room the owners' and
 managers' own DMs get it.
 
-**Heads-up — approvals are short-lived.** The approve gateway answers "ask in the terminal"
-after `APPROVAL_TTL_MS` (default 25 s, shorter than the hook's own timeout). Answering from a
-phone in 25 s is tight; raise both (hook timeout and `APPROVAL_TTL_MS`) if remote approval is
-the point. A phone-only owner counts as "someone is watching", so approvals are no longer
-skipped when no browser tab is open.
+**Approvals wait up to ~2 minutes.** Each approval message carries **✓ Allow / ✗ Deny** buttons;
+a tap sends the same `/approve <id>` / `/deny <id>` a person would type, so the same role and
+policy checks apply. The approve gateway answers "ask in the terminal" after `APPROVAL_TTL_MS`
+(default 115 s), just under its own fetch abort (118 s) and the hook's registered timeout
+(`"timeout": 120`). Lower all three together if you want the terminal dialog back sooner. A
+phone-only owner counts as "someone is watching", so approvals are no longer skipped when no
+browser tab is open.
 
 **What a manager can do.** Approving a tool call lets the PM run it on this machine, so a manager
 is trusted with that project's folder — and with anything the PM's user account can read (the PM's

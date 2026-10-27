@@ -67,6 +67,10 @@ const MAX_FILES = 3000;
 const MAX_DEPTH = 8;
 const MAX_TEXT_BYTES = 2 * 1024 * 1024; // read
 const MAX_SAVE_BYTES = 1024 * 1024; // write
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // a file dropped on the office (base64 in the body: ~5.4 MB)
+const INBOX_DIR = "inbox";
+// a dropped file keeps its own name, minus anything that could steer where it lands
+const UPLOAD_NAME_RE = /^[^/\\\0:*?"<>|]{1,120}$/;
 const MAX_RAW_BYTES = 100 * 1024 * 1024;
 const MAX_HISTORY = 20;
 const COMMENT_MAX = 2000;
@@ -380,6 +384,34 @@ const optionalText = (value, max) => (typeof value === "string" && value.trim() 
 
 /** Every mutating action, keyed by route. Each gets {ctx, role, body} and returns [status, payload]. */
 const ACTIONS = {
+  // A file dragged from Finder/Explorer onto the office lands in <project>/inbox/ (never
+  // overwriting: a taken name gets " (2)", " (3)"…), so the PM can be pointed at it.
+  "/docs/upload"({ root }, _role, body) {
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!UPLOAD_NAME_RE.test(name) || name.startsWith(".") || name === "..") throw invalid("a plain file name is required");
+    if (typeof body.data !== "string") throw invalid("data must be base64");
+    const bytes = Buffer.from(body.data, "base64");
+    if (bytes.length === 0) throw invalid("the file is empty");
+    if (bytes.length > MAX_UPLOAD_BYTES) throw fail("TOO_LARGE", "files up to 4 MB can be dropped here");
+    const inbox = path.join(root, INBOX_DIR);
+    fs.mkdirSync(inbox, { recursive: true });
+    const realInbox = fs.realpathSync(inbox);
+    // a planted link (inbox -> ~/.ssh) must not carry the write outside the project
+    if (!isInside(root, realInbox) || path.relative(root, realInbox) !== INBOX_DIR) throw forbidden("the inbox folder is not inside the project");
+    const dot = name.lastIndexOf(".");
+    const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
+    for (let n = 1; n <= 50; n++) {
+      const file = n === 1 ? name : `${stem} (${n})${ext}`;
+      try {
+        fs.writeFileSync(path.join(realInbox, file), bytes, { flag: "wx" }); // exclusive: never overwrite, never follow a link
+        return [201, { ok: true, path: `${INBOX_DIR}/${file}`, size: bytes.length }];
+      } catch (error) {
+        if (error.code !== "EEXIST") throw error;
+      }
+    }
+    throw fail("CONFLICT", "too many files with that name in the inbox");
+  },
+
   "/docs/save"({ projectsDir, root, slug }, role, body) {
     const { real, rel, kind, st } = resolveDoc(root, body.path);
     if (kind !== "markdown") throw fail("UNSUPPORTED", "only markdown documents can be edited");

@@ -70,3 +70,17 @@ test("other routes fall through", () => {
   const handler = createSessionOpenHandler({ resolveCwd: () => null });
   assert.equal(handler({ method: "GET" }, {}, new URL("http://x/other")), false);
 });
+
+test("{project} opens a terminal in the project's own folder (the office's arcade machine)", async () => {
+  const launched = [];
+  const handler = createSessionOpenHandler({
+    resolveCwd: () => null,
+    resolveProjectCwd: (slug) => (slug === "demo-app" ? dir : null),
+    execFileFn: (cmd, args, options, cb) => { launched.push({ cmd, args }); cb(null); },
+    platform: "darwin",
+  });
+  assert.equal((await call(handler, "POST", { project: "demo-app" })).status, 200);
+  assert.deepEqual(launched, [{ cmd: "open", args: ["-a", "Terminal", dir] }]);
+  assert.equal((await call(handler, "POST", { project: "other" })).status, 404);
+  assert.equal(launched.length, 1);
+});

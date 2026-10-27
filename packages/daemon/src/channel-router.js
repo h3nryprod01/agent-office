@@ -124,9 +124,9 @@ export class ChannelRouter {
     this.sendRaw = send;
   }
 
-  async #say(channel, chatId, text) {
+  async #say(channel, chatId, text, opts) {
     try {
-      await this.sendRaw(channel, chatId, text);
+      await this.sendRaw(channel, chatId, text, opts);
     } catch {
       // a dead channel must never break routing (the transport logs its own failures)
     }
@@ -465,7 +465,13 @@ export class ChannelRouter {
     }
     // the operator's PRIVATE chat only: a group (Telegram ids are negative) cannot answer anything
     if (targets.length === 0) for (const l of this.legacy) if (!l.chatId.startsWith("-")) targets.push([l.channel, l.chatId]);
-    await Promise.all(targets.map(([channel, chatId]) => this.#say(channel, chatId, text)));
+    // one-tap buttons where the channel has them (Telegram): each button sends back exactly the
+    // command a person would type, so it goes through the same role and policy checks as /approve
+    const buttons = [
+      { text: "✓ Allow", data: `/approve ${short}` },
+      { text: "✗ Deny", data: `/deny ${short}` },
+    ];
+    await Promise.all(targets.map(([channel, chatId]) => this.#say(channel, chatId, text, { buttons })));
   }
 
   /** Post to the project's bound room(s). False = no room is bound, nothing was sent. */

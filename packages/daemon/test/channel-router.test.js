@@ -75,7 +75,7 @@ function world({ legacy = [], limits, policy = {}, now = () => Date.now() } = {}
     legacy,
     legacyAsk: (text, reply) => { legacyAsks.push(text); reply("legacy PM says hi"); },
     stateFile: path.join(root, "channels-state.json"),
-    send: async (channel, chatId, text) => { sent.push({ channel, chatId: String(chatId), text }); },
+    send: async (channel, chatId, text, opts) => { sent.push({ channel, chatId: String(chatId), text, ...(opts?.buttons ? { buttons: opts.buttons } : {}) }); },
     ...(limits ? { limits } : {}),
   });
   const say = async (userId, text, extra = {}) => {
@@ -684,5 +684,24 @@ test("the approver is recorded by id; a viewer sees no last PM reply in /status"
   assert.doesNotMatch(w.lastTo(30), /PM-SECRET-REPLY/);
   await w.say(31, "/status");
   assert.match(w.lastTo(31), /PM-SECRET-REPLY/);
+  w.hub.dispose();
+});
+
+// one-tap approvals: the buttons carry the typed command, so a tap goes through the same checks
+test("approval messages carry Allow/Deny buttons; a viewer's tap is refused, a manager's tap decides", async () => {
+  const w = world();
+  join(w, "demo-app", 31, "manager");
+  join(w, "demo-app", 30, "viewer");
+  const pending = w.broker.request({ sessionId: "s-1", tool: "Bash", preview: "npm test", cwd: w.cwds["demo-app"] });
+  const [item] = w.broker.list();
+  await w.router.notifyApproval(item);
+  const msg = w.sent.find((s) => s.chatId === "31");
+  const short = item.id.slice(0, 8);
+  assert.deepEqual(msg.buttons, [{ text: "✓ Allow", data: `/approve ${short}` }, { text: "✗ Deny", data: `/deny ${short}` }]);
+  await w.say(30, `/approve ${short}`); // what a viewer's tap delivers
+  assert.match(w.lastTo(30), /cannot approve|read-only|no pending/i);
+  await w.say(31, `/approve ${short}`);
+  assert.match(w.lastTo(31), /Approved Bash/);
+  assert.equal((await pending).decision, "allow");
   w.hub.dispose();
 });

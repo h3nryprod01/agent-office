@@ -213,3 +213,27 @@ test("a group becoming a supergroup is passed on as a migration (old id → new 
   assert.deepEqual(t.handled[0], { channel: "telegram", type: "migrate", from: "-100", chatId: "-1009999" });
   await t.stop();
 });
+
+// one-tap approvals: buttons under the message, a tap arrives as the command it stands for
+test("buttons ride on the last part of a message as an inline keyboard", async () => {
+  const t = await boot();
+  await t.channel.send("555", "Approval needed", { buttons: [{ text: "✓ Allow", data: "/approve 1a2b3c4d" }, { text: "✗ Deny", data: "/deny 1a2b3c4d" }] });
+  assert.equal(t.fake.sent.length, 1);
+  assert.deepEqual(t.fake.sent[0].reply_markup, {
+    inline_keyboard: [[{ text: "✓ Allow", callback_data: "/approve 1a2b3c4d" }, { text: "✗ Deny", callback_data: "/deny 1a2b3c4d" }]],
+  });
+  await t.channel.send("555", "plain");
+  assert.equal(t.fake.sent[1].reply_markup, undefined);
+  await t.stop();
+});
+
+test("a tap on a button reaches the router as the command it carries, and the spinner is answered", async () => {
+  const t = await boot();
+  t.fake.tap({ chatId: 555, userId: 42, name: "Binh", data: "/approve 1a2b3c4d" });
+  assert.ok(await t.fake.waitFor(() => t.handled.length === 1 && t.fake.answered.length === 1));
+  const { callbackId, ...msg } = t.handled[0];
+  assert.deepEqual(msg, { channel: "telegram", chatId: "555", userId: "42", name: "Binh", text: "/approve 1a2b3c4d", isGroup: false });
+  assert.equal(t.fake.answered[0], callbackId);
+  assert.ok(t.fake.polls.some((p) => Array.isArray(p.allowed_updates) && p.allowed_updates.includes("callback_query")));
+  await t.stop();
+});
