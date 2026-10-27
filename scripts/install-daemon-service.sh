@@ -55,12 +55,14 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
   sleep 0.5
 done
 ok=0
+err=""
 for _ in 1 2 3 4 5; do
-  if launchctl bootstrap "gui/$(id -u)" "$PLIST" 2>/dev/null; then ok=1; break; fi
+  if err=$(launchctl bootstrap "gui/$(id -u)" "$PLIST" 2>&1); then ok=1; break; fi
   sleep 1
 done
 if [ "$ok" != 1 ]; then
-  echo "launchctl bootstrap failed; run: launchctl bootstrap gui/$(id -u) $PLIST" >&2
+  echo "launchctl bootstrap failed: $err" >&2
+  echo "finish by hand: launchctl bootstrap gui/$(id -u) '$PLIST'" >&2
   exit 1
 fi
 echo "installed $LABEL (node: $NODE, claude: ${CLAUDE:-<not found, CHAT_CLAUDE_BIN unset>}, repo: $REPO, log: $LOG)"
