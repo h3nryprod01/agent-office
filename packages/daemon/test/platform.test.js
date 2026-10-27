@@ -89,3 +89,9 @@ test("notifyCommand: linux → notify-send", () => {
     args: ["-a", "Agent Office", "Agent Office", "stuck >30s"],
   });
 });
+
+test("revealCommand: a bundle-looking folder is selected, never launched; a comma never reaches /select,", () => {
+  assert.deepEqual(revealCommand("/x/Tool.app", false, "darwin").args, ["-R", "/x/Tool.app"]);
+  assert.deepEqual(revealCommand("/x/plain", false, "darwin").args, ["/x/plain"]);
+  assert.deepEqual(revealCommand("C:\\x\\a,b.txt", true, "win32"), { cmd: "explorer", args: ["C:\\x"] });
+});

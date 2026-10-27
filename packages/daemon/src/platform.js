@@ -74,12 +74,15 @@ export function commonBinDirs(platform = process.platform, env = process.env) {
  */
 export function revealCommand(realPath, reveal, platform = process.platform) {
   if (isWindows(platform)) {
+    // explorer splits /select, on commas and quotes: such a file only gets its folder opened
+    if (reveal && /[,"]/.test(realPath)) return { cmd: "explorer", args: [path.win32.dirname(realPath)] };
     return { cmd: "explorer", args: [reveal ? `/select,${realPath}` : realPath] };
   }
   if (isLinux(platform)) {
     return { cmd: "xdg-open", args: [reveal ? path.dirname(realPath) : realPath] };
   }
-  return { cmd: "open", args: reveal ? ["-R", realPath] : [realPath] };
+  // `open X.app` (or any bundle-looking folder) would launch it — select it in Finder instead
+  return { cmd: "open", args: reveal || path.extname(realPath) ? ["-R", realPath] : [realPath] };
 }
 
 /**

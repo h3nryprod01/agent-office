@@ -21,6 +21,8 @@ import { nextOffset, readOffset, writeOffset } from "./telegram.js";
 const DEFAULT_API_BASE = "https://api.telegram.org";
 const DEFAULT_OFFSET_FILE = path.join(agentOfficeHome(), "telegram-offset.json"); // honours AGENT_OFFICE_HOME (on-prem service accounts)
 const MESSAGE_LIMIT = 4096;
+// what our ✓/✗ buttons send (channel-router notifyApproval); a forged or stale payload is not a command
+const BUTTON_DATA_RE = /^\/(approve|deny) [0-9a-f]{8}$/;
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function redact(text, token) {
@@ -131,14 +133,16 @@ export function createTelegramChannel({
     // a tap on one of our buttons: its data is the command the button stands for
     const cq = update?.callback_query;
     if (cq) {
-      if (typeof cq.data !== "string" || !cq.data || cq.from?.id == null || cq.from?.is_bot || cq.message?.chat?.id == null) return null;
+      // only the payloads our buttons carry; anything else is answered (spinner stops) and dropped
+      if (typeof cq.data !== "string" || !BUTTON_DATA_RE.test(cq.data)) return cq.id != null ? { callbackOnly: true, callbackId: String(cq.id) } : null;
+      if (cq.from?.id == null || cq.from?.is_bot || cq.message?.chat?.id == null) return null;
       return {
         channel: "telegram",
         chatId: String(cq.message.chat.id),
         userId: String(cq.from.id),
         name: cq.from.first_name || cq.from.username || "",
         text: cq.data,
-        isGroup: cq.message.chat.type === "group" || cq.message.chat.type === "supergroup",
+        isGroup: cq.message.chat.type !== "private",
         callbackId: String(cq.id),
       };
     }
@@ -155,7 +159,7 @@ export function createTelegramChannel({
       userId: String(m.from.id),
       name: m.from.first_name || m.from.username || "",
       text: m.text,
-      isGroup: m.chat.type === "group" || m.chat.type === "supergroup",
+      isGroup: m.chat.type !== "private",
     };
   }
 
@@ -188,6 +192,10 @@ export function createTelegramChannel({
           if (stopped) break;
           const msg = toMessage(update);
           if (!msg) continue;
+          if (msg.callbackOnly) {
+            await call("answerCallbackQuery", { callback_query_id: msg.callbackId }).catch(() => {});
+            continue;
+          }
           try {
             await handler(msg);
           } catch (err) {

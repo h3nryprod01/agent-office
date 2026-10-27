@@ -730,10 +730,11 @@ test("upload: a dropped file lands in inbox/, never overwrites, keeps a plain na
     const second = await post("/docs/upload", { name: "brief.pdf", data: b64("%PDF two") });
     assert.equal((await second.json()).path, "inbox/brief (2).pdf");
     assert.equal(fs.readFileSync(path.join(s.cwd, "inbox", "brief.pdf"), "utf8"), "%PDF one");
-    for (const name of ["../x.md", "a/b.md", ".env", "..", "", "c:d.md"]) {
+    for (const name of ["../x.md", "a/b.md", ".env", "..", "", "c:d.md", "invoice\u202Efdp.exe", "a\nb.md", "CON", "nul.txt", "trail.", "x".repeat(70) + "ệ".repeat(50)]) {
       assert.equal((await post("/docs/upload", { name, data: b64("x") })).status, 400, JSON.stringify(name));
     }
     assert.equal((await post("/docs/upload", { name: "empty.txt", data: "" })).status, 400);
+    assert.equal((await post("/docs/upload", { name: "junk.txt", data: "not base64!" })).status, 400);
     assert.equal((await post("/docs/upload", { name: "big.bin", data: Buffer.alloc(4 * 1024 * 1024 + 1).toString("base64") })).status, 413);
   });
   s.cleanup();

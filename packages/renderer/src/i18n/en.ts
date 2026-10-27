@@ -613,6 +613,7 @@ export const en = {
   "approvalCard.why": "asked because: {why}",
   "approvalCard.expand": "Show the whole command",
   "approvalCard.aria": "{name} asks to run {tool}",
+  "approvalCard.refused": "Your role cannot answer approvals here. The request is still waiting for the owner.",
   "agentMenu.details": "Details",
   "agentMenu.folder": "Open its folder",
   "agentMenu.file": "Show the file it last edited",

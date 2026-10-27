@@ -815,7 +815,7 @@ async function boot(): Promise<void> {
     else if (action === "folder") void revealAgentFolder(a.agentId).then(explain);
     else if (action === "file") void revealAgentFile(a.agentId).then(explain);
     else if (action === "terminal") void openTerminalFor(a.agentId).then((ok) => explain({ ok, status: ok ? 200 : 0 }));
-    else if (action === "resume" && a.resume) void navigator.clipboard?.writeText(a.resume).then(() => toast(t("office.toast.copied")));
+    else if (action === "resume" && a.resume) void navigator.clipboard?.writeText(a.resume).then(() => toast(t("office.toast.copied")), () => toast(a.resume!));
   });
   late.menu = (agentId, x, y) => {
     const agent = current().agents.get(agentId);
@@ -844,6 +844,9 @@ async function boot(): Promise<void> {
       },
       screenPos: (id) => office.screenPos(id),
       visible: () => (document.body.dataset.view ?? "office") === "office" && !replayView,
+      onAnswered: (res) => {
+        if (!res.ok) toast(res.status === 403 ? t("approvalCard.refused") : t("office.toast.failed", { status: res.status || "offline" }));
+      },
     });
   }
 
@@ -857,7 +860,9 @@ async function boot(): Promise<void> {
       ev.preventDefault();
       app.classList.add("drop-target");
     });
-    app.addEventListener("dragleave", () => app.classList.remove("drop-target"));
+    app.addEventListener("dragleave", (ev) => {
+      if (!app.contains(ev.relatedTarget as Node | null)) app.classList.remove("drop-target");
+    });
     app.addEventListener("drop", (ev) => {
       if (!hasFiles(ev)) return;
       ev.preventDefault();
@@ -871,7 +876,7 @@ async function boot(): Promise<void> {
       void (async () => {
         const saved: string[] = [];
         for (const file of files) {
-          const res = await uploadToInbox(slug, file);
+          const res = await uploadToInbox(slug, file).catch(() => ({ error: "unreadable" }) as const);
           if ("path" in res) saved.push(res.path);
           else toast(res.error === "too-large" ? t("office.toast.tooLarge", { name: file.name }) : t("office.toast.dropFailed", { name: file.name, error: res.error }));
         }

@@ -9,9 +9,9 @@
 // and timeout→dialog fail-open — see docs/approve-spike-status.md.)
 //
 // Flow:  stdin PermissionRequest payload
-//        → POST http://127.0.0.1:8787/approval-request  (long-poll ≤27s;
-//          daemon answers immediately with "none" when no office is open,
-//          otherwise when the user clicks ✓/✗ or its own 25s TTL fires)
+//        → POST http://127.0.0.1:8787/approval-request  (long-poll ≤118s;
+//          daemon answers immediately with "none" when nobody is watching,
+//          otherwise when someone clicks ✓/✗ (office or Telegram) or its own 115s TTL fires)
 //        → decision "allow"/"deny": print the PermissionRequest decision JSON
 //        → ANY other outcome (none/timeout/daemon down/garbage): print
 //          NOTHING and exit 0 → Claude Code shows its normal dialog.
@@ -22,8 +22,8 @@
 //     which the daemon applies only after its danger list found nothing to ask about;
 //   - every error path is silence + exit 0 = the user's normal prompt;
 //   - timeout layering: daemon TTL 115s < fetch abort 118s < hook timeout 120s,
-//     so the terminal dialog is delayed at most ~27s when an office is open
-//     but unattended, and ~50ms when no office is connected.
+//     so the terminal dialog is delayed at most ~2 minutes when someone is watching
+//     (an office tab or a Telegram approver) but nobody answers, and ~50ms otherwise.
 
 import { readFileSync } from "node:fs";
 

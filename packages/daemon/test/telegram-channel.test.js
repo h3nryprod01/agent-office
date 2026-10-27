@@ -237,3 +237,14 @@ test("a tap on a button reaches the router as the command it carries, and the sp
   assert.ok(t.fake.polls.some((p) => Array.isArray(p.allowed_updates) && p.allowed_updates.includes("callback_query")));
   await t.stop();
 });
+
+test("a tap whose data is not one of our buttons is answered and dropped; a channel counts as a shared room", async () => {
+  const t = await boot();
+  t.fake.tap({ chatId: 555, userId: 42, data: "/bind other-project" });
+  assert.ok(await t.fake.waitFor(() => t.fake.answered.length === 1));
+  assert.equal(t.handled.length, 0);
+  t.fake.tap({ chatId: -200, userId: 42, data: "/deny 1a2b3c4d", chatType: "channel" });
+  assert.ok(await t.fake.waitFor(() => t.handled.length === 1));
+  assert.equal(t.handled[0].isGroup, true);
+  await t.stop();
+});

@@ -71,6 +71,10 @@ const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // a file dropped on the office (base6
 const INBOX_DIR = "inbox";
 // a dropped file keeps its own name, minus anything that could steer where it lands
 const UPLOAD_NAME_RE = /^[^/\\\0:*?"<>|]{1,120}$/;
+const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
+// control chars, bidi overrides (a name that reads "txt.exe" backwards), Windows device names, trailing dot/space
+const UNSAFE_NAME_RE = /[\p{Cc}\u202A-\u202E\u2066-\u2069]|[. ]$|^(con|prn|aux|nul|com\d|lpt\d)(\.|$)/iu;
+const safeUploadName = (name) => !UNSAFE_NAME_RE.test(name) && Buffer.byteLength(name) <= 200;
 const MAX_RAW_BYTES = 100 * 1024 * 1024;
 const MAX_HISTORY = 20;
 const COMMENT_MAX = 2000;
@@ -388,8 +392,8 @@ const ACTIONS = {
   // overwriting: a taken name gets " (2)", " (3)"…), so the PM can be pointed at it.
   "/docs/upload"({ root }, _role, body) {
     const name = typeof body.name === "string" ? body.name.trim() : "";
-    if (!UPLOAD_NAME_RE.test(name) || name.startsWith(".") || name === "..") throw invalid("a plain file name is required");
-    if (typeof body.data !== "string") throw invalid("data must be base64");
+    if (!UPLOAD_NAME_RE.test(name) || name.startsWith(".") || !safeUploadName(name)) throw invalid("a plain file name is required");
+    if (typeof body.data !== "string" || !BASE64_RE.test(body.data)) throw invalid("data must be base64");
     const bytes = Buffer.from(body.data, "base64");
     if (bytes.length === 0) throw invalid("the file is empty");
     if (bytes.length > MAX_UPLOAD_BYTES) throw fail("TOO_LARGE", "files up to 4 MB can be dropped here");

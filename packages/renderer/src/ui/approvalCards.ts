@@ -6,6 +6,8 @@ import { t } from "../i18n";
 import type { ApprovalsStore, PendingApproval } from "./approvals";
 
 const PREVIEW_SHORT = 140;
+/** a card that just popped up under the pointer must not take the click meant for what was there */
+export const ARM_MS = 500;
 
 const esc = (s: string): string =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
@@ -18,6 +20,8 @@ export interface ApprovalCardsDeps {
   screenPos: (agentId: string) => { x: number; y: number } | null;
   /** cards only show over the 3D office */
   visible: () => boolean;
+  /** the daemon's answer to a click (a viewer's Allow comes back 403) */
+  onAnswered?: (res: { ok: boolean; status: number }) => void;
   now?: () => number;
 }
 
@@ -49,9 +53,10 @@ export function mountApprovalCards(root: HTMLElement, deps: ApprovalCardsDeps): 
     const id = card.dataset.approval!;
     const decision = target.closest<HTMLElement>("[data-decision]")?.dataset.decision;
     if (decision === "allow" || decision === "deny") {
+      if (now() - Number(card.dataset.born ?? 0) < ARM_MS) return;
       card.remove();
       cards.delete(id);
-      void deps.store.respond(id, decision);
+      void deps.store.respond(id, decision).then((res) => deps.onAnswered?.(res));
       return;
     }
     if (target.closest("[data-expand]")) {
@@ -75,6 +80,7 @@ export function mountApprovalCards(root: HTMLElement, deps: ApprovalCardsDeps): 
         card = document.createElement("div");
         card.className = "approval-card";
         card.dataset.approval = a.id;
+        card.dataset.born = String(now());
         card.setAttribute("role", "dialog");
         card.setAttribute("aria-label", t("approvalCard.aria", { name: who.name, tool: a.tool }));
         root.appendChild(card);

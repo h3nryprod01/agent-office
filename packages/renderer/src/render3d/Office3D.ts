@@ -969,7 +969,7 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
     canvas.style.cursor = "grab";
     if (ev.type === "pointerleave") { tip.visible = false; tipId = null; }
     // only a plain left click picks: a right click opens the menu, leaving the canvas is not a click
-    if (ev.type === "pointerup" && ev.button === 0 && dragging && !moved) pick(ev);
+    if (ev.type === "pointerup" && ev.button === 0 && !ev.ctrlKey && dragging && !moved) pick(ev);
     dragging = false;
   }
   canvas.addEventListener("contextmenu", (ev) => {

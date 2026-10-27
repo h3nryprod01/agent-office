@@ -607,6 +607,7 @@ export const vi: Record<string, string> = {
   "approvalCard.why": "hỏi vì: {why}",
   "approvalCard.expand": "Xem cả lệnh",
   "approvalCard.aria": "{name} xin chạy {tool}",
+  "approvalCard.refused": "Vai trò của bạn không được duyệt ở đây. Yêu cầu vẫn đang chờ chủ máy.",
   "agentMenu.details": "Chi tiết",
   "agentMenu.folder": "Mở thư mục của nó",
   "agentMenu.file": "Hiện file nó vừa sửa",

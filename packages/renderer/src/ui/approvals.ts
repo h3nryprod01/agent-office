@@ -73,16 +73,18 @@ export class ApprovalsStore {
   }
 
   /** ✓/✗ click. Optimistic removal; daemon TTL covers the failure cases. */
-  async respond(id: string, decision: "allow" | "deny"): Promise<void> {
+  async respond(id: string, decision: "allow" | "deny"): Promise<{ ok: boolean; status: number }> {
     this.items.delete(id);
     try {
-      await fetch(`${HTTP_BASE}/approval-response`, {
+      const res = await fetch(`${HTTP_BASE}/approval-response`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id, decision }),
       });
+      return { ok: res.ok, status: res.status };
     } catch {
       // POST failed → the hook's own timeout falls back to the normal dialog
+      return { ok: false, status: 0 };
     }
   }
 

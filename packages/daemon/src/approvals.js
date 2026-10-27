@@ -15,7 +15,7 @@ import { randomUUID } from "node:crypto";
 
 // long enough to answer from a phone (Telegram button), still < hook fetch abort (118s) <
 // hook registration timeout (120s): an unanswered request falls back to the normal dialog
-const DEFAULT_TTL_MS = 115_000;
+export const DEFAULT_TTL_MS = 115_000;
 const CORS_HEADERS = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET, POST, OPTIONS",
@@ -56,9 +56,10 @@ export class ApprovalBroker {
    * Register a permission wait. Resolves with "allow" | "deny" | "none".
    * Never rejects — the hook's fail-open must not depend on our error paths.
    * @param {{sessionId?: string, tool?: string, preview?: string, cwd?: string|null, toolInput?: object, harness?: string, lane?: string, role?: string}} payload
+   * @param {AbortSignal} [signal] aborted when the hook hung up (killed, timed out) — the card goes away
    * @returns {Promise<{id: string|null, decision: string, source?: string, message?: string}>}
    */
-  request(payload) {
+  request(payload, signal) {
     // lane L2: the project's policy may answer by itself (auto allow, read-only/deny deny).
     // Checked BEFORE the "nobody is watching" shortcut: an auto-allowed call needs no office open.
     const verdict = this.#evaluatePolicy(payload);
@@ -90,6 +91,7 @@ export class ApprovalBroker {
         resolve: (decision) => resolve({ id, decision }),
       });
       this.#emit("approval_pending", item, { state: "pending" });
+      signal?.addEventListener("abort", () => this.#settle(id, "none", "gone"), { once: true });
     });
   }
 
@@ -279,7 +281,12 @@ export function createApprovalHttpHandler(broker) {
           lane: clean(parsed.lane, NAME_RE),
           role: clean(parsed.role, ROLE_RE),
         };
-        broker.request(payload).then((result) => respond(200, result));
+        // the hook died or timed out before anyone answered: nobody is waiting for this card any more
+        const gone = new AbortController();
+        res.on("close", () => {
+          if (!res.writableEnded) gone.abort();
+        });
+        broker.request(payload, gone.signal).then((result) => respond(200, result));
         return;
       }
 

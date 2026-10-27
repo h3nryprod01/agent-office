@@ -79,7 +79,7 @@ describe("ApprovalsStore", () => {
     const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>;
     fetchMock.mockRejectedValue(new Error("ECONNREFUSED"));
 
-    await expect(store.respond("a-1", "deny")).resolves.toBeUndefined();
+    await expect(store.respond("a-1", "deny")).resolves.toEqual({ ok: false, status: 0 });
     expect(store.list()).toEqual([]);
   });
 

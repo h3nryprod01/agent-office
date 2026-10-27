@@ -71,13 +71,13 @@ export async function startFakeTelegram({ token = "123456:FAKE-TOKEN", holdMs = 
     polls,
     answered,
     /** queue a tap on one of the bot's inline buttons, as Telegram delivers it */
-    tap({ chatId, userId, name = "Tester", data, group = false }) {
+    tap({ chatId, userId, name = "Tester", data, group = false, chatType = group ? "supergroup" : "private" }) {
       const update = {
         update_id: nextId++,
         callback_query: {
           id: `cq-${nextId}`,
           from: { id: Number(userId), first_name: name, is_bot: false },
-          message: { message_id: nextId, chat: { id: Number(chatId), type: group ? "supergroup" : "private" } },
+          message: { message_id: nextId, chat: { id: Number(chatId), type: chatType } },
           data,
         },
       };

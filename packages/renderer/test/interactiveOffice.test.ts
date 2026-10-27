@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // The interactive office: approval cards over characters, the right-click menu, and the host actions.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cardHtml, mountApprovalCards } from "../src/ui/approvalCards";
+import { ARM_MS, cardHtml, mountApprovalCards } from "../src/ui/approvalCards";
 import { menuHtml, mountAgentMenu } from "../src/ui/agentMenu";
 import { revealAgentFile, uploadToInbox, MAX_DROP_BYTES } from "../src/ui/officeActions";
 import { ApprovalsStore, type PendingApproval } from "../src/ui/approvals";
@@ -35,18 +35,26 @@ describe("approval card", () => {
     vi.stubGlobal("fetch", fetchMock);
     const root = document.createElement("div");
     document.body.appendChild(root);
+    let clock = Date.now();
+    const answered = vi.fn();
     const cards = mountApprovalCards(root, {
       store,
       agentOf: () => ({ agentId: "s-1", name: "coder-01" }),
       screenPos: () => ({ x: 100, y: 100 }),
       visible: () => true,
+      onAnswered: answered,
+      now: () => clock,
     });
     await new Promise((r) => setTimeout(r, 50)); // a few animation frames
     const allow = root.querySelector<HTMLButtonElement>('[data-decision="allow"]');
     expect(allow).not.toBeNull();
+    allow!.click(); // the card only just appeared: this click was meant for something else
+    expect(fetchMock).not.toHaveBeenCalled();
+    clock += ARM_MS;
     allow!.click();
     expect(root.querySelector("[data-approval]")).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith("/approval-response", expect.objectContaining({ method: "POST", body: JSON.stringify({ id: "ap-1", decision: "allow" }) }));
+    await vi.waitFor(() => expect(answered).toHaveBeenCalledWith({ ok: true, status: 200 }));
     cards.stop();
   });
   it("no card when the office is not on screen or the agent is not in view", async () => {
