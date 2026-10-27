@@ -72,6 +72,8 @@ export function commonBinDirs(platform = process.platform, env = process.env) {
  * @param {string} [platform]
  * @returns {{cmd: string, args: string[]}}
  */
+const MAC_BUNDLE_RE = /\.(app|appex|bundle|framework|plugin|prefpane|kext|xpc|pkg|mpkg|workflow|action)\/?$/i;
+
 export function revealCommand(realPath, reveal, platform = process.platform) {
   if (isWindows(platform)) {
     // explorer splits /select, on commas and quotes: such a file only gets its folder opened
@@ -81,8 +83,8 @@ export function revealCommand(realPath, reveal, platform = process.platform) {
   if (isLinux(platform)) {
     return { cmd: "xdg-open", args: [reveal ? path.dirname(realPath) : realPath] };
   }
-  // `open X.app` (or any bundle-looking folder) would launch it — select it in Finder instead
-  return { cmd: "open", args: reveal || path.extname(realPath) ? ["-R", realPath] : [realPath] };
+  // `open X.app` would launch the bundle instead of showing it — select it in Finder instead
+  return { cmd: "open", args: reveal || MAC_BUNDLE_RE.test(realPath) ? ["-R", realPath] : [realPath] };
 }
 
 /**

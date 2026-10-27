@@ -845,7 +845,8 @@ async function boot(): Promise<void> {
       screenPos: (id) => office.screenPos(id),
       visible: () => (document.body.dataset.view ?? "office") === "office" && !replayView,
       onAnswered: (res) => {
-        if (!res.ok) toast(res.status === 403 ? t("approvalCard.refused") : t("office.toast.failed", { status: res.status || "offline" }));
+        // 400 = someone else (Telegram, another tab) answered first: nothing to say
+        if (!res.ok && res.status !== 400) toast(res.status === 403 ? t("approvalCard.refused") : t("office.toast.failed", { status: res.status || "offline" }));
       },
     });
   }

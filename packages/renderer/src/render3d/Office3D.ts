@@ -26,9 +26,13 @@ import { buildProps } from "./props";
 import { THEMES, asRoomStyle, buildDecor, deskGrainTexture, floorTexture, type RoomStyle, type RoomTheme } from "./rooms";
 import { SIT_LEG, advanceBlend, blendedAngles, initialBlend, poseModeFor, stepSpeed, turnToward, type PoseAngles, type PoseBlend } from "../render/pose";
 
+/** on a Mac ctrl+click is the right click (it opens the agent menu); elsewhere it is a plain click */
+const IS_MAC = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
+
 /** "screen" is the shipped character (procedural, no asset); "robot" is a CC0 GLB
  *  alternate, loaded only if something calls setKind("robot"). A Mixamo-derived
  *  "human" kind was dropped: unreachable, unused, and its licence was unverified. */
+
 export type Kind = "screen" | "robot";
 
 export interface Office3DHandle {
@@ -969,7 +973,7 @@ export function createOffice3D(opts: Office3DOpts = {}): Office3DHandle {
     canvas.style.cursor = "grab";
     if (ev.type === "pointerleave") { tip.visible = false; tipId = null; }
     // only a plain left click picks: a right click opens the menu, leaving the canvas is not a click
-    if (ev.type === "pointerup" && ev.button === 0 && !ev.ctrlKey && dragging && !moved) pick(ev);
+    if (ev.type === "pointerup" && ev.button === 0 && !(IS_MAC && ev.ctrlKey) && dragging && !moved) pick(ev);
     dragging = false;
   }
   canvas.addEventListener("contextmenu", (ev) => {

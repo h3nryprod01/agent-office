@@ -72,8 +72,8 @@ const INBOX_DIR = "inbox";
 // a dropped file keeps its own name, minus anything that could steer where it lands
 const UPLOAD_NAME_RE = /^[^/\\\0:*?"<>|]{1,120}$/;
 const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
-// control chars, bidi overrides (a name that reads "txt.exe" backwards), Windows device names, trailing dot/space
-const UNSAFE_NAME_RE = /[\p{Cc}\u202A-\u202E\u2066-\u2069]|[. ]$|^(con|prn|aux|nul|com\d|lpt\d)(\.|$)/iu;
+// control and format chars (bidi overrides that make "txt.exe" read backwards, zero-width), Windows device names, trailing dot
+const UNSAFE_NAME_RE = /[\p{Cc}\p{Cf}]|[. ]$|^(con|prn|aux|nul|conin\$|conout\$|com[\d¹²³]|lpt[\d¹²³])(\.|$)/iu;
 const safeUploadName = (name) => !UNSAFE_NAME_RE.test(name) && Buffer.byteLength(name) <= 200;
 const MAX_RAW_BYTES = 100 * 1024 * 1024;
 const MAX_HISTORY = 20;
