@@ -48,7 +48,7 @@ This document says what Agent Office reads, writes and sends, checked against th
 - With no Telegram or Zalo token configured, the daemon makes no outbound network call of its own.
 - The `claude` CLI that the daemon starts for the project PM talks to Anthropic with your own login. What you type to the PM, and the files the PM reads, go to Anthropic under your agreement with Anthropic.
 - Pressing a probe button on the settings page runs the CLI's own status command (`claude auth status`, `codex login status`; what those contact is up to the CLI), or, for Gemini, sends a one-word prompt through your Gemini CLI.
-- `ao update` and the installers run `git pull` and `npm ci`, which contact GitHub and the npm registry, only when you run them.
+- `ao update` runs `git pull` and `npm ci`, and the install scripts run `npm ci` or `npm install`; these contact GitHub and the npm registry, only when you run them.
 - Voice answers are produced by a local model through `POST /tts`; the repository code makes no network call for it, and the voice package you install may download model files, which this repository does not control.
 - Voice input uses the browser's own speech recognition, whose handling of audio is decided by your browser vendor.
 - In LAN mode the event stream, including those transcript excerpts, goes to every connected device that holds a token, a viewer token included.
