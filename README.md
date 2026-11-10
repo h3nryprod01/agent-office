@@ -6,20 +6,11 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-20%20%7C%2022-brightgreen.svg)](https://nodejs.org)
 
-Your coding-agent sessions, rendered as a live isometric office.
+**Stop babysitting your coding agents: see who is waiting on you, and approve from your phone.**
 
-Every character below is a **real agent session** running on this machine — walking to the bookshelf to read files, hammering the arcade machine to run commands, and raising a red ❗ when it needs you.
+Agent Office is a local daemon plus a web UI. It reads your coding-agent sessions from disk, shows each one as a character in an isometric office, and puts the ones that need you at the top of a queue. A permission request can be answered from the office or from Telegram.
 
 ![Live demo — real agent sessions as office characters](docs/media/demo.gif)
-
-## Why
-
-Terminal logs answer *"what happened?"*. Agent Office exists to answer a different question, **faster than the terminal**: *"where do I need to intervene?"*
-
-Two principles drive every decision here:
-
-- Real data + real-time is the soul of the product.
-- Ugly graphics with true data **beat** pretty graphics with fake data.
 
 ## Quick start
 
@@ -30,59 +21,65 @@ git clone https://github.com/h3nryprod01/agent-office && cd agent-office
 ./scripts/start.sh
 ```
 
-That installs dependencies, builds the renderer, installs the daemon as a login agent (it starts at login and restarts itself if it crashes), and opens **http://localhost:8787** — your currently running sessions appear as characters within seconds.
+It installs dependencies, builds the renderer and opens **http://localhost:8787**. If no daemon is running it asks whether to install one as a login service; answer no and it runs in the terminal until Ctrl+C. `--yes` answers yes.
 
-Re-run `./scripts/start.sh` whenever you like: it rebuilds and reuses the daemon that's already running. One process, one port, always the current build.
+No agent session running yet? The office offers **See a sample**: a scripted demo, always labelled *SAMPLE DATA*, that steps aside the moment a real session appears.
 
-> Open it at `localhost`, not `127.0.0.1`. Browsers treat those as separate origins with separate permissions, and the microphone grant that voice input needs does not carry across.
+A one-command `npx` package is built and tested from a local tarball but **is not published to npm yet** (the package name is still open). See [docs/install.md](docs/install.md#from-a-packed-tarball-npx-package).
 
-No live sessions? Add `?mock=1` for a scripted scenario, and `?stress=30` for a perf test with 30 extra characters.
+> Open it at `localhost`, not `127.0.0.1`: browsers keep separate permissions per origin, and the microphone grant voice input needs does not carry across.
 
-**Windows:** `powershell -ExecutionPolicy Bypass -File scripts\start.ps1` — the same thing. Parsed and dry-run clean on pwsh; the Scheduled Task and browser-open steps are Windows-only and unrun there. See [docs/install.md](docs/install.md).
+**Windows:** `powershell -ExecutionPolicy Bypass -File scripts\start.ps1`. Parsed and dry-run on pwsh; **not yet run on a real Windows machine** end to end. **Linux:** `./scripts/install-ubuntu.sh`. More in [docs/install.md](docs/install.md).
 
-**Linux:** `./scripts/install-ubuntu.sh` — systemd `--user` service, starts at boot.
+## What it does
 
-**Prefer an icon to a terminal?** `./scripts/make-app.sh` builds a double-clickable *Agent Office.app* into `~/Applications`.
+- **Waiting-on-you queue** — blocked, waiting and errored agents listed across every repo, with OS notifications. [Mission Control](docs/mission-control-status.md)
+- **Approve permission requests** from the office or from Telegram buttons. Needs a `PermissionRequest` hook; setting it up is manual today. [Approve gateway](docs/approve-spike-status.md) · [Telegram](docs/multi-pm-telegram.md)
+- **Per-project approval modes** with an audit trail, and per-project data rules. [Approval policy](docs/approval-policy.md)
+- **Time-to-intervene numbers** (median, p90, count) and a radar that flags two agents editing the same files. [Radar](docs/radar.md)
+- **The office** — characters walk to a desk, bookshelf, arcade machine or meeting table depending on what they are doing; org chart and one-floor-per-repo building view. [Semantic mapping](docs/semantic-mapping.md)
+- **A PM agent per project** you can chat with, by text, voice or Telegram. [Per-project PM](docs/pm-per-repo-status.md) · [Voice](docs/voice-status.md)
+- **Replay** of a session timeline. [Replay](docs/replay-status.md)
+- **Spend** per session in tokens, and in USD for models with published pricing. [Cost dashboard](docs/cost-dashboard-status.md)
+- **Presentation mode** that masks project names, paths and chat text before any view sees them. [Presentation mode](docs/presentation-mode.md)
+- **Team templates** — rosters of agent roles plus goals you can list, apply and save back. [Templates](docs/company-templates.md)
+- **Worker lanes** — Claude Code pointed at another vendor's model shows up with its own lane. [Worker lanes](docs/worker-lanes.md)
+- **LAN access with tokens and roles**, and an `ao` CLI for `doctor`, `backup`, `update`, `restore`. [On-prem guide](docs/onprem.md)
+- The UI is **English by default and Vietnamese on request**.
 
-**Developing the renderer?** `npm --prefix packages/renderer run dev` serves it on **http://localhost:5199** with hot reload, talking to the same daemon.
+## Which agents it reads
 
-Logs, troubleshooting, and uninstall: **[docs/install.md](docs/install.md)**.
+| Source | Status |
+|---|---|
+| Claude Code | Verified on the current version |
+| Claude Code on other model endpoints (worker lanes) | Verified |
+| Hermes | Verified. Needs Node 22.13 or newer (it reads Hermes' SQLite store with `node:sqlite`) |
+| Codex desktop app | Partly works: newer rollout files are `.jsonl.zst`, which the reader cannot open yet |
+| Codex CLI | Experimental, not verified on the current version |
+| Gemini CLI | Experimental, not verified on a real session. Google has moved Gemini CLI users to `agy`, which has no adapter yet |
 
-## What you actually get
+How each was checked, and when: [docs/adapters-verified.md](docs/adapters-verified.md).
 
-### The office
+## Privacy and security
 
-![The office — real sessions at their stations](docs/media/office-hero.png)
+- It reads transcripts under your home directory and does not write to them. It writes only its own state: `~/.agent-office`; backups in `~/agent-office-backups`; the PM's session file under `.claude/memory/` of its workspace (the repo when run from a clone, `~/.agent-office/workspace` from the npm package); and, if you install the optional hooks, a hook log at `~/.claude/agent-office-hook-events.jsonl`.
+- The daemon's only built-in network clients are for Telegram and Zalo, and they stay off until you set their tokens.
+- It listens on `127.0.0.1` unless you switch on LAN mode, which requires a token for every non-local request. Plain HTTP on a LAN means tokens can be sniffed; read [SECURITY.md](SECURITY.md) before exposing the port.
 
-Characters spawn per session and walk between stations. Where someone is standing tells you what they are doing without reading a word: **desk** = editing, **bookshelf** = reading files, **arcade machine** = running commands, **meeting table** = delegating to sub-agents.
+## Known limits
 
-Multiple repos become multiple office tabs, and a red ❗ over a character means it is stuck.
-
-### Who is waiting on whom
-
-![Org chart overlay — the live parent/child tree of agents](docs/media/readme/orgchart.png)
-
-Sub-agents get their own characters, linked back to whoever spawned them. The org chart overlay is the same information as a tree, with a live count of who is working, blocked, and done.
-
-### Every repo at once
-
-![Building view — one floor per repo](docs/media/readme/building.png)
-
-The building view puts each repo on its own floor. Click one to jump to that office. The intervention queue reaches **across** offices — an alert in a repo you aren't looking at still surfaces, and clicking it switches tab and pans the camera.
-
-### Settings, and the language
-
-![Settings — daemon connection, agent CLIs, and the language picker](docs/media/readme/settings.png)
-
-The office speaks **English by default and Vietnamese on request** — it follows your browser's preference and remembers what you pick.
+- Zalo support follows Zalo's documentation and has **not been run against a real Official Account**.
+- The Telegram channel is tested against a fake Telegram server, **not yet against a real bot**.
+- `waiting_permission` needs a hook; without one the office cannot tell a permission prompt from a slow tool.
+- Text-to-speech for PM replies needs a local virtualenv; without it the feature is simply off.
 
 ## Architecture
 
 ```
-DATA SOURCES (read-only, non-invasive)
+DATA SOURCES (read-only)
   ~/.claude/projects/**/*.jsonl             Claude Code transcripts (root + sub-agents)
-  ~/.codex/sessions/**/rollout-*.jsonl      Codex CLI
-  ~/.gemini/tmp/**                          Gemini CLI
+  ~/.codex/sessions/**/rollout-*.jsonl      Codex (experimental)
+  ~/.gemini/tmp/**                          Gemini CLI (experimental)
   ~/.claude/agent-office-hook-events.jsonl  hooks (optional, for instant signals)
         │ tail + normalize into one event stream
         ▼
@@ -92,49 +89,23 @@ DATA SOURCES (read-only, non-invasive)
   packages/renderer (three.js isometric office and UI)
 ```
 
-The event protocol lives in `packages/protocol`. The daemon is the only writer and the renderer is a pure consumer, so a new harness is an adapter, not a rewrite.
-
-## What works today
-
-**Seeing what your agents are doing** — tails **Claude Code, Codex CLI, and Gemini CLI**, normalized into one stream. Sub-agents get their own characters. Many repos become many office tabs.
-
-**Acting on it** — a needs-attention queue lists blocked, waiting and errored agents and pans the camera to them; OS notifications fire when one gets stuck; a permission prompt raises ❗ on the character and can be approved from the office or from Telegram; a per-repo PM agent you can chat with (by voice, if you like); a spend dashboard across all three harnesses.
-
-**Running agents as a team** — `templates/` holds "company in a box" setups: a roster of agent roles plus goals, which you can list, inspect, apply, and save back.
-
-## Status
-
-A working tool, still a personal project rather than a product. Known limits:
-
-- **Localhost only, no authentication** — read [SECURITY.md](SECURITY.md) before exposing the port anywhere.
-- Spend in USD is only complete for models with published pricing; others count tokens but not dollars rather than guessing.
-- Animation pauses in hidden browser tabs (browsers stop `requestAnimationFrame`); state stays correct and characters catch up when the tab is visible.
-- `waiting_permission` needs a hook: the approve gateway (`PermissionRequest`) or the hook pilot report it at once. Without one, the office cannot tell a permission prompt from a slow tool.
-- Text-to-speech for PM replies needs a local virtualenv; without it the feature is simply off.
-
-Test suite: 560 tests across 55 files, run on Node 20 and 22 in CI.
-
-## Roadmap
-
-1. **Aquarium** — passively visualize your own sessions. ✅
-2. **Mission Control** — inspect a character, see who's blocked, jump to who needs you. ✅
-3. **Open protocol** — one adapter per harness behind a shared schema. ✅ (Claude Code, Codex, Gemini)
-
-Next: a public protocol document so third parties can add harnesses without reading the daemon's source.
+The event protocol lives in `packages/protocol`. The daemon only reads session data and the renderer only consumes it, so a new harness is an adapter, not a rewrite. Real data over pretty graphics: sample data is never shown unlabelled.
 
 ## Repo structure
 
-- `packages/daemon/` — data pipeline: transcript + hook tailers → event stream
-- `packages/renderer/` — three.js isometric renderer and UI
-- `packages/protocol/` — event protocol (JSON schema)
-- `templates/` — "company in a box" agent rosters
-- `docs/` — specs, semantic mapping, and a status note per feature ([index](docs/README.md))
+- `packages/daemon/` — transcript and hook tailers, HTTP/WebSocket server, `ao` CLI code
+- `packages/renderer/` — three.js renderer and UI
+- `packages/protocol/` — event protocol
+- `templates/` — agent rosters
+- `docs/` — reference docs and a status note per feature ([index](docs/README.md))
 - `assets/` — art, with sources and licenses in [assets/CREDITS.md](assets/CREDITS.md)
 
 ## Contributing
 
-Issues welcome, including "this didn't work on my machine". Replies are best-effort — this is a spare-time project. Please open an issue before building anything substantial. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Issues welcome, including "this didn't work on my machine". Replies are best-effort. Please open an issue before building anything substantial. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Third-party art is CC0; see [assets/CREDITS.md](assets/CREDITS.md) for per-asset attribution.
+MIT — see [LICENSE](LICENSE). Third-party art is CC0; see [assets/CREDITS.md](assets/CREDITS.md).
+
+Agent Office is an independent project. It is not affiliated with, endorsed by, or sponsored by Anthropic, OpenAI, Google, Telegram or Zalo. Product names belong to their owners and are used only to say what the tool reads or talks to.

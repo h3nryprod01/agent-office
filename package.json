@@ -1,0 +1,31 @@
+{
+  "name": "agent-office-app",
+  "version": "0.1.0",
+  "description": "See which coding agents are waiting on you, and approve from your phone. Local daemon plus a bundled web UI.",
+  "type": "module",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/h3nryprod01/agent-office.git" },
+  "bin": "packages/daemon/bin/office.js",
+  "engines": { "node": ">=20" },
+  "dependencies": { "ws": "^8.18.0" },
+  "files": [
+    "packages/daemon/bin",
+    "packages/daemon/src",
+    "packages/daemon/hooks",
+    "packages/daemon/package.json",
+    "packages/renderer/dist",
+    "templates",
+    "scripts/ao.mjs",
+    "scripts/company-template-lib.mjs",
+    "scripts/_ui.sh",
+    "scripts/install-daemon-service.sh",
+    "scripts/install-daemon-service-linux.sh",
+    "scripts/install-daemon-service.ps1",
+    "LICENSE",
+    "README.md",
+    "README.vi.md"
+  ],
+  "scripts": {
+    "prepack": "npm --prefix packages/renderer run build"
+  }
+}

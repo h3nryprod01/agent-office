@@ -643,4 +643,11 @@ export const en = {
   "office.toast.tooLarge": "{name} is over 4 MB.",
   "office.dropHint": "Drop files to put them in the project inbox",
   "drop.askPm": "I put these in the inbox: {paths}. Take a look and tell me what to do with them.",
+  "firstRun.title": "No agent sessions are running yet",
+  "firstRun.body": "Start Claude Code in any project and it shows up here. Want a look around first?",
+  "firstRun.see": "See a sample",
+  "firstRun.no": "Not now",
+  "firstRun.demoLabel": "SAMPLE DATA",
+  "firstRun.demoNote": "These agents are a scripted demo, not your sessions. They disappear when a real session starts.",
+  "firstRun.exit": "Exit sample",
 };

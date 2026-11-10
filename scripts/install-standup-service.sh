@@ -2,8 +2,13 @@
 # Install daily standup as a macOS launchd user agent: runs 09:00 every day.
 # Repo nay là local (~/Projects/agent-office) nên launchd đọc được trực tiếp —
 # không còn copy ra Application Support như hồi repo nằm trong OneDrive CloudStorage.
-# Usage: ./scripts/install-standup-service.sh [uninstall]
+# Usage: ./scripts/install-standup-service.sh [--yes] [uninstall]
+# Asks before installing; --yes answers the question.
 set -euo pipefail
+
+# shellcheck source=_ui.sh
+. "$(dirname "$0")/_ui.sh"
+parse_yes "$@"
 
 LABEL="com.agentoffice.standup"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
@@ -11,12 +16,16 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 OLD_APP_DIR="$HOME/Library/Application Support/agent-office"
 LOG="$HOME/Library/Logs/agent-office-standup.log"
 
-if [ "${1:-}" = "uninstall" ]; then
+if [ "${1:-}" = "uninstall" ] || [ "${2:-}" = "uninstall" ]; then
   launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
   rm -f "$PLIST" "$OLD_APP_DIR/standup.sh" "$OLD_APP_DIR/standup-prompt.md"
   echo "uninstalled $LABEL"
   exit 0
 fi
+
+confirm "Install the daily 09:00 standup as a background job (launchd)? This writes $PLIST and runs launchctl." \
+  "Cài standup 09:00 hằng ngày làm tác vụ nền (launchd)? Việc này ghi $PLIST và chạy launchctl." ||
+  die "Not installed." "Chưa cài."
 
 mkdir -p "$HOME/Library/LaunchAgents"
 # dọn bản copy cũ để không ai lỡ chạy nhầm script stale

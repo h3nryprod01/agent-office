@@ -3403,3 +3403,27 @@ body[data-clean="on"] #chat-box {
   border-radius: 8px;
   pointer-events: none;
 }
+
+/* lane I: first-run offer and the always-on sample-data label */
+.first-run {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 65;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  max-width: min(640px, calc(100vw - 32px));
+  background: #0f172a;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.first-run[hidden] { display: none; }
+.first-run[data-mode="demo"] { border-color: #f59e0b; }
+.first-run[data-mode="demo"] strong { color: #fbbf24; letter-spacing: 0.06em; }
+.first-run button { cursor: pointer; }

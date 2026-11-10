@@ -637,4 +637,11 @@ export const vi: Record<string, string> = {
   "office.toast.tooLarge": "{name} lớn hơn 4 MB.",
   "office.dropHint": "Thả file để đưa vào inbox của dự án",
   "drop.askPm": "Mình vừa để vào inbox: {paths}. Xem giúp và cho biết nên làm gì với chúng.",
+  "firstRun.title": "Chưa có phiên agent nào đang chạy",
+  "firstRun.body": "Mở Claude Code trong một dự án bất kỳ là nó hiện ở đây. Muốn xem thử trước không?",
+  "firstRun.see": "Xem bản mẫu",
+  "firstRun.no": "Để sau",
+  "firstRun.demoLabel": "DỮ LIỆU MẪU",
+  "firstRun.demoNote": "Các agent này là kịch bản demo, không phải phiên của bạn. Chúng biến mất khi có phiên thật.",
+  "firstRun.exit": "Thoát bản mẫu",
 };

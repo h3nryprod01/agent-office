@@ -11,9 +11,14 @@ and nothing else.
 ./scripts/start.sh
 ```
 
-It installs dependencies if they are missing, rebuilds the renderer, sets the
-daemon up if it isn't running, and opens **http://localhost:8787**. Run it again
-whenever you like — it reuses the daemon that's already up.
+It installs dependencies if they are missing, rebuilds the renderer and opens
+**http://localhost:8787**. If no daemon is running it **asks** whether to install
+one as a login service (launchd on macOS, systemd `--user` on Linux). Answer no
+and the daemon runs in that terminal until Ctrl+C; `--yes` answers yes without
+asking. Nothing is installed without a yes. Run it again whenever you like — it
+reuses the daemon that's already up.
+
+Messages are in English; they switch to Vietnamese when `LANG` starts with `vi`.
 
 > Open it at `localhost`; don't type `127.0.0.1` by hand. Browsers treat those as
 > two separate origins with separate permissions, so via the IP you'd have to
@@ -47,6 +52,37 @@ powershell -ExecutionPolicy Bypass -File scripts\start.ps1
 > verified on real Windows 11 — see [windows-port.md](windows-port.md). On
 > Windows, treat the first run as the test: success prints `Agent Office -> ...`
 > and opens a browser.
+
+## From a packed tarball (npx package)
+
+The repo root is also an npm package: the daemon plus a prebuilt renderer, started
+by one command that runs in the foreground and opens the browser. It installs **no**
+background service unless you pass `--install-service`.
+
+**It is not published to npm yet** (the name is still open), so build and install a
+tarball yourself:
+
+```bash
+npm --prefix packages/renderer ci   # once
+npm pack                            # builds the renderer, writes <name>-<version>.tgz
+mkdir /tmp/ao && cd /tmp/ao
+npm install /path/to/<name>-<version>.tgz
+./node_modules/.bin/<package-name> --port 8787
+```
+
+Options: `--port N` (default 8787), `--no-open`, `--install-service [--yes]`, `--help`.
+`<package-name> doctor|backup|...` runs the `ao` CLI (`update` only works on a
+git clone; for the package use `npm i -g <package-name>@latest`). Its workspace
+(the PM's session file) lives in `~/.agent-office/workspace`, not inside the
+package; `--install-service` writes that location into the service definition
+too. If the port is already serving Agent Office it says so instead of starting a
+second daemon. If a service from another copy (say a clone) is installed, the
+question names it and says it will be replaced.
+`--install-service` refuses to run from npm's temporary `npx` cache, because the
+service would point at a folder npm later deletes; install globally first.
+
+Checked on macOS only, from a tarball, with a throwaway `HOME` and a port other than
+8787. The `--install-service` path has not been run.
 
 ## What runs where
 
