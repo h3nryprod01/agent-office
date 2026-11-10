@@ -138,6 +138,7 @@ export class InterventionMetrics {
    * @param {(cwd: string|null, repo: string|null) => string|null} [opts.projectOf]
    * @param {number} [opts.retentionDays]
    * @param {number} [opts.flushMs] 0 = write each episode immediately
+   * @param {string|null} [opts.auditDir] projects directory holding policy-audit.jsonl files; null = no auto-approval counts
    */
   constructor({
     dir = DEFAULT_METRICS_DIR,
@@ -145,12 +146,14 @@ export class InterventionMetrics {
     projectOf = createProjectResolver({ now }),
     retentionDays = 90,
     flushMs = 1000,
+    auditDir = null,
   } = {}) {
     this.dir = dir;
     this.now = now;
     this.projectOf = projectOf;
     this.retentionDays = retentionDays;
     this.flushMs = flushMs;
+    this.auditDir = auditDir;
     /** @type {Map<string, object>} agentId → open episode */
     this.open = new Map();
     /** @type {Map<string, object>} episode id → episode */
@@ -297,43 +300,212 @@ export class InterventionMetrics {
    * @param {string} [q.kind] one of KINDS
    */
   summary({ days = 7, date, project, kind } = {}) {
-    const now = this.now();
     const span = Math.min(Math.max(Math.trunc(days) || 7, 1), this.retentionDays);
-    const dates = date
-      ? [date]
-      : Array.from({ length: span }, (_, i) => {
-          const d = new Date(now);
-          d.setDate(d.getDate() - (span - 1 - i)); // calendar steps: a DST day is not 24 h
-          return localDay(d.getTime());
-        });
-    const inWindow = new Set(dates);
-    const key = (e) => e.project ?? e.repo ?? "other";
-
-    const eps = this.episodes().filter(
-      (e) =>
-        inWindow.has(localDay(e.endTs)) &&
-        (!kind || e.kind === kind) &&
-        (!project || e.project === project || e.repo === project),
-    );
-    const group = (list, by) => {
-      const out = {};
-      for (const k of new Set(list.map(by))) out[k] = stats(list.filter((e) => by(e) === k).map((e) => e.durationMs));
-      return out;
-    };
-    return {
-      generatedAt: now,
-      window: { from: dates[0], to: dates.at(-1), days: dates.length },
-      filters: { project: project ?? null, kind: kind ?? null },
-      total: stats(eps.map((e) => e.durationMs)),
-      byKind: group(eps, (e) => e.kind),
-      byProject: group(eps, key),
-      byDay: dates.map((d) => {
-        const day = eps.filter((e) => localDay(e.endTs) === d);
-        return { date: d, ...stats(day.map((e) => e.durationMs)), byProject: group(day, key) };
-      }),
-      open: this.open.size,
-    };
+    const now = this.now();
+    // the policy audit (auto-approved counts) is optional: only the daemon wires a directory in
+    const audit = this.auditDir && !date ? readAutoApprovals(this.auditDir, { now, days: span }) : null;
+    return summarizeEpisodes(this.episodes(), { now, days: span, date, project, kind, audit, open: this.open.size });
   }
+}
+
+const key = (e) => e.project ?? e.repo ?? "other";
+const group = (list, by) => {
+  const out = {};
+  for (const k of new Set(list.map(by))) out[k] = stats(list.filter((e) => by(e) === k).map((e) => e.durationMs));
+  return out;
+};
+
+/** The calendar days a window covers, oldest first. */
+function windowDates(now, days) {
+  return Array.from({ length: days }, (_, i) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - (days - 1 - i)); // calendar steps: a DST day is not 24 h
+    return localDay(d.getTime());
+  });
+}
+
+/** Day an episode counts for: its end, or start + duration when the end is missing. null = unusable. */
+function episodeEnd(e) {
+  if (!Number.isFinite(e?.durationMs) || e.durationMs < 0) return null;
+  if (Number.isFinite(e.endTs)) return e.endTs;
+  return Number.isFinite(e.startTs) ? e.startTs + e.durationMs : null;
+}
+
+/**
+ * Pure: episodes → the report. Shared by the daemon (live, in memory), `ao report --dir`
+ * (read-only, straight from disk) and GET /metrics/intervention.
+ * @param {object[]} episodes
+ * @param {Object} q
+ * @param {number} q.now
+ * @param {number} [q.days]
+ * @param {string} [q.date] a single local day, overrides days
+ * @param {string} [q.project] project slug or repo name
+ * @param {string} [q.kind] one of KINDS
+ * @param {{autoApproved: number, autoDenied: number}|null} [q.audit]
+ * @param {number} [q.open] agents currently waiting (live daemon only)
+ * @param {number} [q.badLines] unreadable lines met while loading (disk reads only)
+ */
+export function summarizeEpisodes(episodes, { now, days = 7, date, project, kind, audit = null, open = 0, badLines = 0 }) {
+  const dates = date ? [date] : windowDates(now, Math.max(Math.trunc(days) || 7, 1));
+  const inWindow = new Set(dates);
+  let skipped = 0;
+  const eps = [];
+  for (const raw of episodes) {
+    const endTs = episodeEnd(raw);
+    if (endTs === null) {
+      skipped++;
+      continue;
+    }
+    const e = { ...raw, endTs };
+    if (!inWindow.has(localDay(endTs))) continue;
+    if (kind && e.kind !== kind) continue;
+    if (project && e.project !== project && e.repo !== project) continue;
+    eps.push(e);
+  }
+  const longest = eps.reduce((a, e) => (!a || e.durationMs > a.durationMs ? e : a), null);
+  const perm = eps.filter((e) => e.kind === "waiting_permission");
+  const denied = perm.filter((e) => e.resolution === "denied").length;
+  return {
+    generatedAt: now,
+    window: { from: dates[0], to: dates.at(-1), days: dates.length },
+    filters: { project: project ?? null, kind: kind ?? null },
+    total: stats(eps.map((e) => e.durationMs)),
+    longest: longest && {
+      durationMs: longest.durationMs,
+      kind: longest.kind,
+      project: key(longest),
+      harness: longest.harness ?? "unknown",
+      endTs: longest.endTs,
+    },
+    // approval waits only: how many were turned down (a terminal decline counts, it is a "no" too)
+    permission: { count: perm.length, denied, denyRate: perm.length ? denied / perm.length : 0 },
+    autoApproved: audit ? audit.autoApproved : null,
+    autoDenied: audit ? audit.autoDenied : null,
+    byKind: group(eps, (e) => e.kind),
+    byProject: group(eps, key),
+    byHarness: Object.entries(group(eps, (e) => e.harness ?? "unknown")).map(([harness, s]) => ({ harness, ...s })),
+    byDay: dates.map((d) => {
+      const day = eps.filter((e) => localDay(e.endTs) === d);
+      return { date: d, ...stats(day.map((e) => e.durationMs)), byProject: group(day, key) };
+    }),
+    open,
+    skipped,
+    badLines,
+    // false = nothing was ever recorded (as opposed to a quiet window): the card/CLI can say why
+    anyRecords: episodes.length > 0,
+  };
+}
+
+/**
+ * Read-only: every resolved episode in a metrics directory. Unlike the InterventionMetrics
+ * constructor it never deletes old files, so it is safe to point at data you do not own.
+ */
+export function readEpisodesFromDir(dir) {
+  const byId = new Map(); // same dedupe as the daemon's loader: an id seen twice counts once
+  let badLines = 0;
+  let files = [];
+  try {
+    files = fs.readdirSync(dir).filter((f) => DAY_FILE_RE.test(f));
+  } catch {
+    return { episodes: [], badLines };
+  }
+  for (const f of files.sort()) {
+    let text;
+    try {
+      text = fs.readFileSync(path.join(dir, f), "utf8");
+    } catch {
+      continue;
+    }
+    for (const line of text.split("\n")) {
+      if (!line) continue;
+      try {
+        const ep = JSON.parse(line);
+        if (ep && typeof ep === "object") byId.set(ep.id ?? `${f}:${byId.size}`, ep);
+        else badLines++;
+      } catch {
+        badLines++;
+      }
+    }
+  }
+  return { episodes: [...byId.values()], badLines };
+}
+
+/**
+ * Policy auto-decisions in the window, from each project's policy-audit.jsonl (read-only).
+ * null = the directory is not there. The audit keeps only its newest ~1000 lines per project.
+ */
+export function readAutoApprovals(projectsDir, { now, days = 7 }) {
+  let entries;
+  try {
+    entries = fs.readdirSync(projectsDir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  const inWindow = new Set(windowDates(now, Math.max(Math.trunc(days) || 7, 1)));
+  const out = { autoApproved: 0, autoDenied: 0 };
+  for (const d of entries) {
+    if (!d.isDirectory()) continue;
+    let text;
+    try {
+      text = fs.readFileSync(path.join(projectsDir, d.name, "policy-audit.jsonl"), "utf8");
+    } catch {
+      continue;
+    }
+    for (const line of text.split("\n")) {
+      if (!line) continue;
+      try {
+        const row = JSON.parse(line);
+        if (!Number.isFinite(row.ts) || !inWindow.has(localDay(row.ts))) continue;
+        if (row.decision === "allow") out.autoApproved++;
+        else if (row.decision === "deny") out.autoDenied++;
+      } catch {
+        // torn line
+      }
+    }
+  }
+  return out;
+}
+
+/** "42s", "3m 05s", "1h 23m" — same scale as the office card. */
+export function formatDuration(ms) {
+  if (ms <= 0) return "0s";
+  if (ms < 1000) return "<1s";
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const pad = (n) => String(n).padStart(2, "0");
+  if (s < 3600) return `${Math.floor(s / 60)}m ${pad(s % 60)}s`;
+  return `${Math.floor(s / 3600)}h ${pad(Math.floor((s % 3600) / 60))}m`;
+}
+
+/** Plain-text report for `ao report`. */
+export function formatReport(r) {
+  const head = `Agent wait report: ${r.window.from} to ${r.window.to} (${r.window.days} days)`;
+  if (r.total.count === 0) {
+    if (r.anyRecords === false) {
+      return `${head}\n\nNothing has been recorded yet. The daemon records tool errors and denied calls from agent transcripts\nwhile it runs (no hook needed); waits for approval are recorded only when a hook reports them\n(hooks/notify.mjs, or the approval gateway). Either no agent has run since the daemon started,\nor no such hook is installed.`;
+    }
+    return `${head}\n\nNo waits in the last ${r.window.days} days.`;
+  }
+  const f = formatDuration;
+  const lines = [
+    head,
+    "",
+    `Waits: ${r.total.count}   total ${f(r.total.totalMs)}   median ${f(r.total.medianMs)}   p90 ${f(r.total.p90Ms)}`,
+    `Longest: ${f(r.longest.durationMs)} (${r.longest.kind}, ${r.longest.project}, ${r.longest.harness})`,
+    `Approval waits: ${r.permission.count}, declined ${r.permission.denied} (${Math.round(r.permission.denyRate * 100)}%)`,
+  ];
+  if (r.autoApproved !== null) lines.push(`Auto-approved by policy: ${r.autoApproved}`);
+  const rows = (title, list) => [
+    "",
+    `${title}:`,
+    ...list.map(([name, s]) => `  ${name.padEnd(24)} ${String(s.count).padStart(5)}x  total ${f(s.totalMs).padStart(8)}  median ${f(s.medianMs).padStart(8)}  p90 ${f(s.p90Ms).padStart(8)}`),
+  ];
+  const byTotal = (a, b) => b[1].totalMs - a[1].totalMs;
+  lines.push(...rows("By kind", Object.entries(r.byKind).sort(byTotal)));
+  lines.push(...rows("By project", Object.entries(r.byProject).sort(byTotal)));
+  lines.push(...rows("By harness", r.byHarness.map(({ harness, ...s }) => [harness, s]).sort(byTotal)));
+  if (r.skipped || r.badLines) lines.push("", `Skipped ${r.skipped ?? 0} record(s) with no usable time and ${r.badLines ?? 0} unreadable line(s).`);
+  return lines.join("\n");
 }
 
 /** GET /metrics/intervention?days=&date=&project=&kind= */
@@ -366,7 +538,7 @@ export function createMetricsHttpHandler(metrics) {
 
 /** Observe every broadcast event (the attachNotifier wrapping trick). */
 export function attachInterventionMetrics(server, opts = {}) {
-  const metrics = new InterventionMetrics(opts);
+  const metrics = new InterventionMetrics({ auditDir: DEFAULT_PROJECTS_DIR, ...opts });
   const original = server.broadcast.bind(server);
   server.broadcast = (event) => {
     original(event);

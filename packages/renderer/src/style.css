@@ -2102,6 +2102,53 @@ body:not([data-view="office"]) .iv-panel {
   color: #94a3b8;
 }
 
+.iv-panel .iv-facts {
+  margin-bottom: 6px;
+  color: #94a3b8;
+}
+
+.iv-panel h3 {
+  font-size: 11px;
+  font-weight: 600;
+  margin: 8px 0 2px;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.iv-panel .iv-rows {
+  list-style: none;
+}
+
+.iv-panel .iv-rows li {
+  margin: 2px 0;
+  color: #94a3b8;
+}
+
+.iv-panel .iv-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.iv-panel .iv-actions button {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.iv-panel .iv-actions button.on {
+  border-color: #64748b;
+  color: #f8fafc;
+}
+
+.iv-panel .iv-share {
+  margin-left: auto;
+}
+
 .side-panel .session-actions .v {
   display: flex;
   flex-wrap: wrap;

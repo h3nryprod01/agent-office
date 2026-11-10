@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { checkInstalled } from "../harness-probe.js";
 import { AccessStore, agentOfficeHome } from "../access.js";
+import { checkAdapters } from "./adapter-check.js";
 
 const MIN_NODE_MAJOR = 20;
 const MIN_RAM_GB = 4;
@@ -82,6 +83,7 @@ export async function runChecks({
   probePort: probe = probePort,
   exec = defaultExec,
   preflight = false,
+  adapters = checkAdapters,
 } = {}) {
   const out = [];
   const add = (r) => out.push(r);
@@ -130,6 +132,12 @@ export async function runChecks({
     } else {
       add({ id: bin, status: "info", title: `${hint.label} not installed (optional)`, fix: hint.fix });
     }
+  }
+
+  // --- can the adapters still read what the agents write today? (needs a known home: tests that pass env {} skip it)
+  const userHome = env.HOME ?? env.USERPROFILE;
+  if (!preflight && userHome) {
+    for (const r of await adapters({ homeDir: userHome, env })) add(r);
   }
 
   // --- port

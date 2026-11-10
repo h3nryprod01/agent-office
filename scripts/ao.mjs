@@ -18,6 +18,7 @@ import { runAccessCommand, lanAddresses } from "../packages/daemon/src/cli/acces
 import { runApprovalsCommand } from "../packages/daemon/src/cli/approvals-setup.js";
 import os from "node:os";
 import readline from "node:readline";
+import { runReport } from "../packages/daemon/src/cli/report.js";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const home = agentOfficeHome();
@@ -36,6 +37,7 @@ const HELP = `Agent Office
   update [--dry-run]
   backup [--out DIR]          (default ${defaultBackupDir()})
   restore <archive.tar.gz> [--no-restart]
+  report [--days N] [--json] [--dir DIR]   (how long agents waited on you; read-only)
   lan on|off|status
   token add --label <name> --role owner|manager|viewer
   token list | token revoke <id|label>
@@ -137,6 +139,8 @@ async function main(argv) {
         ask: (q) => prompt(q),
         askHidden: (q) => prompt(q, { hidden: true }),
       });
+    case "report":
+      return runReport(rest);
     case "lan":
     case "token":
       try {

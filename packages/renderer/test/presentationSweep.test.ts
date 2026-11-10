@@ -17,6 +17,7 @@ it("with the switch ON no sensitive name survives in any view", async () => {
   // ...and the app is genuinely populated, not just empty
   expect(surface).toMatch(/project-\d/);
   expect(surface).toMatch(/dir-\d|file-\d/);
+  expect(surface).toContain("Time to intervene"); // the wait-report card was part of the sweep
   expect(surface).toContain("\u2592"); // blurred free text
   expect(surface).toMatch(/~\/[^\s]*project-\d/); // a real-looking working directory survives as an alias, not as ••••
   expect(surface).toMatch(/mcp__server-\d/);
