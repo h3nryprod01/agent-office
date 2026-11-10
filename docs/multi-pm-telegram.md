@@ -42,6 +42,23 @@ door is a pairing code, and wrong guesses are throttled: 5 per 10 minutes per pe
 
 Codes live only in daemon memory: a restart invalidates them.
 
+## Approve from your phone in one command
+
+```
+ao approvals setup            # (a) daemon up? (b) hook in ~/.claude/settings.json (c) bot token (d) pair (e) test approval
+ao approvals setup --dry-run  # same, but writes nothing and sends no test approval (needs a test daemon: --port N, not 8787)
+ao approvals remove           # take the hook out again
+```
+
+What it does to `~/.claude/settings.json`: it shows the exact `PermissionRequest` hook block, asks, saves a
+timestamped backup (`settings.json.ao-backup-…`) and merges the block in without touching any other key or hook.
+If the file is not valid JSON it stops and changes nothing. `--yes` skips the question. The file is rewritten as
+2-space JSON. The bot token is read from the daemon's environment; the command can check a token you have at
+hand (environment or a hidden prompt) against Telegram but never prints or stores it. Pairing uses the same
+one-time code as below. The test approval is a harmless `echo`; if it comes back instantly, a project policy in
+`auto` mode probably answered it instead of you. Verified against a fake Telegram server only; not yet against a
+live bot (see the handover note for the 5-line check).
+
 ## Telegram setup
 
 1. Create a bot with @BotFather, put the token in the daemon's environment:
@@ -90,6 +107,26 @@ is trusted with that project's folder — and with anything the PM's user accoun
 environment is scrubbed of the bot token, but not of files such as a service env file). Give the
 manager role to people you would give a shell to; use `viewer` otherwise, or set the project's
 policy mode to `read-only`, which stops managers from approving remotely.
+
+### Personal-data shield (`piiGuard`)
+
+For a project that handles customers' personal data, set `"policy": { "piiGuard": true }` in its `project.json`
+(owner only to turn it off). Then everything the daemon sends to Telegram or Zalo for that project passes a
+masker first: PM replies, approval alerts (and `/pending`), `/status`, the daily digest, and the notification push.
+Masked: Vietnamese phone numbers (`0912 345 678`, `+84 …`, with spaces, dots or dashes), CCCD (12 digits) and CMND
+(9 digits) numbers, e-mail addresses. Only the last 2-3 characters stay: `[phone ***678]`. The count of masked
+values (never the values) goes to `projects/<slug>/pii-audit.jsonl`. Text is masked as a whole before it is
+shortened, and a half-cut tail is dropped, so a number cannot straddle a cut.
+
+It applies to the project's bound room, to the private chat of each member, and to the operator's own chat while
+any project has the shield on. **If the project list or a `project.json` cannot be read, everything is masked**
+(one warning in the log) rather than nothing.
+
+**Limits, plainly.** It matches shapes, so it cannot find a person's name or an address, nor digits spelled out
+in words, nor a number split by letters. It can mask a harmless number that looks like an ID (a plain 9-digit
+counter). When in doubt it masks. It guards what goes to chat only: the model provider still receives whatever
+the agents read, and the PM's own transcript on this machine is not changed. It does **not** block a worker lane:
+`allowedHarnesses` only warns (below), because a session that already runs cannot be stopped from here.
 
 ### End-of-day digest
 

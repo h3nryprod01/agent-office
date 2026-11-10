@@ -65,6 +65,21 @@ redacted preview, mode + where it came from, decision, reasons. `GET /policy/aud
 `allowedHarnesses` / `allowedLanes`: a session whose harness (or reported lane) is not listed raises one `policy_alert` event
 (intervention queue) and an OS notification. Reading the transcript is never blocked. Empty/absent = no rule.
 
+## Personal-data shield (`policy.piiGuard`)
+
+`"piiGuard": true` masks phone numbers, CCCD/CMND numbers and e-mail addresses in everything sent to Telegram/Zalo for the
+project (details, limits and the audit file: `docs/multi-pm-telegram.md`). Turning it **off** (`false`) needs the `owner` role;
+a policy save that does not mention it leaves it as it was, so an older Settings panel cannot switch it off by accident.
+
+With `piiGuard` on, the data rule above gets two extra warnings (still **warnings, nothing is blocked**: the session is already
+running and this daemon only reads its transcript):
+
+- `allowedHarnesses` is not set → one `policy_alert` (`kind: pii_no_allowlist`) + OS notification per project per daemon run,
+  saying any harness or worker lane may see the data;
+- a session of a harness outside `allowedHarnesses` → the usual alert, with a sentence that this project handles personal data.
+
+To keep personal data away from a third-party worker lane, do not run that lane in the project; the policy cannot stop it.
+
 ## API
 
 `GET /policy`, `GET /policy?project=<slug>`, `POST /policy {project, policy}`, `GET /policy/audit`.
