@@ -15,6 +15,9 @@ import { runChecks, formatReport, exitCode } from "../packages/daemon/src/cli/do
 import { createBackup, restoreBackup, defaultBackupDir } from "../packages/daemon/src/cli/backup.js";
 import { runUpdate, restartCommand, commandLine, defaultRun } from "../packages/daemon/src/cli/update.js";
 import { runAccessCommand, lanAddresses } from "../packages/daemon/src/cli/access-cmd.js";
+import { runApprovalsCommand } from "../packages/daemon/src/cli/approvals-setup.js";
+import os from "node:os";
+import readline from "node:readline";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const home = agentOfficeHome();
@@ -35,7 +38,27 @@ const HELP = `Agent Office
   restore <archive.tar.gz> [--no-restart]
   lan on|off|status
   token add --label <name> --role owner|manager|viewer
-  token list | token revoke <id|label>`;
+  token list | token revoke <id|label>
+  approvals setup [--dry-run] [--yes] [--project <slug>] [--port N]   answer permission prompts from Telegram
+  approvals remove [--dry-run] [--yes]`;
+
+// lane A: a question on the terminal; hidden = no echo (for a token). Without a terminal there is nobody to ask: "".
+function prompt(question, { hidden = false } = {}) {
+  if (!process.stdin.isTTY) return Promise.resolve("");
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+    if (hidden) {
+      rl._writeToOutput = (text) => {
+        if (text.startsWith(question)) process.stdout.write(question);
+      };
+    }
+    rl.question(question, (answer) => {
+      rl.close();
+      if (hidden) process.stdout.write("\n");
+      resolve(answer);
+    });
+  });
+}
 
 async function main(argv) {
   const [verb, ...rest] = argv;
@@ -105,6 +128,15 @@ async function main(argv) {
         return 1;
       }
     }
+    case "approvals":
+      return runApprovalsCommand(rest, {
+        repo,
+        home: os.homedir(),
+        port,
+        log: (m) => console.log(m),
+        ask: (q) => prompt(q),
+        askHidden: (q) => prompt(q, { hidden: true }),
+      });
     case "lan":
     case "token":
       try {
