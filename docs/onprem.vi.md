@@ -46,8 +46,7 @@ Anthropic (đọc ngày 10/11/2026; trang này thay đổi, hãy đọc lại) l
   khiển `claude` CLI của khách bằng gói thuê bao của khách có thuộc trường hợp đó hay
   không. Cho tới khi Anthropic trả lời bằng văn bản, dùng khoá API của khách.
 * **Bạn dùng cá nhân trên máy mình bằng gói của mình thì giữ nguyên.**
-* **Không đặt "Claude" hay "Claude Code" trong tên sản phẩm/dịch vụ của bạn.** Trang cho
-  phép nói bằng chữ thường rằng sản phẩm chạy Claude Code.
+* **Không dùng tên hay logo "Claude Code" hoặc "Anthropic" trong tên sản phẩm, tính năng, công ty của bạn, hay theo cách gợi ý Anthropic bảo trợ bạn.** Trang cho phép nói bằng chữ thường rằng sản phẩm chạy Claude Code; các trường hợp khác xem [Trademark Guidelines](https://www.anthropic.com/legal/trademark-guidelines) của Anthropic.
 * Codex CLI và Gemini CLI có điều khoản riêng; đọc tương tự (chưa kiểm ở đây).
 
 Không chắc đã đủ chưa? Cứ cài, rồi chạy bộ kiểm tra (mục 2): nó nói rõ thiếu gì và

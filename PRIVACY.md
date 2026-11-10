@@ -5,7 +5,7 @@ This document says what Agent Office reads, writes and sends, checked against th
 ## In short
 
 - Agent Office has no telemetry, no analytics, no crash reporting and no account.
-- The daemon's own code calls out to exactly two hosts, `api.telegram.org` (changeable with `TELEGRAM_API_BASE`) and `openapi.zalo.me`, and only after you configure the matching bot or Official Account token.
+- The daemon's own code calls out to exactly two hosts, `api.telegram.org` (`TELEGRAM_API_BASE` redirects only the multi-project Telegram channel; stuck-agent alerts always use `api.telegram.org`) and `openapi.zalo.me`, and only after you configure the matching bot or Official Account token.
 - The web app loads no remote script, font, image or stylesheet.
 - Everything else stays on your machine, unless you turn on LAN mode, in which case other devices you authorise can read it.
 - If you turn on Telegram or Zalo, text that was written on your machine (command lines, file paths, agent output, the PM's answers) is sent to those services. Section 4 lists exactly what.
@@ -62,7 +62,7 @@ The Telegram channel starts when `TELEGRAM_BOT_TOKEN` is set. The one-way alert 
 - Approval request: the project name, the tool name, and the first 300 characters of the command, file path or tool input that is waiting for a yes or no, plus the short id (and two one-tap buttons where the channel has them, as Telegram does).
 - Approval requests go to the project's bound chat, or else to the DMs of its owners and managers, or else to your operator chat.
 - Stuck-agent alert (Telegram only, to `TELEGRAM_CHAT_ID`): the agent name, the repo, "Waiting for approval" or "Error" or "Blocked", up to 2000 characters of the agent's last detail text, and a link to your office.
-- The PM's answer, in full, to whoever asked, split into messages of at most 4096 characters.
+- The PM's answer, in full, to whoever asked, split into messages of at most 4096 characters (Telegram; Zalo sends it whole).
 - Command replies: `/status` (project name, template, item counts, and in a private chat the last 200 characters of the PM's reply), `/items` (open item titles), `/pending` (the first 120 characters of each approval), `/projects`, `/whoami`.
 - The end-of-day digest at 18:00 local time by default to a project's bound room: project name, titles of up to 5 items finished today, counts, and a time-to-intervene line. `AO_DIGEST_TIME` changes the hour and `AO_DIGEST=0` switches it off.
 

@@ -19,11 +19,11 @@ function readJson(file) {
 }
 
 /** Node resolution: nearest node_modules/<name> walking up from `fromDir`. */
-function resolveInstalled(fromDir, name) {
+function resolveInstalled(fromDir, name, stopAt) {
   for (let dir = fromDir; ; dir = path.dirname(dir)) {
     const candidate = path.join(dir, "node_modules", name);
     if (existsSync(path.join(candidate, "package.json"))) return candidate;
-    if (path.dirname(dir) === dir) return null;
+    if (dir === stopAt || path.dirname(dir) === dir) return null; // never look in ~/node_modules
   }
 }
 
@@ -40,12 +40,12 @@ function licenseTextOf(dir) {
  * @returns {{name:string, version:string, license:string, homepage:string, licenseText:string}[]}
  *   production dependencies, transitive, sorted by name@version
  */
-export function collectProduction(packageDir) {
+export function collectProduction(packageDir, { stopAt = path.resolve(packageDir, "..", "..") } = {}) {
   const seen = new Map();
   const visit = (dir, from) => {
     const manifest = readJson(path.join(dir, "package.json"));
     for (const dep of Object.keys(manifest.dependencies ?? {})) {
-      const installed = resolveInstalled(dir, dep);
+      const installed = resolveInstalled(dir, dep, stopAt);
       if (!installed) {
         throw new Error(`${dep} (needed by ${manifest.name ?? from}) is not installed; run npm ci in ${packageDir}`);
       }

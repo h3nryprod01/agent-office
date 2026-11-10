@@ -30,7 +30,7 @@ Last updated: `<date>`
 
 **Your choices.** Ask `<contact>` to remove you from a project and delete your stored id and name. Stop writing to the bot to stop it receiving your messages. Messages already in Telegram can be deleted in Telegram.
 
-**Security.** The bot only answers people who joined the project with a one-time code or were added by an owner; others get no reply. Agent Office does not encrypt its project files itself; they are protected by the access controls and disk encryption of the machine they run on. `<Describe your disk encryption and backups.>` Telegram asks bot developers to encrypt user data at rest and tell users about a breach; make sure your setup meets that before you rely on this paragraph.
+**Security.** The bot only answers people who joined the project with a one-time code or were added by an owner; others get no reply, except that a pairing attempt is answered. Agent Office does not encrypt its project files itself; they are protected by the access controls and disk encryption of the machine they run on. `<Describe your disk encryption and backups.>` Telegram asks bot developers to encrypt user data at rest and tell users about a breach; make sure your setup meets that before you rely on this paragraph.
 
 **Children.** `<State your position; this bot is not meant for children.>`
 

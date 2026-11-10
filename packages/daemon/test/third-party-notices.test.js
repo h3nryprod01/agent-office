@@ -44,3 +44,12 @@ test("renderNotices merges the same name@version from several packages and lists
   assert.match(md, /Kenney/);
   assert.match(md, /MIT text/);
 });
+
+test("collectProduction does not look above the repo root (e.g. ~/node_modules)", () => {
+  const outer = mkdtempSync(path.join(os.tmpdir(), "notices-"));
+  const root = path.join(outer, "repo");
+  mkdirSync(root);
+  writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "app", dependencies: { stray: "^1" } }));
+  pkg(path.join(outer, "node_modules", "stray"), "stray", "1.0.0", {}, "stray");
+  assert.throws(() => collectProduction(root, { stopAt: root }), /stray.*npm ci/s);
+});

@@ -48,8 +48,7 @@ advice.
   their subscription falls under that. Until Anthropic answers you in writing, use the
   client's API key.
 * **Your own use on your own machine with your own plan is unchanged.**
-* **Do not put "Claude" or "Claude Code" in the name of your product or service.** The
-  page allows saying in plain text that something runs Claude Code.
+* **Do not use the names or logos "Claude Code" or "Anthropic" in your product, feature or company name, or in a way that suggests Anthropic endorses you.** The page allows saying in plain text that something runs Claude Code; other uses fall under Anthropic's [Trademark Guidelines](https://www.anthropic.com/legal/trademark-guidelines).
 * Codex CLI and Gemini CLI have their own terms; read them the same way (not checked
   here).
 

@@ -44,8 +44,7 @@ preflights). The one GET route that had a side effect was `/harnesses?probe=<key
 runs the harness CLI: for Claude it runs `claude auth status` (no tokens), for Gemini it
 sends a real prompt. It now also refuses a request the browser marks `Sec-Fetch-Site:
 cross-site` or `same-site`. The served app, curl and the address bar are unaffected.
-This relies on the browser sending Fetch Metadata headers (all current browsers do); an
-old browser that does not looks like curl and is not stopped. Other GET routes only read (the one exception is `GET /docs*` renaming a corrupt `docs-meta.json` aside, which an outside page cannot cause: it needs the file to be corrupt already and changes nothing else).
+This relies on the browser sending Fetch Metadata headers (all current browsers do); a browser without them (Safari before 16.4 is one) looks like curl and is not stopped. A link opened from another app, typed in, or from a bookmark arrives with `Sec-Fetch-Site: none` and can still trigger a Gemini probe; that is accepted, as it needs the user to open the link. Over plain HTTP on a LAN the protection is the token plus the `SameSite=Strict` session cookie, not Fetch Metadata. Other GET routes only read (the one exception is `GET /docs*` renaming a corrupt `docs-meta.json` aside, which an outside page cannot cause: it needs the file to be corrupt already and changes nothing else).
 
 Known limits: DNS rebinding against the loopback interface is closed — a loopback request only
 counts as the local user when its `Host` is a loopback name (`localhost`, `127.0.0.1`,
@@ -63,7 +62,7 @@ off the wire, put a TLS terminator in front and keep the daemon itself on loopba
 - **`tailscale serve` or a reverse proxy with a self-signed certificate** (Caddy, nginx)
   that forwards to `127.0.0.1:8787`: not tested here, so no commands are given. Check
   that the proxy forwards the WebSocket upgrade and keeps the `Host` header. Note that a
-  proxy on the same machine makes every request arrive from loopback; the daemon treats
+  proxy on the same machine makes every request arrive from loopback, and the token check is bypassed only if the proxy rewrites `Host` to a loopback name; the daemon treats
   requests carrying proxy headers (`X-Forwarded-For` and friends) as remote, so the proxy
   must send them or the token check is bypassed. Verify with a request from another device.
 
