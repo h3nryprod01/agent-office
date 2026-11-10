@@ -62,6 +62,9 @@ export function normalizePolicy(raw) {
     },
     allowedHarnesses: cleanList(p.allowedHarnesses),
     allowedLanes: cleanList(p.allowedLanes),
+    // lane A: only a literal `true` switches the shield on. An explicit `false` is kept (it is how an owner says "off", see
+    // PolicyStore.setPolicy); the key is absent when the policy never mentioned it, so older policies keep their exact shape
+    ...(typeof p.piiGuard === "boolean" ? { piiGuard: p.piiGuard } : {}),
   };
 }
 
@@ -69,7 +72,7 @@ export function normalizePolicy(raw) {
 export function validatePolicy(input) {
   if (!isPlainObject(input)) throw invalid("policy must be an object");
   for (const key of Object.keys(input)) {
-    if (!["approval", "allowedHarnesses", "allowedLanes"].includes(key)) throw invalid(`policy: unknown field "${key}"`);
+    if (!["approval", "allowedHarnesses", "allowedLanes", "piiGuard"].includes(key)) throw invalid(`policy: unknown field "${key}"`);
   }
   if (input.approval !== undefined) {
     if (!isPlainObject(input.approval)) throw invalid("policy.approval must be an object");
@@ -85,6 +88,7 @@ export function validatePolicy(input) {
       }
     }
   }
+  if (input.piiGuard !== undefined && typeof input.piiGuard !== "boolean") throw invalid("policy.piiGuard must be true or false");
   for (const field of ["allowedHarnesses", "allowedLanes"]) {
     const list = input[field];
     if (list === undefined || list === null) continue;
@@ -172,5 +176,6 @@ export function requiredRole(before, after) {
   }
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   if (!same(before.allowedHarnesses, after.allowedHarnesses) || !same(before.allowedLanes, after.allowedLanes)) return "owner";
+  if (before.piiGuard === true && after.piiGuard !== true) return "owner"; // the shield coming off lets personal data out
   return "manager";
 }
