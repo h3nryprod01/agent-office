@@ -125,15 +125,43 @@ GET /metrics/intervention?days=7&project=<slug-or-repo>&kind=<kind>&date=YYYY-MM
   "byKind": { "waiting_permission": { "count": 8, "medianMs": 61000, "p90Ms": 240000, "totalMs": 0 } },
   "byProject": { "acme-web": { "count": 9, "medianMs": 0, "p90Ms": 0, "totalMs": 0 } },
   "byDay": [ { "date": "2026-10-27", "count": 4, "medianMs": 0, "p90Ms": 0, "totalMs": 0, "byProject": {} } ],
-  "open": 1
+  "longest": { "durationMs": 240000, "kind": "waiting_permission", "project": "acme-web", "harness": "claude-code", "endTs": 1789999000000 },
+  "permission": { "count": 8, "denied": 1, "denyRate": 0.125 },
+  "autoApproved": 3,
+  "autoDenied": 0,
+  "byHarness": [ { "harness": "claude-code", "count": 12, "medianMs": 42000, "p90Ms": 185000, "totalMs": 410000 } ],
+  "open": 1,
+  "skipped": 0
 }
 ```
+
+`total.totalMs` is the total time agents waited. `permission.denyRate` is the share of
+approval waits that ended in a "no" (a decline typed in the terminal counts too).
+`autoApproved` / `autoDenied` count what the approval policy decided on its own in the
+window, read from each project's `policy-audit.jsonl`; it is `null` when there is no
+audit to read, and the audit keeps only each project's newest ~1000 lines, so a busy
+30-day window can undercount. `skipped` counts records with no usable time (they are
+left out, not guessed).
 
 `median` is the mean of the middle pair when the count is even; `p90` is
 nearest-rank. Projects come from `~/.agent-office/projects/<slug>/project.json`
 (`cwd` and everything under it, worktrees included); a session no project
 claims is grouped by repo name. The small card at the top right of the office
-shows median, p90 and count for the last 7 days, per kind.
+shows median, p90 and count for the last 7 or 30 days (switch on the card), plus total
+wait, longest wait, decline rate, auto-approvals and the biggest projects and agents. **Save image**
+downloads a PNG of it: project names are only drawn while Present mode is on (they are aliased
+then); otherwise the image shows the numbers and the per-agent split only.
+
+### `ao report`
+
+```
+node scripts/ao.mjs report [--days 7|30|N] [--json] [--dir <metrics dir>] [--audit-dir <projects dir>]
+```
+
+Prints the same report in the terminal. It reads the day files straight from disk (no daemon
+needed, nothing written, old files are not pruned), so `--dir` can safely point at a copy or at
+another machine's folder. With no data it says why: waits are only recorded once the approval hook
+is installed (`ao approvals setup`) and agents have run since.
 
 Known limits:
 
