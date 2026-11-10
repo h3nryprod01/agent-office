@@ -71,8 +71,13 @@ npm install /path/to/<name>-<version>.tgz
 ```
 
 Options: `--port N` (default 8787), `--no-open`, `--install-service [--yes]`, `--help`.
-`<package-name> doctor|backup|...` runs the `ao` CLI. Its workspace (the PM's
-session file) lives in `~/.agent-office/workspace`, not inside the package.
+`<package-name> doctor|backup|...` runs the `ao` CLI (`update` only works on a
+git clone; for the package use `npm i -g <package-name>@latest`). Its workspace
+(the PM's session file) lives in `~/.agent-office/workspace`, not inside the
+package; `--install-service` writes that location into the service definition
+too. If the port is already serving Agent Office it says so instead of starting a
+second daemon. If a service from another copy (say a clone) is installed, the
+question names it and says it will be replaced.
 `--install-service` refuses to run from npm's temporary `npx` cache, because the
 service would point at a folder npm later deletes; install globally first.
 

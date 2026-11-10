@@ -53,7 +53,7 @@ Gói `npx` một lệnh đã được dựng và kiểm từ tarball cục bộ 
 |---|---|
 | Claude Code | Đã kiểm trên bản hiện hành |
 | Claude Code trỏ tới endpoint model khác (làn worker) | Đã kiểm |
-| Hermes | Đã kiểm |
+| Hermes | Đã kiểm. Cần Node 22.13 trở lên (đọc kho SQLite của Hermes bằng `node:sqlite`) |
 | Ứng dụng Codex trên máy tính | Chạy một phần: file rollout mới có đuôi `.jsonl.zst`, bộ đọc chưa mở được |
 | Codex CLI | Thử nghiệm, chưa kiểm trên bản hiện hành |
 | Gemini CLI | Thử nghiệm, chưa kiểm trên phiên thật. Google đã chuyển người dùng Gemini CLI sang `agy`, chưa có adapter cho `agy` |
@@ -62,7 +62,7 @@ Cách kiểm và ngày kiểm từng nguồn: [docs/adapters-verified.md](docs/a
 
 ## Riêng tư và bảo mật
 
-- Nó đọc transcript trong thư mục home của bạn và không ghi vào đó. Trạng thái của riêng nó nằm ở `~/.agent-office`.
+- Nó đọc transcript trong thư mục home của bạn và không ghi vào đó. Nó chỉ ghi trạng thái của chính nó: `~/.agent-office`; bản sao lưu ở `~/agent-office-backups`; file phiên của PM trong `.claude/memory/` của thư mục làm việc (chính repo khi chạy từ bản clone, `~/.agent-office/workspace` khi chạy từ gói npm); và nếu bạn cài hook tuỳ chọn thì có log hook ở `~/.claude/agent-office-hook-events.jsonl`.
 - Kết nối mạng dựng sẵn của daemon chỉ có cho Telegram và Zalo, và chúng tắt cho tới khi bạn đặt token.
 - Nó chỉ nghe trên `127.0.0.1` trừ khi bạn bật chế độ LAN, khi đó mọi yêu cầu không phải từ máy này đều cần token. HTTP trần trong LAN nghĩa là token có thể bị nghe lén; đọc [SECURITY.md](SECURITY.md) trước khi mở cổng ra ngoài.
 

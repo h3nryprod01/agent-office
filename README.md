@@ -53,7 +53,7 @@ A one-command `npx` package is built and tested from a local tarball but **is no
 |---|---|
 | Claude Code | Verified on the current version |
 | Claude Code on other model endpoints (worker lanes) | Verified |
-| Hermes | Verified |
+| Hermes | Verified. Needs Node 22.13 or newer (it reads Hermes' SQLite store with `node:sqlite`) |
 | Codex desktop app | Partly works: newer rollout files are `.jsonl.zst`, which the reader cannot open yet |
 | Codex CLI | Experimental, not verified on the current version |
 | Gemini CLI | Experimental, not verified on a real session. Google has moved Gemini CLI users to `agy`, which has no adapter yet |
@@ -62,7 +62,7 @@ How each was checked, and when: [docs/adapters-verified.md](docs/adapters-verifi
 
 ## Privacy and security
 
-- It reads transcripts under your home directory and does not write to them. Its own state lives in `~/.agent-office`.
+- It reads transcripts under your home directory and does not write to them. It writes only its own state: `~/.agent-office`; backups in `~/agent-office-backups`; the PM's session file under `.claude/memory/` of its workspace (the repo when run from a clone, `~/.agent-office/workspace` from the npm package); and, if you install the optional hooks, a hook log at `~/.claude/agent-office-hook-events.jsonl`.
 - The daemon's only built-in network clients are for Telegram and Zalo, and they stay off until you set their tokens.
 - It listens on `127.0.0.1` unless you switch on LAN mode, which requires a token for every non-local request. Plain HTTP on a LAN means tokens can be sniffed; read [SECURITY.md](SECURITY.md) before exposing the port.
 
