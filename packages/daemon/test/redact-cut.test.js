@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { safePreview, redactPii } from "../src/redact-pii.js";
+import { assertLinear } from "./helpers/linear.js";
+
 
 const PHONES = ["0912345678", "0912 345 678", "0912​345​678", "+84 912 345 678", "(+84) 912.345.678", "091-234-5678", "0912 345 678"];
 const EMAIL = "nguyen.van.a@example.com";
@@ -57,9 +59,7 @@ test("a cut that happens to fall at a word boundary keeps the words before it", 
   assert.equal(safePreview("npm run build and then deploy", 13), "npm run");
 });
 
-test("a very long input is handled quickly", () => {
-  const t0 = Date.now();
-  safePreview("0 ".repeat(50000), 400);
-  safePreview("1".repeat(100000), 400, { alreadyCut: true });
-  assert.ok(Date.now() - t0 < 1000);
+test("safePreview time grows linearly with length", () => {
+  assertLinear("spaced zeros", (n) => "0 ".repeat(n / 2), (t) => safePreview(t, 400));
+  assertLinear("digits, already cut", (n) => "1".repeat(n), (t) => safePreview(t, 400, { alreadyCut: true }));
 });

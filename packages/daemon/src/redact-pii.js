@@ -11,8 +11,8 @@
 // is replaced: nothing else in the text is rewritten (an ellipsis stays an ellipsis).
 
 // what people put between digit groups: whitespace (tab, newline, NBSP, thin space), any dash, dot, slash, brackets,
-// middle dot, bullet, underscore. Limit: at most 3 such characters in a row (4+ spaces between digit groups are not seen)
-const SEP_CHARS = "\\s\\p{Pd}./()·•_";
+// middle dot and its lookalikes, bullet, underscore, comma. Limit: at most 3 such characters in a row (4+ spaces between digit groups are not seen)
+const SEP_CHARS = "\\s\\p{Pd}./()·•_・‧∙⋅,"; // (half-width katakana middle dot U+FF65 reads as U+30FB after NFKC)
 const SEP = `(?:[${SEP_CHARS}]{1,3})`; // bounded, so the scan stays linear
 
 // Principle: when in doubt, MASK. Hiding a harmless number costs a little readability; letting a phone
@@ -87,6 +87,16 @@ function detection(text) {
   return { det: out.join(""), from, to };
 }
 
+/** The first index at or after `i` that is not an invisible/combining character (they belong to the character before). */
+function past(text, i) {
+  while (i < text.length) {
+    const ch = String.fromCodePoint(text.codePointAt(i));
+    if (!INVISIBLE.test(ch)) break;
+    i += ch.length;
+  }
+  return i;
+}
+
 /** Replace what `re` finds in the detection copy, in the original text. `replacer(match)` returns the new text or null to skip. */
 function stage(text, re, replacer) {
   const { det, from, to } = detection(text);
@@ -97,7 +107,7 @@ function stage(text, re, replacer) {
     const rep = replacer(m[0]);
     if (rep === null) continue;
     const s = from ? from[m.index] : m.index;
-    const e = from ? to[m.index + m[0].length - 1] : m.index + m[0].length;
+    const e = from ? past(text, to[m.index + m[0].length - 1]) : m.index + m[0].length;
     if (s < last) continue;
     result += text.slice(last, s) + rep;
     last = e;
@@ -177,7 +187,26 @@ export function dropCutTail(text) {
   let keep = keepLength(det);
   while (keep > 0 && /\s/.test(det[keep - 1])) keep -= 1;
   if (!to) return det.slice(0, keep);
-  return keep === 0 ? "" : t.slice(0, to[keep - 1]);
+  return keep === 0 ? "" : t.slice(0, past(t, to[keep - 1])); // keep a kept letter's own combining marks (decomposed Vietnamese)
+}
+
+/**
+ * The mirror of dropCutTail for text whose START was cut off (the last 500 characters of a stream): drop the
+ * first (possibly half) word, then a run of digits and separators left at the front (3+ digits).
+ */
+export function dropCutHead(text) {
+  const t = String(text ?? "");
+  const { det, from } = detection(t);
+  const w = det.slice(0, WINDOW);
+  let i = 0;
+  while (i < w.length && !/\s/.test(w[i])) i += 1;
+  if (i >= w.length || i > MAX_LAST_WORD) i = (/^[A-Za-z0-9._%+\-@]*/.exec(w) ?? [""])[0].length;
+  let rest = det.slice(i);
+  const lead = new RegExp(`^[\\s\\d${SEP_CHARS}]*`, "u").exec(rest)[0];
+  if (lead.replace(/\D/g, "").length >= 3) i += lead.length;
+  else i += /^\s*/.exec(rest)[0].length;
+  if (i >= det.length) return "";
+  return t.slice(from ? from[i] : i).trimStart();
 }
 
 /**

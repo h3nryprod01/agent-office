@@ -27,6 +27,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { makeEvent } from "./event-schema.js";
 import { clip } from "./approvals.js";
+import { dropCutHead } from "./redact-pii.js";
 import { cliSpawnOptions } from "./platform.js";
 
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // PM reads registry/git before answering
@@ -66,6 +67,10 @@ export const GENERIC_PM_SYSTEM_PROMPT =
   "prompt it returns: it carries that member's persona and SOP (docs/company-protocol.md section 6). " +
   "You CANNOT approve permissions for another session — if asked, say plainly that " +
   "it has to be approved in that session's own app.";
+
+/** Keep the last 500 characters of a stream. The cut can land inside a number: drop the half-cut first word and any digits left at the front. */
+const STDERR_KEEP = 500;
+const keepStderrTail = (text) => (text.length > STDERR_KEEP ? dropCutHead(text.slice(-STDERR_KEEP)) : text);
 
 export class ChatSessionManager {
   /**
@@ -360,7 +365,7 @@ export class ChatSessionManager {
         }
       }
     });
-    child.stderr.on("data", (chunk) => { stderrTail = (stderrTail + chunk).slice(-500); });
+    child.stderr.on("data", (chunk) => { stderrTail = keepStderrTail(stderrTail + chunk); });
     child.on("error", (error) => {
       finish(() => emit({ role: "system", text: `Could not run the claude CLI: ${error.message}`, targetSessionId: liveSessionId, done: true, error: true }));
     });
@@ -404,7 +409,7 @@ export class ChatSessionManager {
     const proc = { child, repo: repoName, cwd, sessionId: saved, buf: "", stderrTail: "", idleTimer: null, dead: false };
     child.stdin?.on("error", () => {});
     child.stdout.on("data", (chunk) => this.#onWarmData(proc, chunk));
-    child.stderr.on("data", (chunk) => { proc.stderrTail = (proc.stderrTail + chunk).slice(-500); });
+    child.stderr.on("data", (chunk) => { proc.stderrTail = keepStderrTail(proc.stderrTail + chunk); });
     child.on("exit", (code) => this.#onWarmExit(proc, code));
     child.on("error", () => this.#onWarmExit(proc, -1));
     this.warm.set(repoName, proc);

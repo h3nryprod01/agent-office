@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { redactPii } from "../src/redact-pii.js";
+import { assertLinear } from "./helpers/linear.js";
+
 
 // Every number below is made up. Positive = must be masked, negative = must pass through untouched.
 const POSITIVE = [
@@ -125,11 +127,8 @@ test("masking twice changes nothing more", () => {
   assert.deepEqual(twice.counts, { phone: 0, id: 0, email: 0 });
 });
 
-test("a long text with many digits stays fast (no catastrophic backtracking)", () => {
-  const nasty = "0 ".repeat(5000) + "1".repeat(20000) + " 0-".repeat(3000);
-  const t0 = Date.now();
-  redactPii(nasty);
-  assert.ok(Date.now() - t0 < 1000, "redactPii took too long");
+test("a long text with many digits grows linearly (no catastrophic backtracking)", () => {
+  assertLinear("nasty", (n) => "0 ".repeat(n / 10) + "1".repeat(n / 2) + " 0-".repeat(n / 10), redactPii);
 });
 
 test("two phone numbers separated by a comma are two values", () => {

@@ -13,6 +13,8 @@ import { ChatSessionManager } from "../src/chat-session.js";
 import { describeMetrics } from "../src/digest.js";
 import { normalizePolicy, requiredRole, shieldOn } from "../src/policy.js";
 import { PolicyStore } from "../src/policy-store.js";
+import { assertLinear } from "./helpers/linear.js";
+
 
 const ascii = (s) => s.normalize("NFKC").replace(/\D/g, "");
 function leaks(out, phone) {
@@ -71,13 +73,18 @@ for (const [name, input, kind] of [["CMND slashes", "CMND 123/456/789", "id"], [
 test("still leaves an IP address, a version and a date alone", () => {
   for (const t of ["ip 203.0.113.20", "v2.1.308", "ngày 12/11/2026", "1.500.000.000 đ", "Phí 123.456.789 đ"]) assert.equal(redactPii(t).text, t, t);
 });
-test("100k characters of exotic text stay under 100 ms", () => {
-  for (const s of ["٠١٢٣".repeat(25000), "0️⃣".repeat(50000), "ㅤ".repeat(100000), "0912_".repeat(20000), "０９１２　".repeat(20000)]) {
-    for (const run of [() => redactPii(s), () => safePreview(s, 400, { alreadyCut: true })]) {
-      const t0 = performance.now();
-      run();
-      assert.ok(performance.now() - t0 < 100, JSON.stringify(s.slice(0, 6)));
-    }
+test("exotic text: time grows linearly with length", () => {
+  const makers = {
+    arabicIndic: (n) => "\u0660\u0661\u0662\u0663".repeat(n / 4),
+    keycaps: (n) => "0\ufe0f\u20e3".repeat(n / 3),
+    hangulFiller: (n) => "\u3164".repeat(n),
+    underscores: (n) => "0912_".repeat(n / 5),
+    fullwidthSpaced: (n) => "\uff10\uff19\uff11\uff12\u3000".repeat(n / 5),
+    commas: (n) => "0912,".repeat(n / 5),
+  };
+  for (const [name, make] of Object.entries(makers)) {
+    assertLinear(`${name} redactPii`, make, redactPii);
+    assertLinear(`${name} safePreview`, make, (t) => safePreview(t, 400, { alreadyCut: true }));
   }
 });
 

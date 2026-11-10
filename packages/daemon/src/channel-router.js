@@ -68,7 +68,7 @@ function parseCommand(text) {
 }
 
 /** A display name goes into the PM's prompt: no brackets or line breaks to fake another speaker. */
-const safeName = (name) => String(name ?? "").replace(/[\[\]\r\n]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40);
+const safeName = (name) => clip(String(name ?? "").replace(/[\[\]\r\n]/g, " ").replace(/\s+/g, " ").trim(), 40);
 
 function realOr(p) {
   try {

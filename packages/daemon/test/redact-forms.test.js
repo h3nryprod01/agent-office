@@ -2,6 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { redactPii } from "../src/redact-pii.js";
+import { assertLinear } from "./helpers/linear.js";
+
 
 const FORMS = [
   ["plain spaces", "0912 345 678", "phone"],
@@ -68,21 +70,16 @@ for (const text of KEEP) {
   });
 }
 
-test("100k characters of mixed text in under 100 ms (ASCII, Vietnamese, digits, separators)", () => {
-  const samples = [
-    "lorem ipsum dolor sit amet ".repeat(4000),
-    "Khách hàng đã gọi lại để hỏi giá căn hộ ".repeat(2500),
-    "1".repeat(100000),
-    "0 ".repeat(50000),
-    "0912-".repeat(20000),
-    "a.".repeat(50000),
-    "​".repeat(100000),
-    "０１２３".repeat(25000),
-  ];
-  for (const s of samples) {
-    const t0 = performance.now();
-    redactPii(s);
-    const ms = performance.now() - t0;
-    assert.ok(ms < 100, `${ms.toFixed(0)} ms for ${JSON.stringify(s.slice(0, 12))}…`);
-  }
+test("time grows linearly with length, for mixed ASCII, Vietnamese, digit and separator text", () => {
+  const makers = {
+    ascii: (n) => "lorem ipsum dolor sit amet ".repeat(Math.ceil(n / 27)),
+    vietnamese: (n) => "Khách hàng đã gọi lại để hỏi giá căn hộ ".repeat(Math.ceil(n / 40)),
+    digits: (n) => "1".repeat(n),
+    zeros: (n) => "0 ".repeat(n / 2),
+    dashes: (n) => "0912-".repeat(n / 5),
+    dots: (n) => "a.".repeat(n / 2),
+    invisible: (n) => "\u200b".repeat(n),
+    fullwidth: (n) => "\uff10\uff11\uff12\uff13".repeat(n / 4),
+  };
+  for (const [name, make] of Object.entries(makers)) assertLinear(name, make, redactPii);
 });
