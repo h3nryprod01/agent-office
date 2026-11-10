@@ -99,6 +99,13 @@ test("home: missing-but-creatable or writable → ok, and doctor itself creates 
   assert.ok(r.fix);
 });
 
+test("deps: an npm-installed package keeps ws in the package root node_modules, not packages/daemon", async () => {
+  const repo = tmp();
+  fs.mkdirSync(path.join(repo, "node_modules", "ws"), { recursive: true });
+  const results = await runChecks(env({ repo }));
+  assert.equal(byId(results, "deps").status, "ok");
+});
+
 test("deps and build: missing → warn with the one command that fixes both", async () => {
   const e = env({ repo: tmp() });
   const results = await runChecks(e);

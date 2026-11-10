@@ -22,6 +22,8 @@
     "scripts/install-daemon-service-linux.sh",
     "scripts/install-daemon-service.ps1",
     "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "PRIVACY.md",
     "README.md",
     "README.vi.md"
   ],

@@ -55,7 +55,7 @@ This document says what Agent Office reads, writes and sends, checked against th
 
 ## 4. If you turn on Telegram or Zalo
 
-The Telegram channel starts when `TELEGRAM_BOT_TOKEN` is set. The one-way alert to your own chat needs `TELEGRAM_CHAT_ID` as well. The Zalo channel starts only when `ZALO_OA_TOKEN`, `ZALO_APP_ID` and `ZALO_OA_SECRET` are all set. These messages are sent unredacted: the credential masking in section 2 applies only to the audit file, not to what is sent to chat.
+The Telegram channel starts when `TELEGRAM_BOT_TOKEN` is set. The one-way alert to your own chat needs `TELEGRAM_CHAT_ID` as well. The Zalo channel starts only when `ZALO_OA_TOKEN`, `ZALO_APP_ID` and `ZALO_OA_SECRET` are all set. By default these messages are sent unredacted: the credential masking in section 2 applies only to the audit file, not to what is sent to chat. The exception is the personal-data shield: when any project sets `policy.piiGuard: true`, every message sent to a chat that receives that project's traffic, and to the operator's own chat, first has Vietnamese phone numbers, CCCD/CMND numbers and e-mail addresses masked by pattern (the last 2–3 characters are kept), and any text that was shortened has its half-cut last word dropped. The shield does not mask names or addresses, and it does not change what agents send to their model provider. Details and limits: [docs/multi-pm-telegram.md](docs/multi-pm-telegram.md).
 
 ### Sent out
 

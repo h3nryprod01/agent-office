@@ -180,7 +180,8 @@ export async function runChecks({
   }
 
   if (!preflight) {
-    const wsInstalled = fs.existsSync(path.join(repo, "packages", "daemon", "node_modules", "ws"));
+    // a clone installs into packages/daemon; the npm package installs its dependencies at the package root
+    const wsInstalled = ["packages/daemon/node_modules/ws", "node_modules/ws"].some((p) => fs.existsSync(path.join(repo, p)));
     add(
       wsInstalled
         ? { id: "deps", status: "ok", title: "daemon dependencies installed" }

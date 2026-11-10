@@ -34,7 +34,7 @@ Gói `npx` một lệnh đã được dựng và kiểm từ tarball cục bộ 
 ## Nó làm được gì
 
 - **Hàng đợi "đang chờ bạn"** — agent bị chặn, đang chờ và gặp lỗi, gom từ mọi repo, kèm thông báo của hệ điều hành. [Mission Control](docs/mission-control-status.md)
-- **Duyệt yêu cầu cấp quyền** ngay trong văn phòng hoặc bằng nút trên Telegram. Cần hook `PermissionRequest`; hiện cài hook còn làm tay. [Approve gateway](docs/approve-spike-status.md) · [Telegram](docs/multi-pm-telegram.md)
+- **Duyệt yêu cầu cấp quyền** ngay trong văn phòng hoặc bằng nút trên Telegram. Cần hook `PermissionRequest`: lệnh `node scripts/ao.mjs approvals setup` thêm hook (có sao lưu và `--dry-run`) và ghép cặp bot Telegram. Đã thử với máy chủ Telegram giả, chưa thử với bot thật. Mỗi dự án có thể bật lá chắn dữ liệu cá nhân để che số điện thoại, số CCCD/CMND và email trong tin nhắn. [Approve gateway](docs/approve-spike-status.md) · [Telegram](docs/multi-pm-telegram.md)
 - **Chế độ duyệt theo từng dự án** có nhật ký kiểm toán, cùng quy tắc dữ liệu theo dự án. [Chính sách duyệt](docs/approval-policy.md)
 - **Số đo thời gian chờ** (trung vị, p90, số lần) và radar báo khi hai agent cùng sửa một file. [Radar](docs/radar.md)
 - **Văn phòng** — nhân vật đi tới bàn làm việc, giá sách, máy arcade hoặc bàn họp tuỳ việc đang làm; sơ đồ tổ chức và toà nhà mỗi repo một tầng. [Ánh xạ ngữ nghĩa](docs/semantic-mapping.md)
@@ -65,6 +65,7 @@ Cách kiểm và ngày kiểm từng nguồn: [docs/adapters-verified.md](docs/a
 - Nó đọc transcript trong thư mục home của bạn và không ghi vào đó. Nó chỉ ghi trạng thái của chính nó: `~/.agent-office`; bản sao lưu ở `~/agent-office-backups`; file phiên của PM trong `.claude/memory/` của thư mục làm việc (chính repo khi chạy từ bản clone, `~/.agent-office/workspace` khi chạy từ gói npm); và nếu bạn cài hook tuỳ chọn thì có log hook ở `~/.claude/agent-office-hook-events.jsonl`.
 - Kết nối mạng dựng sẵn của daemon chỉ có cho Telegram và Zalo, và chúng tắt cho tới khi bạn đặt token.
 - Nó chỉ nghe trên `127.0.0.1` trừ khi bạn bật chế độ LAN, khi đó mọi yêu cầu không phải từ máy này đều cần token. HTTP trần trong LAN nghĩa là token có thể bị nghe lén; đọc [SECURITY.md](SECURITY.md) trước khi mở cổng ra ngoài.
+- Đọc gì, lưu gì, gửi gì ra khỏi máy: [PRIVACY.md](PRIVACY.md). Giấy phép bên thứ ba: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Giới hạn đã biết
 
