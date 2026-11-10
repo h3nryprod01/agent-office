@@ -6,6 +6,8 @@
 // title can never inject formatting or links). The time-to-intervene line comes from the
 // radar lane's GET /metrics/intervention when that endpoint exists; if it does not, or
 // answers in a shape we do not recognise, the line is simply left out.
+import { clip } from "./approvals.js";
+
 
 const DEFAULT_TIME = { h: 18, m: 0 };
 const TITLE_LIMIT = 5;
@@ -27,7 +29,7 @@ const localDate = (ms) => {
 /** One line out of whatever the radar returns, or null when there is nothing usable. */
 export function describeMetrics(metrics) {
   if (!metrics || typeof metrics !== "object") return null;
-  if (typeof metrics.summary === "string" && metrics.summary) return metrics.summary.slice(0, 200);
+  if (typeof metrics.summary === "string" && metrics.summary) return clip(metrics.summary, 200);
   const ms = [metrics.medianMs, metrics.p50Ms, metrics.avgMs].find((v) => Number.isFinite(v));
   if (ms === undefined) return null;
   const minutes = Math.max(1, Math.round(ms / 60_000));

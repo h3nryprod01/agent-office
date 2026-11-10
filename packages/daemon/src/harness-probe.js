@@ -13,6 +13,7 @@ import { accessSync, constants } from "node:fs";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { binCandidates, commonBinDirs, cliSpawnOptions } from "./platform.js";
+import { isCrossSiteRequest } from "./origin-guard.js";
 
 // The daemon runs under a service manager (launchd on macOS, a Scheduled Task on
 // Windows) with a bare PATH, so a PATH-only scan reports codex/gemini/claude as
@@ -149,7 +150,8 @@ const CACHE_TTL_MS = 60_000;
  *   per call (cheap PATH check); loggedIn is the cached probe result if still
  *   valid, else null (not yet probed). NEVER spawns here.
  * GET /harnesses?probe=<key> → runs probeLoggedIn for that harness (if
- *   installed), caches it, returns the full list. Unknown key → 400.
+ *   installed), caches it, returns the full list. Unknown key → 400. A request a
+ *   page on another site caused (Sec-Fetch-Site cross-site/same-site) → 403.
  *
  * @param {{probeFn?: Function, checkInstalledFn?: Function}} opts
  *   probeFn / checkInstalledFn default to the real implementations; tests
@@ -199,6 +201,12 @@ export function createHarnessHttpHandler({
       return true;
     }
 
+    // A probe spawns the harness CLI (gemini sends a real prompt). A request with no
+    // Origin gets past the origin guard, so refuse one a page on another site caused.
+    if (isCrossSiteRequest(req)) {
+      respond(res, 403, { error: "cross-site request refused" });
+      return true;
+    }
     const harness = HARNESSES.find((h) => h.key === probeKey);
     if (!harness) {
       respond(res, 400, { error: "unknown harness" });

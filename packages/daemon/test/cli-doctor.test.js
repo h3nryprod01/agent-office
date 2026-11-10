@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { runChecks, formatReport, exitCode } from "../src/cli/doctor.js";
 
 function tmp() {
@@ -97,6 +98,42 @@ test("home: missing-but-creatable or writable → ok, and doctor itself creates 
   assert.equal(r.status, "fail");
   assert.equal(r.blocking, true);
   assert.ok(r.fix);
+});
+
+const fakeWs = (dir) => {
+  fs.mkdirSync(path.join(dir, "ws"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "ws", "package.json"), JSON.stringify({ name: "ws", main: "index.js" }));
+  fs.writeFileSync(path.join(dir, "ws", "index.js"), "");
+};
+
+test("deps: found wherever node would resolve ws from the daemon (clone, global package, npx layout)", async () => {
+  const clone = tmp();
+  fakeWs(path.join(clone, "packages", "daemon", "node_modules"));
+  assert.equal(byId(await runChecks(env({ repo: clone })), "deps").status, "ok");
+
+  const globalPkg = tmp();
+  fakeWs(path.join(globalPkg, "node_modules"));
+  assert.equal(byId(await runChecks(env({ repo: globalPkg })), "deps").status, "ok");
+
+  const prefix = tmp(); // npm install x.tgz / npx: ws sits next to the package, not inside it
+  const pkg = path.join(prefix, "node_modules", "agent-office-app");
+  fs.mkdirSync(pkg, { recursive: true });
+  fakeWs(path.join(prefix, "node_modules"));
+  assert.equal(byId(await runChecks(env({ repo: pkg })), "deps").status, "ok");
+});
+
+test("deps: NODE_PATH does not count (the daemon imports ws as ESM, which ignores it)", () => {
+  // NODE_PATH is read once at process start, so check it in a fresh process
+  const elsewhere = tmp();
+  fakeWs(elsewhere);
+  const doctor = new URL("../src/cli/doctor.js", import.meta.url).href;
+  const code = `const { runChecks } = await import(${JSON.stringify(doctor)});
+    const r = await runChecks({ repo: ${JSON.stringify(tmp())}, home: ${JSON.stringify(path.join(tmp(), ".agent-office"))},
+      platform: "linux", nodeVersion: "v22.1.0", env: {}, port: 8787, totalmem: 16 * 2 ** 30,
+      which: (bin) => ({ installed: true, path: "/usr/bin/" + bin }), probePort: async () => "free", exec: () => ({ status: 0, stdout: "" }) });
+    process.stdout.write(r.find((x) => x.id === "deps").status);`;
+  const out = spawnSync(process.execPath, ["--input-type=module", "-e", code], { env: { ...process.env, NODE_PATH: elsewhere }, encoding: "utf8" });
+  assert.equal(out.stdout, "warn", out.stderr);
 });
 
 test("deps and build: missing → warn with the one command that fixes both", async () => {

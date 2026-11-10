@@ -37,13 +37,35 @@ scenario, and `?stress=30` adds 30 characters for a perf check.
 ## Before you open a PR
 
 ```bash
-npm --prefix packages/daemon test         # node --test, 241 tests
-npm --prefix packages/renderer test       # vitest, 311 tests
+npm --prefix packages/daemon test         # node --test
+npm --prefix packages/renderer test       # vitest
 npm --prefix packages/renderer run build  # tsc --noEmit && vite build
 ```
 
 All three must pass. CI runs the same commands on Node 20 and 22, plus
 shellcheck over `scripts/*.sh`.
+
+## Sign off your commits (DCO)
+
+Every commit in a pull request must carry a `Signed-off-by` line. It is your statement
+that you have the right to submit the change under this project's license (MIT), in the
+terms of the [Developer Certificate of Origin 1.1](https://developercertificate.org/).
+Add it with `git commit -s`, or fix an existing commit with `git commit --amend -s`
+(`git rebase --signoff main` for several). The line must use your real name and an
+address you control; a GitHub noreply address is fine.
+
+```text
+Signed-off-by: Your Name <you@users.noreply.github.com>
+```
+
+The sign-off certifies where the code came from. It does not change the license, and it
+gives the maintainer no extra rights over your contribution beyond what the MIT license
+already grants everyone. There is no CI check for it yet, so a missing line will be asked
+for in review.
+
+## Conduct
+
+Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## The leak gate
 

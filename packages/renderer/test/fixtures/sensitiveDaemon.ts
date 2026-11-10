@@ -131,6 +131,17 @@ export function fakeFetch(now: number): (input: RequestInfo | URL, init?: Reques
         return json({ version: 1, updated: null, departments: [{ name: "initech-sales", budgetUsdPerDay: 5, members: [{ name: "Maria Gonzalez", role: "Acme Corp billing specialist", hired: null, source: null, cv: null }] }] });
       case "/templates":
         return json([{ name: "acme-onboarding", departments: [{ name: "globex-ops", memberCount: 2 }], memberTotal: 2, hasGoals: true, missingSkills: ["initech-skill"] }]);
+      case "/metrics/intervention": {
+        const st = (count: number, totalMs: number) => ({ count, medianMs: 1000, p90Ms: 2000, totalMs });
+        return json({
+          generatedAt: now, window: { from: "2026-10-21", to: "2026-10-27", days: 7 }, filters: { project: null, kind: null },
+          total: st(5, 9000), byKind: { waiting_permission: st(5, 9000) }, anyRecords: true,
+          longest: { durationMs: 4000, kind: "waiting_permission", project: "acme-web", harness: "claude-code", endTs: now },
+          permission: { count: 5, denied: 1, denyRate: 0.2 }, autoApproved: null,
+          byProject: { "acme-web": st(3, 6000), "globex-api": st(2, 3000) },
+          byHarness: [{ harness: "claude-code", ...st(5, 9000) }],
+        });
+      }
       case "/approvals":
         return json({ items: [] });
       case "/chat":

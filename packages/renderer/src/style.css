@@ -2102,6 +2102,53 @@ body:not([data-view="office"]) .iv-panel {
   color: #94a3b8;
 }
 
+.iv-panel .iv-facts {
+  margin-bottom: 6px;
+  color: #94a3b8;
+}
+
+.iv-panel h3 {
+  font-size: 11px;
+  font-weight: 600;
+  margin: 8px 0 2px;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.iv-panel .iv-rows {
+  list-style: none;
+}
+
+.iv-panel .iv-rows li {
+  margin: 2px 0;
+  color: #94a3b8;
+}
+
+.iv-panel .iv-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.iv-panel .iv-actions button {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.iv-panel .iv-actions button.on {
+  border-color: #64748b;
+  color: #f8fafc;
+}
+
+.iv-panel .iv-share {
+  margin-left: auto;
+}
+
 .side-panel .session-actions .v {
   display: flex;
   flex-wrap: wrap;
@@ -3356,3 +3403,27 @@ body[data-clean="on"] #chat-box {
   border-radius: 8px;
   pointer-events: none;
 }
+
+/* lane I: first-run offer and the always-on sample-data label */
+.first-run {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 65;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  max-width: min(640px, calc(100vw - 32px));
+  background: #0f172a;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.first-run[hidden] { display: none; }
+.first-run[data-mode="demo"] { border-color: #f59e0b; }
+.first-run[data-mode="demo"] strong { color: #fbbf24; letter-spacing: 0.06em; }
+.first-run button { cursor: pointer; }

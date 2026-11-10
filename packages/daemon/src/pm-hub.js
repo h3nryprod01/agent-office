@@ -17,6 +17,7 @@ import path from "node:path";
 
 import { ChatSessionManager } from "./chat-session.js";
 import { makeEvent } from "./event-schema.js";
+import { clip } from "./approvals.js";
 import { DEFAULT_PROJECTS_DIR, listProjects, readProject } from "./projects.js";
 
 export const MAX_QUEUE = 5;
@@ -230,8 +231,8 @@ export class PmHub {
     pm.active = null;
     pm.unread += 1;
     pm.lastAt = this.now();
-    pm.lastText = text.slice(0, 200);
-    pm.lastError = error ? text.slice(0, 200) : null;
+    pm.lastText = clip(text, 200);
+    pm.lastError = error ? clip(text, 200) : null;
     try {
       req.onReply?.({ text, error });
     } catch (err) {

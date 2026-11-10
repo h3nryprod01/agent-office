@@ -126,6 +126,7 @@ export async function runUpdate({
   health = waitForDaemon,
   swap = swapDist,
   fsx = realFs,
+  realpath = (p) => fs.realpathSync(p),
   cleanup = (dir) => fs.rmSync(path.join(dir, "dist.next"), { recursive: true, force: true }),
   homeExists = (p) => fs.existsSync(p),
   log = console.log,
@@ -154,6 +155,22 @@ export async function runUpdate({
 
   const status = git("status", "--porcelain");
   if (status.status !== 0) throw new UpdateError(`${repo} is not a git checkout — update needs the cloned repository.`);
+  // `git status` also succeeds when the install merely sits INSIDE another repo (a global
+  // install under an nvm directory that is itself a git checkout): pulling there would
+  // update the wrong repository. Require the checkout to be its own top level.
+  const top = git("rev-parse", "--show-toplevel");
+  let ownRoot = false;
+  try {
+    ownRoot = top.status === 0 && realpath(top.stdout.trim()) === realpath(repo);
+  } catch {
+    // unresolvable path: treat as not our own checkout
+  }
+  if (!ownRoot) {
+    throw new UpdateError(
+      `${repo} is not the root of its own git checkout (it sits inside another repository, or is an installed package), so \`update\` will not pull.\n` +
+        "  Installed from npm?  npm install -g waitchime@latest",
+    );
+  }
   if (status.stdout.trim() !== "") {
     throw new UpdateError(
       "This checkout has local changes, so `update` will not pull over them.\n" +

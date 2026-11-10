@@ -31,6 +31,7 @@ import { openTerminalFor, sessionActions } from "./ui/sessionActions";
 import { mountToast } from "./ui/toast";
 import { RadarStore } from "./ui/radar"; // lane L4
 import { mountInterventionStats, type InterventionSummary } from "./ui/interventionStats"; // lane L4
+import { downloadShareImage } from "./ui/waitShare"; // lane R
 import { mountOfficeTabs, TAB_ALL, type TabKey } from "./ui/officeTabs";
 import { mountTimelineBar, type ReplayView } from "./ui/timelineBar";
 import { mountChatBox, type ChatBoxHandle } from "./ui/chatBox";
@@ -47,6 +48,7 @@ import { PolicyAlertsStore } from "./ui/policyAlerts";
 import { mountPolicyPanel, type AuditRow, type PolicyBody, type PolicyPanelHandle, type ProjectPolicy } from "./ui/policyPanel";
 // lane L9: presentation mode (data-layer masking)
 import { installPresentationMode, isPresentationMode, mountCleanHud, mountPresentationToggle } from "./presentation";
+import { mountFirstRun, withoutDemo } from "./ui/firstRun"; // lane I
 
 /** "" = the All tab's office; otherwise the repo name. */
 const ALL_KEY = "";
@@ -528,8 +530,11 @@ async function boot(): Promise<void> {
     const ivRoot = document.createElement("div");
     ivRoot.id = "intervention-stats";
     document.body.appendChild(ivRoot);
-    mountInterventionStats(ivRoot, (): Promise<InterventionSummary> =>
-      fetch("/metrics/intervention?days=7").then((r) => r.json()),
+    mountInterventionStats(
+      ivRoot,
+      (days): Promise<InterventionSummary> => fetch(`/metrics/intervention?days=${days}`).then((r) => r.json()),
+      // Present mode on: the summary arrived already aliased, so project rows may go in the image
+      (summary) => downloadShareImage(summary, { showProjects: isPresentationMode() }),
     );
   }
 
@@ -622,7 +627,7 @@ async function boot(): Promise<void> {
       }
     }
     queue.render(current());
-    notifier.sync(current());
+    notifier.sync(withoutDemo(current())); // lane I: the labelled sample must never raise an OS toast or dock badge
     sidePanel.render(current(), replayView?.now);
     tabs.render(current());
   }, 250);
@@ -656,6 +661,8 @@ async function boot(): Promise<void> {
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+
+  if (useWs) mountFirstRun({ getState: () => state, setState: (s) => { state = s; }, resetTab: () => tabs.select(TAB_ALL) }); // lane I: labelled sample when nothing real runs
 
   // debug handle for dev-tools poking; not part of the public surface
   (window as unknown as Record<string, unknown>).__office3d = office3d;

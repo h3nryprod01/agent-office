@@ -91,6 +91,9 @@ export async function sendWithToken(token, userId, text, { fetchFn = fetch } = {
   }
 }
 
+// NOTE (lane A): this legacy bridge (`sendMessage`, `startZaloBridge`-style callers below) is NOT wired in index.js;
+// Zalo goes through zalo-channel.js and multi-pm.js, which mask. If it is ever wired in again, every send MUST go
+// through PiiGuard (pii-guard.js): this path sends unmasked.
 /**
  * One PM turn: send `text`, collect the streamed assistant reply, restore the
  * broadcast wrap when the turn is done. Mirrors telegram.js's inline bridge —

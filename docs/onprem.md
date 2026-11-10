@@ -23,7 +23,34 @@ Vietnamese version: [onprem.vi.md](onprem.vi.md).
 
 Agent Office itself sends nothing to anyone. The only things that leave the machine
 are what the agent CLIs send to their own vendors, and the optional Telegram/Zalo
-bridges if you configure them.
+bridges if you configure them. [PRIVACY.md](../PRIVACY.md) lists exactly what is read,
+written and sent.
+
+### Whose Claude account
+
+Claude Code's terms are Anthropic's, not this project's. Anthropic's page
+[Legal and compliance](https://code.claude.com/docs/en/legal-and-compliance) (read on
+2026-11-10; it changes, read it again) is the source for what follows. This is not legal
+advice.
+
+* **Each organisation uses its own account.** The people who use the office sign in to
+  Claude Code with their own plan, or the organisation provides its own Anthropic API
+  key or cloud-provider credentials.
+* **If you install this for someone else, do not pay for their Claude usage, resell it,
+  or route it through your own login.** That page says customers may not pay for,
+  resell or intermediate Claude usage on their end users' behalf, and that each end user
+  authenticates with their own credentials. Do not modify the Claude Code binary.
+* **If you charge for a deployment, use an API key issued in the client's own name.**
+  This is Agent Office's recommendation, not a quote: the page says developers building
+  products on Claude should use API-key authentication and may not route requests
+  through Free, Pro, Max or Ultra plan credentials on behalf of their users. The page
+  does not say whether a paid service that drives the client's own `claude` CLI under
+  their subscription falls under that. Until Anthropic answers you in writing, use the
+  client's API key.
+* **Your own use on your own machine with your own plan is unchanged.**
+* **Do not use the names or logos "Claude Code" or "Anthropic" in your product, feature or company name, or in a way that suggests Anthropic endorses you.** The page allows saying in plain text that something runs Claude Code; other uses fall under Anthropic's [Trademark Guidelines](https://www.anthropic.com/legal/trademark-guidelines).
+* Codex CLI and Gemini CLI have their own terms; read them the same way (not checked
+  here).
 
 Not sure you have everything? Install first, then run the checker (section 2): it
 tells you what is missing and the exact command that fixes it.
@@ -303,6 +330,26 @@ Run `doctor` first. It covers most of this table.
 | `update` says "local changes" | You edited files in the checkout. `git stash` them, then run `update`. |
 | Port 8787 already in use | `doctor` shows what holds it. Stop that program, or run on another port with `DAEMON_WS_PORT`. The optional hooks in your own Claude Code settings run in your shell, not the service: give them the port too, e.g. `AGENT_OFFICE_PORT=8788 node …/approve-gateway.mjs`. |
 | `claude` is installed but the office says it isn't | The service has a smaller PATH than your terminal. Re-install the service from a terminal where `claude` works: macOS `./scripts/install-daemon-service.sh`, Linux `./scripts/install-daemon-service-linux.sh`, Windows `scripts\install-daemon-service.ps1`. |
+
+## 8. Optional: spoken Vietnamese answers (VieNeu)
+
+By default the office speaks with your browser's own voices and needs nothing installed.
+Vietnamese answers use a local model (VieNeu, run by a Python worker behind `POST /tts`)
+only if you set one up yourself: a Python environment that has the `vieneu` package,
+pointed to by `VIENEU_PYTHON` (or a `.venv-tts` folder at the repository root). Without
+it `/tts` answers 503 and the office falls back to the browser voice.
+
+**Read the licence of the model weights before you turn this on, especially in anything
+you sell.** The `vieneu` code is Apache-2.0, but the weights are licensed per model, and
+the variants differ. On 2026-11-10 the Hugging Face pages of the `pnnbao-ump` author
+showed Apache-2.0 for several models (for example VieNeu-TTS-0.3B, VieNeu-TTS-v2-Turbo,
+the 0.5B GGUF) and CC BY-NC 4.0, which forbids commercial use, for the 0.3B GGUF
+quantisations (`VieNeu-TTS-0.3B-q4-gguf`, `-q8-gguf`). An earlier revision of the 0.3B
+card also stated a commercial licence fee. Which model the `vieneu` version you install
+loads by default was not checked. Open the official model card of the exact model your
+install downloads, and do not enable this voice in a deployment you charge for until you
+have confirmed it allows commercial use. The sample voice file in `docs/media` is a demo
+recording, not a licence.
 
 ## What has and has not been tested
 

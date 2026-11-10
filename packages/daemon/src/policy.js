@@ -24,6 +24,9 @@ function invalid(message) {
   return err;
 }
 
+/** lane A: ONE rule for the PII shield flag everywhere: anything except absent, null or false is ON (a hand-written "true" or 1 included). */
+export const shieldOn = (v) => v !== undefined && v !== null && v !== false;
+
 const isPlainObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 
 /** The transcript tailers say "claude-code"; the shared contract says "claude". */
@@ -62,6 +65,9 @@ export function normalizePolicy(raw) {
     },
     allowedHarnesses: cleanList(p.allowedHarnesses),
     allowedLanes: cleanList(p.allowedLanes),
+    // lane A: any value but absent/null/false switches the shield on (see shieldOn). An explicit `false` is kept (it is how an owner says "off", see
+    // PolicyStore.setPolicy); the key is absent when the policy never mentioned it, so older policies keep their exact shape
+    ...(p.piiGuard !== undefined && p.piiGuard !== null ? { piiGuard: shieldOn(p.piiGuard) } : {}),
   };
 }
 
@@ -69,7 +75,7 @@ export function normalizePolicy(raw) {
 export function validatePolicy(input) {
   if (!isPlainObject(input)) throw invalid("policy must be an object");
   for (const key of Object.keys(input)) {
-    if (!["approval", "allowedHarnesses", "allowedLanes"].includes(key)) throw invalid(`policy: unknown field "${key}"`);
+    if (!["approval", "allowedHarnesses", "allowedLanes", "piiGuard"].includes(key)) throw invalid(`policy: unknown field "${key}"`);
   }
   if (input.approval !== undefined) {
     if (!isPlainObject(input.approval)) throw invalid("policy.approval must be an object");
@@ -85,6 +91,7 @@ export function validatePolicy(input) {
       }
     }
   }
+  if (input.piiGuard !== undefined && typeof input.piiGuard !== "boolean") throw invalid("policy.piiGuard must be true or false");
   for (const field of ["allowedHarnesses", "allowedLanes"]) {
     const list = input[field];
     if (list === undefined || list === null) continue;
@@ -172,5 +179,8 @@ export function requiredRole(before, after) {
   }
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   if (!same(before.allowedHarnesses, after.allowedHarnesses) || !same(before.allowedLanes, after.allowedLanes)) return "owner";
+  // the shield coming off lets personal data out. Only an EXPLICIT false counts: a save that does not mention the
+  // flag (an older settings panel) leaves it on, because PolicyStore.setPolicy keeps it
+  if (before.piiGuard === true && after.piiGuard === false) return "owner";
   return "manager";
 }

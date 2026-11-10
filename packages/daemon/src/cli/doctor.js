@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { checkInstalled } from "../harness-probe.js";
 import { AccessStore, agentOfficeHome } from "../access.js";
+import { checkAdapters } from "./adapter-check.js";
 
 const MIN_NODE_MAJOR = 20;
 const MIN_RAM_GB = 4;
@@ -70,6 +71,14 @@ function serviceInstalled({ platform, exec }) {
  * @param {object} [o] every field is injectable for tests
  * @returns {Promise<{id: string, status: string, title: string, detail?: string, fix?: string, blocking?: boolean}[]>}
  */
+/** True when `node_modules/<name>` exists in `dir` or any folder above it (Node's ESM package lookup). */
+function hasPackageUp(dir, name) {
+  for (let d = path.resolve(dir); ; d = path.dirname(d)) {
+    if (fs.existsSync(path.join(d, "node_modules", name))) return true;
+    if (path.dirname(d) === d) return false;
+  }
+}
+
 export async function runChecks({
   platform = process.platform,
   nodeVersion = process.version,
@@ -82,6 +91,7 @@ export async function runChecks({
   probePort: probe = probePort,
   exec = defaultExec,
   preflight = false,
+  adapters = checkAdapters,
 } = {}) {
   const out = [];
   const add = (r) => out.push(r);
@@ -132,6 +142,12 @@ export async function runChecks({
     }
   }
 
+  // --- can the adapters still read what the agents write today? (needs a known home: tests that pass env {} skip it)
+  const userHome = env.HOME ?? env.USERPROFILE;
+  if (!preflight && userHome) {
+    for (const r of await adapters({ homeDir: userHome, env })) add(r);
+  }
+
   // --- port
   const portState = await probe(port);
   if (portState === "free") add({ id: "port", status: "ok", title: `port ${port} is free` });
@@ -172,7 +188,9 @@ export async function runChecks({
   }
 
   if (!preflight) {
-    const wsInstalled = fs.existsSync(path.join(repo, "packages", "daemon", "node_modules", "ws"));
+    // look where the daemon's ESM `import "ws"` looks: node_modules in packages/daemon and every folder above it
+    // (a clone has it in packages/daemon, the npm package next to or above itself); NODE_PATH does not count for ESM
+    const wsInstalled = hasPackageUp(path.join(repo, "packages", "daemon"), "ws");
     add(
       wsInstalled
         ? { id: "deps", status: "ok", title: "daemon dependencies installed" }

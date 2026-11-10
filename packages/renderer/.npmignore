@@ -1,0 +1,2 @@
+# npm ignores the .gitignore dist otherwise; the root files[] whitelist decides what ships
+node_modules

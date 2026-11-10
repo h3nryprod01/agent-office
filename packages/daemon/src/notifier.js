@@ -17,6 +17,7 @@
 import { execFile } from "node:child_process";
 import { isWindows, isLinux, notifyCommand } from "./platform.js";
 import { sendMessage } from "./telegram.js";
+import { sharedGuard } from "./pii-guard.js";
 
 const DEFAULT_THRESHOLD_MS = 30_000;
 const DEFAULT_OFFICE_URL = process.env.AGENT_OFFICE_URL ?? "http://localhost:5199";
@@ -142,6 +143,14 @@ const NOTIFIER_CANDIDATES = [
 let notifierIdx = 0;
 
 /**
+ * The Telegram push of a notification goes to the operator's own chat. Lane A: when any project has
+ * `policy.piiGuard`, personal data in it is masked first (the OS notification stays on this machine, unmasked).
+ */
+export function guardedTelegramSend(text, { guard = sharedGuard(), send = sendMessage } = {}) {
+  return send(guard.applyToOperator("telegram", text));
+}
+
+/**
  * Default delivery. Windows → PowerShell balloon (notifyCommand); Linux →
  * notify-send; macOS → terminal-notifier (clickable) → osascript fallback.
  * Every platform also gets a best-effort Telegram push (telegram.js;
@@ -151,7 +160,7 @@ let notifierIdx = 0;
  */
 export function deliverNotification(
   { title, subtitle, message, url },
-  { platform = process.platform, execFileFn = execFile, sendTelegram = sendMessage } = {},
+  { platform = process.platform, execFileFn = execFile, sendTelegram = guardedTelegramSend } = {},
 ) {
   // Secondary channel, right alongside the OS notification below: fire and
   // forget, independent of which platform branch runs or whether it

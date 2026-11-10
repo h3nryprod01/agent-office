@@ -212,3 +212,62 @@ test("bookkeeping lines emit nothing", () => {
     assert.equal(n.normalizeLine(raw).length, 0, JSON.stringify(raw).slice(0, 60));
   }
 });
+
+// Codex Desktop sessions (observed 2026-05 .. 2026-10, cli_version 0.130 .. 0.162 alpha) carry the assistant's
+// text as event_msg/item_completed with item.type "AgentMessage"; they never contain event_msg/agent_message.
+const agentItem = (text, id = "msg_1") =>
+  line("event_msg", {
+    type: "item_completed",
+    thread_id: SID,
+    turn_id: "turn_1",
+    item: { type: "AgentMessage", id, content: [{ type: "Text", text }], phase: "final_answer" },
+    completed_at_ms: 1783000000000,
+  });
+
+test("desktop format: item_completed AgentMessage becomes a speak event", () => {
+  const n = new CodexSessionNormalizer(SID);
+  n.normalizeLine(sessionMeta);
+  const [e] = n.normalizeLine(agentItem("Da sua xong file."));
+  assert.equal(e.type, "speak");
+  assert.equal(e.harness, "codex");
+  assert.match(e.detail, /sua xong/);
+});
+
+test("desktop format: other item_completed kinds and empty text stay silent", () => {
+  const n = new CodexSessionNormalizer(SID);
+  n.normalizeLine(sessionMeta);
+  const other = line("event_msg", { type: "item_completed", item: { type: "CommandExecution", id: "c1", content: [] } });
+  assert.deepEqual(n.normalizeLine(other), []);
+  assert.deepEqual(n.normalizeLine(agentItem("")), []);
+  assert.deepEqual(n.normalizeLine(line("event_msg", { type: "item_completed" })), []);
+});
+
+test("a file that carries the same text in both formats speaks it once", () => {
+  const n = new CodexSessionNormalizer(SID);
+  n.normalizeLine(sessionMeta);
+  const first = n.normalizeLine(line("event_msg", { type: "agent_message", message: "Done." }));
+  const second = n.normalizeLine(agentItem("Done."));
+  assert.equal(first.length, 1);
+  assert.deepEqual(second, []);
+  // ...in the other order too
+  const m = new CodexSessionNormalizer(SID);
+  m.normalizeLine(sessionMeta);
+  assert.equal(m.normalizeLine(agentItem("Done.")).length, 1);
+  assert.deepEqual(m.normalizeLine(line("event_msg", { type: "agent_message", message: "Done." })), []);
+});
+
+test("the same text said twice in one format is still two speaks", () => {
+  const n = new CodexSessionNormalizer(SID);
+  n.normalizeLine(sessionMeta);
+  assert.equal(n.normalizeLine(agentItem("OK", "a")).length, 1);
+  assert.equal(n.normalizeLine(agentItem("OK", "b")).length, 1);
+});
+
+test("the same text said again after a tool call is a new speak, not a cross-format duplicate", () => {
+  const n = new CodexSessionNormalizer(SID);
+  n.normalizeLine(sessionMeta);
+  assert.equal(n.normalizeLine(line("event_msg", { type: "agent_message", message: "Done." })).length, 1);
+  const call = line("response_item", { type: "function_call", call_id: "c9", name: "shell", arguments: "{}" });
+  assert.ok(n.normalizeLine(call).length > 0);
+  assert.equal(n.normalizeLine(agentItem("Done.")).length, 1);
+});
