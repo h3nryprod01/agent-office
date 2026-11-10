@@ -24,7 +24,7 @@ Last updated: `<date>`
 - Other members of a project room can see messages posted in that room.
 - `<Anyone else: your hosting provider, a support contractor.>`
 
-**What the bot sends you.** Alerts that an agent is waiting or failed, approval requests that quote the command or file path waiting for a decision (up to 300 characters), the assistant's replies, project status and item titles, and a daily summary if the project room has one. These can contain parts of the project's code, file paths and work item titles, so only people who may see that should be in the chat.
+**What the bot sends you.** Alerts that an agent is waiting or failed, approval requests that quote the command or file path waiting for a decision (up to 300 characters), the assistant's replies, project status and item titles, and a daily summary if the project room has one. These can contain parts of the project's code, file paths and work item titles, so only people who may see that should be in the chat. If the operator turned on the personal-data shield, phone, ID-card and e-mail numbers in these messages are masked except for their last 2–3 characters; names and addresses are not.
 
 **How long it is kept.** `<Membership data: until you leave the project or ask for removal. Chat history on Telegram: until deleted there.>`
 

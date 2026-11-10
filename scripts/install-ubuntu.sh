@@ -13,9 +13,9 @@ URL="http://127.0.0.1:8787"
 . "$REPO/scripts/_ui.sh"
 parse_yes "$@"
 
-# lane L1: operations verbs go to the ao CLI: ./scripts/install-ubuntu.sh doctor | update | backup | restore | lan | token
+# lane L1: operations verbs go to the ao CLI: ./scripts/install-ubuntu.sh doctor | update | backup | restore | lan | token | report | approvals
 case "${1:-}" in
-  doctor | update | backup | restore | lan | token)
+  doctor | update | backup | restore | lan | token | report | approvals)
     command -v node >/dev/null 2>&1 || die "Node.js 20+ is required: https://nodejs.org/en/download" "Cần Node.js 20+: https://nodejs.org/en/download"
     exec node "$REPO/scripts/ao.mjs" "$@"
     ;;

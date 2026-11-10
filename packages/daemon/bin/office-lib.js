@@ -64,6 +64,12 @@ export function updateRefusal(passthrough, hasGit, pkgName) {
   return `\`update\` works on a git clone. This is an installed package; to update it run: npm i -g ${pkgName}@latest`;
 }
 
+/** `approvals setup` writes this package's hook path into ~/.claude/settings.json: refuse from the npx cache, which npm may delete. */
+export function approvalsRefusal(passthrough, ephemeral, pkgName) {
+  if (!passthrough || passthrough[0] !== "approvals" || passthrough[1] !== "setup" || !ephemeral) return null;
+  return `This copy lives in npm's temporary npx cache; a hook pointing here would break when npm cleans it.\nInstall it first:  npm i -g ${pkgName}  then run  ${pkgName} approvals setup`;
+}
+
 /** [command, args] for the login-service installer; PowerShell spells the switch -Yes. */
 export function serviceCommand(platform, pkgRoot, yes) {
   if (platform === "win32") {

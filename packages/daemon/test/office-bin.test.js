@@ -10,6 +10,7 @@ import {
   browserCommand,
   daemonEnv,
   updateRefusal,
+  approvalsRefusal,
   serviceCommand,
   looksLikeOffice,
 } from "../bin/office-lib.js";
@@ -99,4 +100,12 @@ test("looksLikeOffice: recognises our page, not any other web server", () => {
   assert.equal(looksLikeOffice("<!doctype html><title>Agent Office — renderer skeleton</title>"), true);
   assert.equal(looksLikeOffice("<html><title>Grafana</title></html>"), false);
   assert.equal(looksLikeOffice(""), false);
+});
+
+test("approvalsRefusal: `approvals setup` from the npx cache would point a hook at a folder npm deletes", () => {
+  assert.equal(approvalsRefusal(["approvals", "setup"], false, "pkg"), null);
+  assert.equal(approvalsRefusal(["approvals", "remove"], true, "pkg"), null, "removing is always fine");
+  assert.equal(approvalsRefusal(["doctor"], true, "pkg"), null);
+  assert.equal(approvalsRefusal(undefined, true, "pkg"), null);
+  assert.match(approvalsRefusal(["approvals", "setup", "--dry-run"], true, "pkg"), /npm i(nstall)? -g pkg/);
 });

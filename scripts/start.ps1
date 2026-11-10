@@ -17,7 +17,7 @@
 #Requires -Version 5.1
 [CmdletBinding()]
 param(
-    # lane L1: `start.ps1 doctor|update|backup|restore|lan|token [options]` runs the ao CLI instead of starting
+    # lane L1: `start.ps1 doctor|update|backup|restore|lan|token|report|approvals [options]` runs the ao CLI instead of starting
     [Parameter(Position = 0)][string]$Command = "start",
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest,
     # Must match install-daemon-service.ps1's default; that script registers the
@@ -53,12 +53,12 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     Write-Error (Say "Node.js 20+ is required: winget install OpenJS.NodeJS.LTS" "Can Node.js 20+: winget install OpenJS.NodeJS.LTS")
     exit 1
 }
-if ($Command -in @("doctor", "update", "backup", "restore", "lan", "token")) {
+if ($Command -in @("doctor", "update", "backup", "restore", "lan", "token", "report", "approvals")) {
     & node (Join-Path $Repo "scripts\ao.mjs") $Command @Rest
     exit $LASTEXITCODE
 }
 if ($Command -ne "start") {
-    [Console]::Error.WriteLine("unknown command '$Command' - use: doctor, update, backup, restore, lan, token (or no argument to start)")
+    [Console]::Error.WriteLine("unknown command '$Command' - use: doctor, update, backup, restore, lan, token, report, approvals (or no argument to start)")
     exit 2
 }
 & node (Join-Path $Repo "scripts\ao.mjs") doctor --preflight

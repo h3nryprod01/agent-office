@@ -9,7 +9,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { browserCommand, daemonEnv, isEphemeralInstall, looksLikeOffice, nodeMajorOk, parseArgs, serviceCommand, updateRefusal } from "./office-lib.js";
+import { approvalsRefusal, browserCommand, daemonEnv, isEphemeralInstall, looksLikeOffice, nodeMajorOk, parseArgs, serviceCommand, updateRefusal } from "./office-lib.js";
 
 const PKG_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const PKG_NAME = JSON.parse(readFileSync(path.join(PKG_ROOT, "package.json"), "utf8")).name;
@@ -58,6 +58,8 @@ const exitWith = (child) => child.on("exit", (code, sig) => process.exit(code ??
 
 const refusal = updateRefusal(args.passthrough, existsSync(path.join(PKG_ROOT, ".git")), PKG_NAME);
 if (refusal) die(refusal);
+const approvalsNo = approvalsRefusal(args.passthrough, isEphemeralInstall(PKG_ROOT), PKG_NAME);
+if (approvalsNo) die(approvalsNo);
 
 if (args.passthrough) {
   exitWith(run(process.execPath, [path.join(PKG_ROOT, "scripts", "ao.mjs"), ...args.passthrough]));

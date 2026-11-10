@@ -34,7 +34,7 @@ A one-command `npx` package is built and tested from a local tarball but **is no
 ## What it does
 
 - **Waiting-on-you queue** — blocked, waiting and errored agents listed across every repo, with OS notifications. [Mission Control](docs/mission-control-status.md)
-- **Approve permission requests** from the office or from Telegram buttons. Needs a `PermissionRequest` hook: `node scripts/ao.mjs approvals setup` adds it (with a backup and a `--dry-run`) and pairs a Telegram bot. Tested against a stand-in Telegram server, not yet a live bot. Projects can turn on a personal-data shield that masks phone, ID and e-mail numbers in chat messages. [Approve gateway](docs/approve-spike-status.md) · [Telegram](docs/multi-pm-telegram.md)
+- **Approve permission requests** from the office or from Telegram buttons. Needs a `PermissionRequest` hook: `node scripts/ao.mjs approvals setup` (from the npm package: `<package-name> approvals setup` after `npm i -g`) adds it (with a backup and a `--dry-run`) and pairs a Telegram bot. Tested against a stand-in Telegram server, not yet a live bot. Projects can turn on a personal-data shield that masks phone, ID and e-mail numbers in chat messages. [Approve gateway](docs/approve-spike-status.md) · [Telegram](docs/multi-pm-telegram.md)
 - **Per-project approval modes** with an audit trail, and per-project data rules. [Approval policy](docs/approval-policy.md)
 - **Time-to-intervene numbers** (median, p90, count) and a radar that flags two agents editing the same files. [Radar](docs/radar.md)
 - **The office** — characters walk to a desk, bookshelf, arcade machine or meeting table depending on what they are doing; org chart and one-floor-per-repo building view. [Semantic mapping](docs/semantic-mapping.md)
@@ -62,7 +62,7 @@ How each was checked, and when: [docs/adapters-verified.md](docs/adapters-verifi
 
 ## Privacy and security
 
-- It reads transcripts under your home directory and does not write to them. It writes only its own state: `~/.agent-office`; backups in `~/agent-office-backups`; the PM's session file under `.claude/memory/` of its workspace (the repo when run from a clone, `~/.agent-office/workspace` from the npm package); and, if you install the optional hooks, a hook log at `~/.claude/agent-office-hook-events.jsonl`.
+- It reads transcripts under your home directory and does not write to them. It writes only its own state: `~/.agent-office`; backups in `~/agent-office-backups`; the PM's session file under `.claude/memory/` of its workspace (the repo when run from a clone, `~/.agent-office/workspace` from the npm package); and, if you install the optional hooks, a hook log at `~/.claude/agent-office-hook-events.jsonl`. `approvals setup` edits `~/.claude/settings.json` after asking, with a backup.
 - The daemon's only built-in network clients are for Telegram and Zalo, and they stay off until you set their tokens.
 - It listens on `127.0.0.1` unless you switch on LAN mode, which requires a token for every non-local request. Plain HTTP on a LAN means tokens can be sniffed; read [SECURITY.md](SECURITY.md) before exposing the port.
 - What is read, stored and sent off the machine: [PRIVACY.md](PRIVACY.md). Third-party licences: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

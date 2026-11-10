@@ -20,9 +20,9 @@ parse_yes "$@"
 # buộc để Web Speech / getUserMedia chạy.
 URL="http://localhost:8787"
 
-# lane L1: operations verbs go to the ao CLI: ./scripts/start.sh doctor | update | backup | restore | lan | token
+# lane L1: operations verbs go to the ao CLI: ./scripts/start.sh doctor | update | backup | restore | lan | token | report | approvals
 case "${1:-}" in
-  doctor | update | backup | restore | lan | token)
+  doctor | update | backup | restore | lan | token | report | approvals)
     command -v node >/dev/null 2>&1 || die "Node.js 20+ is required: https://nodejs.org/en/download" "Cần Node.js 20+: https://nodejs.org/en/download"
     exec node "$REPO/scripts/ao.mjs" "$@"
     ;;

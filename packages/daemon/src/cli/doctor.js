@@ -5,6 +5,7 @@
 // failure paths on any OS. It is read-only: nothing on the machine is created or changed.
 
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -180,8 +181,13 @@ export async function runChecks({
   }
 
   if (!preflight) {
-    // a clone installs into packages/daemon; the npm package installs its dependencies at the package root
-    const wsInstalled = ["packages/daemon/node_modules/ws", "node_modules/ws"].some((p) => fs.existsSync(path.join(repo, p)));
+    // resolve ws the way the daemon does at runtime: a clone has it in packages/daemon, the npm package next to or above itself
+    let wsInstalled = true;
+    try {
+      createRequire(path.join(repo, "packages", "daemon", "package.json")).resolve("ws");
+    } catch {
+      wsInstalled = false;
+    }
     add(
       wsInstalled
         ? { id: "deps", status: "ok", title: "daemon dependencies installed" }

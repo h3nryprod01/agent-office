@@ -8,7 +8,7 @@ This document says what Agent Office reads, writes and sends, checked against th
 - The daemon's own code calls out to exactly two hosts, `api.telegram.org` (`TELEGRAM_API_BASE` redirects only the multi-project Telegram channel; stuck-agent alerts always use `api.telegram.org`) and `openapi.zalo.me`, and only after you configure the matching bot or Official Account token.
 - The web app loads no remote script, font, image or stylesheet.
 - Everything else stays on your machine, unless you turn on LAN mode, in which case other devices you authorise can read it.
-- If you turn on Telegram or Zalo, text that was written on your machine (command lines, file paths, agent output, the PM's answers) is sent to those services. Section 4 lists exactly what.
+- If you turn on Telegram or Zalo, text that was written on your machine (command lines, file paths, agent output, the PM's answers) is sent to those services; a project can turn on a personal-data shield that first masks phone, ID-card and e-mail numbers. Section 4 lists exactly what.
 
 ## 1. What it reads from your disk
 
@@ -29,6 +29,7 @@ This document says what Agent Office reads, writes and sends, checked against th
 - `access.json` holds LAN mode state and access tokens as SHA-256 hashes, with file mode 600.
 - `projects/<slug>/project.json` holds a project's name, template, folder, policy, chat bindings and members (display name, role, Telegram/Zalo user id).
 - `projects/<slug>/items.json` holds the project's work items.
+- `projects/<slug>/pii-audit.jsonl` counts how many phone, ID and e-mail values the personal-data shield masked per message, never the values.
 - `projects/<slug>/policy-audit.jsonl` logs each automatic approval decision with the tool name and a 200-character preview of the command in which common credential patterns are replaced by `***`.
 - `projects/<slug>/docs-meta.json` and its version snapshots hold document status, comments and review history.
 - `projects/<slug>/pm-session.json` holds the project PM's Claude session id, folder and time.
@@ -38,6 +39,7 @@ This document says what Agent Office reads, writes and sends, checked against th
 - The default PM's session map is `.claude/memory/pm-session.json` inside the Agent Office checkout, not in the data folder.
 - The Agent Office hook script (`notify.mjs`) appends one line per tool call to `~/.claude/agent-office-hook-events.jsonl`: session id, folder, tool name and tool-use id, and deliberately not the tool's input.
 - `ao backup` writes a `.tar.gz` of the whole data folder to `~/agent-office-backups`.
+- `ao approvals setup` (after asking) adds a `PermissionRequest` hook to `~/.claude/settings.json` and first copies that file to `settings.json.ao-backup-<time>`; `ao approvals remove` takes the hook out the same way.
 - When you save a document or upload a file in the documents page, or create a project, it writes into that project folder.
 - These files are plain JSON and are not encrypted by Agent Office; rely on your operating system's disk encryption and permissions.
 - Pairing codes, pending approvals and rate-limit counters live in memory only and vanish when the daemon stops.
@@ -55,7 +57,7 @@ This document says what Agent Office reads, writes and sends, checked against th
 
 ## 4. If you turn on Telegram or Zalo
 
-The Telegram channel starts when `TELEGRAM_BOT_TOKEN` is set. The one-way alert to your own chat needs `TELEGRAM_CHAT_ID` as well. The Zalo channel starts only when `ZALO_OA_TOKEN`, `ZALO_APP_ID` and `ZALO_OA_SECRET` are all set. By default these messages are sent unredacted: the credential masking in section 2 applies only to the audit file, not to what is sent to chat. The exception is the personal-data shield: when any project sets `policy.piiGuard: true`, every message sent to a chat that receives that project's traffic, and to the operator's own chat, first has Vietnamese phone numbers, CCCD/CMND numbers and e-mail addresses masked by pattern (the last 2–3 characters are kept), and any text that was shortened has its half-cut last word dropped. The shield does not mask names or addresses, and it does not change what agents send to their model provider. Details and limits: [docs/multi-pm-telegram.md](docs/multi-pm-telegram.md).
+The Telegram channel starts when `TELEGRAM_BOT_TOKEN` is set. The one-way alert to your own chat needs `TELEGRAM_CHAT_ID` as well. The Zalo channel starts only when `ZALO_OA_TOKEN`, `ZALO_APP_ID` and `ZALO_OA_SECRET` are all set. By default these messages are sent unredacted: the credential masking in section 2 applies only to the audit file, not to what is sent to chat. The exception is the personal-data shield: when any project sets `policy.piiGuard: true`, every message sent to a chat that receives that project's traffic, and to the operator's own chat, first has Vietnamese phone numbers, CCCD/CMND numbers and e-mail addresses masked by pattern (the last 2–3 characters are kept), and any line marked as cut (ending in "…") has its half-cut last word dropped. If a project's settings cannot be read, every chat is masked. The shield does not mask names or addresses, and it does not change what agents send to their model provider. Details and limits: [docs/multi-pm-telegram.md](docs/multi-pm-telegram.md).
 
 ### Sent out
 

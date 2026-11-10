@@ -6,6 +6,8 @@
 //   restore <archive> [--no-restart]            put an archive back (the current data is moved aside)
 //   lan on|off|status                           let other machines in, with a token
 //   token add|list|revoke                       who may connect, and as what
+//   report [--days N] [--json]                  how long agents waited on you (read-only)
+//   approvals setup|remove                      answer permission prompts from Telegram
 // The shell wrappers (start.sh, start.ps1, install-ubuntu.sh) forward these verbs here.
 
 import path from "node:path";

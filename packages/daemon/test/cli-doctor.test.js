@@ -99,11 +99,26 @@ test("home: missing-but-creatable or writable → ok, and doctor itself creates 
   assert.ok(r.fix);
 });
 
-test("deps: an npm-installed package keeps ws in the package root node_modules, not packages/daemon", async () => {
-  const repo = tmp();
-  fs.mkdirSync(path.join(repo, "node_modules", "ws"), { recursive: true });
-  const results = await runChecks(env({ repo }));
-  assert.equal(byId(results, "deps").status, "ok");
+const fakeWs = (dir) => {
+  fs.mkdirSync(path.join(dir, "ws"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "ws", "package.json"), JSON.stringify({ name: "ws", main: "index.js" }));
+  fs.writeFileSync(path.join(dir, "ws", "index.js"), "");
+};
+
+test("deps: found wherever node would resolve ws from the daemon (clone, global package, npx layout)", async () => {
+  const clone = tmp();
+  fakeWs(path.join(clone, "packages", "daemon", "node_modules"));
+  assert.equal(byId(await runChecks(env({ repo: clone })), "deps").status, "ok");
+
+  const globalPkg = tmp();
+  fakeWs(path.join(globalPkg, "node_modules"));
+  assert.equal(byId(await runChecks(env({ repo: globalPkg })), "deps").status, "ok");
+
+  const prefix = tmp(); // npm install x.tgz / npx: ws sits next to the package, not inside it
+  const pkg = path.join(prefix, "node_modules", "agent-office-app");
+  fs.mkdirSync(pkg, { recursive: true });
+  fakeWs(path.join(prefix, "node_modules"));
+  assert.equal(byId(await runChecks(env({ repo: pkg })), "deps").status, "ok");
 });
 
 test("deps and build: missing → warn with the one command that fixes both", async () => {
