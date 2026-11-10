@@ -15,6 +15,7 @@ import { runChecks, formatReport, exitCode } from "../packages/daemon/src/cli/do
 import { createBackup, restoreBackup, defaultBackupDir } from "../packages/daemon/src/cli/backup.js";
 import { runUpdate, restartCommand, commandLine, defaultRun } from "../packages/daemon/src/cli/update.js";
 import { runAccessCommand, lanAddresses } from "../packages/daemon/src/cli/access-cmd.js";
+import { runReport } from "../packages/daemon/src/cli/report.js";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const home = agentOfficeHome();
@@ -33,6 +34,7 @@ const HELP = `Agent Office
   update [--dry-run]
   backup [--out DIR]          (default ${defaultBackupDir()})
   restore <archive.tar.gz> [--no-restart]
+  report [--days N] [--json] [--dir DIR]   (how long agents waited on you; read-only)
   lan on|off|status
   token add --label <name> --role owner|manager|viewer
   token list | token revoke <id|label>`;
@@ -105,6 +107,8 @@ async function main(argv) {
         return 1;
       }
     }
+    case "report":
+      return runReport(rest);
     case "lan":
     case "token":
       try {
