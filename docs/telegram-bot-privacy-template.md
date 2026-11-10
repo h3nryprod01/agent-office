@@ -41,5 +41,5 @@ Last updated: `<date>`
 ## Putting it in place
 
 1. Host the text at a stable public URL (a page on your site is enough).
-2. In @BotFather, set the policy link for the bot (`/mybots`, choose the bot, Edit Bot, Edit Privacy Policy), as described in section 4 of Telegram's terms. Check the current menu wording in BotFather; it may differ.
+2. In @BotFather, register the policy for the bot, as section 4 of Telegram's terms requires. The menu wording changes; follow what BotFather shows (not checked here).
 3. Put the same link in your customer contract if you run the bot for a client.
