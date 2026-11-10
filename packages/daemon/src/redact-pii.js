@@ -25,7 +25,8 @@ const LONG_PHONE_RE = new RegExp(`${STRONG_START}0[12](?:${SEP}?\\d){9}${STRONG_
 const CCCD_RE = new RegExp(`${STRONG_START}0(?:0[1-9]|[1-8]\\d|9[0-6])(?:${SEP}?\\d){9}${STRONG_END}`, "giu");
 // CMND: exactly 9 plain digits
 const CMND_RE = new RegExp(`${WEAK_START}\\d{9}${WEAK_END}${UNIT}`, "giu");
-const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
+// lengths are bounded (RFC 5321: local part 64, label 63) so a huge run of letters/digits cannot make the scan quadratic
+const EMAIL_RE = /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,8}\.[A-Za-z]{2,24}/g;
 
 const digitsOf = (s) => s.replace(/\D/g, "");
 const tail = (s, n) => s.slice(-n);
@@ -73,10 +74,27 @@ export const emptyCounts = () => ({ phone: 0, id: 0, email: 0 });
 export const totalCount = (c) => c.phone + c.id + c.email;
 
 /**
- * A string that was cut at a fixed length (a 200-character preview) can end halfway through a number:
- * "…call 09123" has no complete phone number for redactPii to find. Drop such a trailing run of digits
- * (3 or more) so a fragment of a number does not travel. Used only on text known to have been truncated.
+ * Text that has been CUT to a length can end halfway through a value ("0912 345 6", "nguyen.van.a@gma"),
+ * and a half value no longer matches any pattern. So after a cut: drop the last (possibly half) word, then
+ * any run of digits/separators left at the end (3+ digits). Uses the same SEP set as the masker.
  */
-export function dropDigitTail(text) {
-  return String(text ?? "").replace(/[+(]?\d[\d ()\u00a0.\-]*\d$/, (tailRun) => (tailRun.replace(/\D/g, "").length >= 3 ? "…" : tailRun));
+const DIGIT_TAIL_RE = new RegExp(`[+(]?\\d(?:[\\d()]|${SEP})*$`, "u");
+export function dropCutTail(text) {
+  const withoutLastWord = String(text ?? "").replace(/\S*$/u, "");
+  // only the last 64 characters can hold a half number: bounds the scan on a huge input
+  const head = withoutLastWord.slice(0, -64 || undefined);
+  const tail = withoutLastWord.slice(-64).replace(DIGIT_TAIL_RE, (run) => (run.replace(/\D/g, "").length >= 3 ? "" : run));
+  return (withoutLastWord.length > 64 ? head + tail : tail).trimEnd();
+}
+
+/**
+ * The one way to shorten text that is about to leave the machine: MASK THE WHOLE TEXT FIRST, then cut, so a
+ * value can never straddle the cut. If a cut happened (or the text arrives already cut by an earlier step,
+ * `alreadyCut`) the tail is dropped as above.
+ */
+export function safePreview(text, max, { alreadyCut = false } = {}) {
+  const masked = redactPii(text).text;
+  const cut = masked.length > max;
+  const out = cut ? masked.slice(0, max) : masked;
+  return cut || alreadyCut ? dropCutTail(out) : out;
 }
