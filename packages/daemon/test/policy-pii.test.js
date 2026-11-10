@@ -8,10 +8,9 @@ test("piiGuard is off unless the project turns it on, and the default shape does
   assert.equal(normalizePolicy({ piiGuard: true }).piiGuard, true);
 });
 
-test("normalizePolicy ignores a garbage piiGuard instead of switching the shield on or throwing", () => {
-  for (const junk of ["true", 1, {}, [], null, "yes"]) {
-    assert.equal(Object.hasOwn(normalizePolicy({ piiGuard: junk }), "piiGuard"), false, JSON.stringify(junk));
-  }
+test("a hand-written piiGuard that is not a clean boolean counts as ON (when in doubt, shield); null counts as absent", () => {
+  for (const junk of ["true", 1, {}, [], "yes"]) assert.equal(normalizePolicy({ piiGuard: junk }).piiGuard, true, JSON.stringify(junk));
+  assert.equal(Object.hasOwn(normalizePolicy({ piiGuard: null }), "piiGuard"), false);
 });
 
 test("validatePolicy accepts a boolean piiGuard and rejects anything else", () => {

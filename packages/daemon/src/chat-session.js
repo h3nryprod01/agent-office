@@ -26,6 +26,7 @@ import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
 import { makeEvent } from "./event-schema.js";
+import { clip } from "./approvals.js";
 import { cliSpawnOptions } from "./platform.js";
 
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // PM reads registry/git before answering
@@ -218,7 +219,7 @@ export class ChatSessionManager {
         cwd,
         repo,
         status: error ? "error" : done ? "ok" : "start",
-        detail: text.slice(0, 200),
+        detail: clip(text, 200),
         meta: { role, text, targetSessionId, done, error },
       })
     );
@@ -354,7 +355,7 @@ export class ChatSessionManager {
         } else if (msg.type === "result") {
           finish(() => {
             const isErr = msg.is_error === true;
-            emit({ role: isErr ? "system" : "assistant", text: isErr ? `PM error: ${typeof msg.result === "string" ? msg.result.slice(0, 300) : "unknown"}` : "", targetSessionId: liveSessionId, done: true, error: isErr });
+            emit({ role: isErr ? "system" : "assistant", text: isErr ? `PM error: ${typeof msg.result === "string" ? clip(msg.result, 300) : "unknown"}` : "", targetSessionId: liveSessionId, done: true, error: isErr });
           });
         }
       }
@@ -369,7 +370,7 @@ export class ChatSessionManager {
       finish(() => {
         emit({
           role: "system",
-          text: stopped ? "(stopped on request)" : code === 0 ? "" : `The PM turn ended unexpectedly (exit ${code}). ${stderrTail.trim().slice(0, 200)}`.trim(),
+          text: stopped ? "(stopped on request)" : code === 0 ? "" : `The PM turn ended unexpectedly (exit ${code}). ${clip(stderrTail.trim(), 200)}`.trim(),
           targetSessionId: liveSessionId,
           done: true,
           error: !stopped && code !== 0,
@@ -457,7 +458,7 @@ export class ChatSessionManager {
       cur.emit({ role: "system", text: "That PM session is gone — it has been reset. Send your message again to start a new one.", targetSessionId: null, done: true, error: true });
       return;
     }
-    cur.emit({ role: isErr ? "system" : "assistant", text: isErr ? `PM error: ${typeof msg.result === "string" ? msg.result.slice(0, 300) : "unknown"}` : "", targetSessionId: proc.sessionId, done: true, error: isErr });
+    cur.emit({ role: isErr ? "system" : "assistant", text: isErr ? `PM error: ${typeof msg.result === "string" ? clip(msg.result, 300) : "unknown"}` : "", targetSessionId: proc.sessionId, done: true, error: isErr });
     this.#armWarmIdle(proc);
   }
 
@@ -476,7 +477,7 @@ export class ChatSessionManager {
         ? "(stopped on request)"
         : cur.timedOut
           ? `The PM did not answer within ${Math.round(this.timeoutMs / 1000)}s — the turn was cancelled, try again.`
-          : `The PM turn ended unexpectedly (exit ${code}). ${proc.stderrTail.trim().slice(0, 200)}`.trim(),
+          : `The PM turn ended unexpectedly (exit ${code}). ${clip(proc.stderrTail.trim(), 200)}`.trim(),
       targetSessionId: proc.sessionId,
       done: true,
       error: !cur.stopRequested,

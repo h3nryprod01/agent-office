@@ -8,7 +8,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DEFAULT_PROJECTS_DIR, PROJECT_SLUG_RE } from "./projects.js";
-import { normalizePolicy, validatePolicy } from "./policy.js";
+import { normalizePolicy, shieldOn, validatePolicy } from "./policy.js";
 
 const AUDIT_FILE = "policy-audit.jsonl";
 
@@ -110,7 +110,7 @@ export class PolicyStore {
     }
     // lane A: a save that does not mention the PII shield (an older settings panel) must not switch it off;
     // only an explicit `piiGuard: false` does
-    const keepShield = meta.policy?.piiGuard === true && input.piiGuard === undefined;
+    const keepShield = shieldOn(meta.policy?.piiGuard) && input.piiGuard === undefined;
     const tmp = `${file}.tmp`;
     fs.writeFileSync(tmp, `${JSON.stringify({ ...meta, policy: keepShield ? { ...policy, piiGuard: true } : policy }, null, 2)}\n`);
     fs.renameSync(tmp, file);

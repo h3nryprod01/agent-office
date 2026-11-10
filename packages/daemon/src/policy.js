@@ -24,6 +24,9 @@ function invalid(message) {
   return err;
 }
 
+/** lane A: ONE rule for the PII shield flag everywhere: anything except absent, null or false is ON (a hand-written "true" or 1 included). */
+export const shieldOn = (v) => v !== undefined && v !== null && v !== false;
+
 const isPlainObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 
 /** The transcript tailers say "claude-code"; the shared contract says "claude". */
@@ -62,9 +65,9 @@ export function normalizePolicy(raw) {
     },
     allowedHarnesses: cleanList(p.allowedHarnesses),
     allowedLanes: cleanList(p.allowedLanes),
-    // lane A: only a literal `true` switches the shield on. An explicit `false` is kept (it is how an owner says "off", see
+    // lane A: any value but absent/null/false switches the shield on (see shieldOn). An explicit `false` is kept (it is how an owner says "off", see
     // PolicyStore.setPolicy); the key is absent when the policy never mentioned it, so older policies keep their exact shape
-    ...(typeof p.piiGuard === "boolean" ? { piiGuard: p.piiGuard } : {}),
+    ...(p.piiGuard !== undefined && p.piiGuard !== null ? { piiGuard: shieldOn(p.piiGuard) } : {}),
   };
 }
 

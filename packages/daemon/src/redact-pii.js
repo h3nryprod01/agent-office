@@ -10,8 +10,9 @@
 // match is mapped back to the ORIGINAL text, which is the one that is returned. So only the matched value
 // is replaced: nothing else in the text is rewritten (an ellipsis stays an ellipsis).
 
-// what people put between digit groups: whitespace (tab, newline, NBSP, thin space), any dash, dot, slash, brackets
-const SEP_CHARS = "\\s\\p{Pd}./()";
+// what people put between digit groups: whitespace (tab, newline, NBSP, thin space), any dash, dot, slash, brackets,
+// middle dot, bullet, underscore. Limit: at most 3 such characters in a row (4+ spaces between digit groups are not seen)
+const SEP_CHARS = "\\s\\p{Pd}./()·•_";
 const SEP = `(?:[${SEP_CHARS}]{1,3})`; // bounded, so the scan stays linear
 
 // Principle: when in doubt, MASK. Hiding a harmless number costs a little readability; letting a phone
@@ -33,12 +34,28 @@ const PHONE_RE = new RegExp(`${STRONG_START}(?:${INTL}|0)(?:${SEP}?\\d){9}${STRO
 const LONG_PHONE_RE = new RegExp(`${STRONG_START}0[12](?:${SEP}?\\d){9}${STRONG_END}`, "giu");
 // CCCD: 12 digits whose first three are a province code (001-096)
 const CCCD_RE = new RegExp(`${STRONG_START}0(?:0[1-9]|[1-8]\\d|9[0-6])(?:${SEP}?\\d){9}${STRONG_END}`, "giu");
-// CMND: 9 digits, plain or grouped 3-3-3
-const CMND_RE = new RegExp(`${WEAK_START}(?:\\d{9}|\\d{3}(?:[ .\\-]\\d{3}){2})${WEAK_END}${UNIT}`, "giu");
+// CMND: 9 digits, plain or grouped 3-3-3, 4-5, 5-4, 3-6, 6-3 (not 4 groups: "203.0.113.20" is an IP address)
+const G = "[ .\\-/]";
+const CMND_RE = new RegExp(`${WEAK_START}(?:\\d{9}|\\d{3}(?:${G}\\d{3}){2}|\\d{4}${G}\\d{5}|\\d{5}${G}\\d{4}|\\d{3}${G}\\d{6}|\\d{6}${G}\\d{3})${WEAK_END}${UNIT}`, "giu");
 // lengths are bounded (RFC 5321: local part 64, label 63) so a huge run of letters/digits cannot make the scan quadratic
 const EMAIL_RE = /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,8}\.[A-Za-z]{2,24}/giu;
 
-const INVISIBLE = /[­᠎​-‏‪-‮⁠-⁤﻿]/u;
+// dropped from the detection copy: format characters (zero-width, bidi, soft hyphen, BOM), combining marks (variation
+// selectors, keycaps, grapheme joiner, combining lines) and the Hangul fillers that render as blanks
+const INVISIBLE = /[\p{Cf}\p{Mn}\p{Me}\u115f\u1160\u3164\uffa0]/u;
+const DECIMAL = /\p{Nd}/u;
+const digitCache = new Map();
+/** Any script's decimal digit as an ASCII digit (Arabic-Indic, Devanagari, math digits…). */
+function asciiDigit(cp) {
+  let v = digitCache.get(cp);
+  if (v === undefined) {
+    let start = cp;
+    for (let k = 0; k < 50 && DECIMAL.test(String.fromCodePoint(start - 1)); k++) start -= 1;
+    v = String((cp - start) % 10);
+    digitCache.set(cp, v);
+  }
+  return v;
+}
 const NON_ASCII = /[^\x00-\x7f]/;
 
 const digitsOf = (s) => s.replace(/\D/g, "");
@@ -57,7 +74,8 @@ function detection(text) {
   for (const ch of text) {
     const len = ch.length;
     if (!INVISIBLE.test(ch)) {
-      const n = ch.codePointAt(0) < 128 ? ch : ch.normalize("NFKC");
+      const cp = ch.codePointAt(0);
+      const n = cp < 128 ? ch : DECIMAL.test(ch) ? asciiDigit(cp) : ch.normalize("NFKC");
       for (let k = 0; k < n.length; k++) {
         out.push(n[k]);
         from.push(i);
@@ -133,22 +151,33 @@ const DIGIT_TAIL_RE = new RegExp(`[+(]?\\d[\\d${SEP_CHARS}]*$`, "u");
 const WORDISH_TAIL_RE = /[A-Za-z0-9._%+\-@]*$/;
 const MAX_LAST_WORD = 40;
 
-/**
- * Text that has been CUT to a length can end halfway through a value ("0912 345 6", "nguyen.van.a@gma"),
- * and a half value no longer matches any pattern. So after a cut: drop the last (possibly half) word, or,
- * when there is no word break to rely on (compact JSON), the trailing run of letters/digits/@/./-; then drop
- * any run of digits and separators left at the end (3+ digits). Looks at the last 256 characters only.
- */
-export function dropCutTail(text) {
-  const t = String(text ?? "").replace(/…+\s*$/u, "");
-  const head = t.length > WINDOW ? t.slice(0, -WINDOW) : "";
-  let end = t.length > WINDOW ? t.slice(-WINDOW) : t;
+/** How many characters of the (detection) text survive: drop the last word, or the trailing letters/digits run, then a trailing digit run. */
+function keepLength(det) {
+  const start = Math.max(0, det.length - WINDOW);
+  let end = det.slice(start);
   let i = end.length;
   while (i > 0 && !/\s/.test(end[i - 1])) i -= 1; // the last word starts after the last whitespace
   if (i > 0 && end.length - i <= MAX_LAST_WORD) end = end.slice(0, i);
   else end = end.replace(WORDISH_TAIL_RE, "");
   end = end.replace(DIGIT_TAIL_RE, (run) => (run.replace(/\D/g, "").length >= 3 ? "" : run));
-  return (head + end).trimEnd();
+  return start + end.length;
+}
+
+/**
+ * Text that has been CUT to a length can end halfway through a value ("0912 345 6", "nguyen.van.a@gma"),
+ * and a half value no longer matches any pattern. So after a cut: drop the last (possibly half) word, or,
+ * when there is no word break to rely on (compact JSON), the trailing run of letters/digits/@/./-; then drop
+ * any run of digits and separators left at the end (3+ digits). Looks at the last 256 characters only.
+ * Runs on the same normalised detection copy as the masker (full-width, Arabic-Indic digits, invisible
+ * characters) and cuts the ORIGINAL text at the mapped position.
+ */
+export function dropCutTail(text) {
+  const t = String(text ?? "").replace(/…+\s*$/u, "");
+  const { det, to } = detection(t);
+  let keep = keepLength(det);
+  while (keep > 0 && /\s/.test(det[keep - 1])) keep -= 1;
+  if (!to) return det.slice(0, keep);
+  return keep === 0 ? "" : t.slice(0, to[keep - 1]);
 }
 
 /**

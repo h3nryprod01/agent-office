@@ -206,7 +206,7 @@ const NAME_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const clean = (value, re) => (typeof value === "string" && re.test(value) ? value : undefined);
 
 /** Cut to `max` characters and SAY so with a trailing "…" (lane A: the personal-data shield drops the half-cut tail of a marked cut). */
-const clip = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+export const clip = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
 /** One-line summary of a tool_input for the queue UI. Built daemon-side so
  * the hook stays dumb; input arrives already truncated by the hook. */

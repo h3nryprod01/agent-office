@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DEFAULT_PROJECTS_DIR, PROJECT_SLUG_RE, readProject } from "./projects.js";
 import { boundChat, CHANNELS } from "./members.js";
+import { shieldOn } from "./policy.js";
 import { dropCutTail, dropMarkedCuts, emptyCounts, redactPii, totalCount } from "./redact-pii.js";
 
 const AUDIT_FILE = "pii-audit.jsonl";
@@ -73,8 +74,7 @@ export class PiiGuard {
         all = true;
         continue;
       }
-      const flag = meta.policy?.piiGuard;
-      if (flag !== undefined && flag !== null && flag !== false) slugs.push(e.name);
+      if (shieldOn(meta.policy?.piiGuard)) slugs.push(e.name);
     }
     if (all && !this.failing) this.log.warn("[pii-guard] could not read the project list or a project.json: masking all chat output until it can be read");
     this.failing = all;

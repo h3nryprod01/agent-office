@@ -20,6 +20,7 @@ import os from "node:os";
 import { canApprove, canChat, findMemberByIdentity, listMembers, bindChat, unbindChat, projectForChat, boundChat, roleIn, projectSlugs, CHANNELS } from "./members.js";
 import { DEFAULT_PROJECTS_DIR, readItems, readProject } from "./projects.js";
 import { JsonState } from "./json-state.js";
+import { clip } from "./approvals.js";
 
 const MIN_APPROVAL_PREFIX = 4;
 const OPEN_ITEM_LIMIT = 15;
@@ -408,7 +409,7 @@ export class ChannelRouter {
     const rows = [];
     for (const slug of this.#visibleSlugs(ctx)) {
       if (!canApprove(this.#roleOf(ctx, slug))) continue;
-      for (const a of this.approvalsOf(slug)) rows.push(`${a.id.slice(0, 8)} — ${slug} — ${a.tool}: ${this.mask(slug, a.preview, { max: 120 }).slice(0, 120)}`);
+      for (const a of this.approvalsOf(slug)) rows.push(`${a.id.slice(0, 8)} — ${slug} — ${a.tool}: ${clip(this.mask(slug, a.preview, { max: 120 }), 120)}`);
     }
     if (ctx.memberships.length > 0 && !ctx.legacy && !ctx.memberships.some((x) => canApprove(x.member.role))) {
       return "Your role cannot see or answer approvals.";
@@ -450,7 +451,7 @@ export class ChannelRouter {
     const short = approval.id.slice(0, 8);
     const secs = approval.expiresAt ? Math.max(0, Math.round((approval.expiresAt - this.now()) / 1000)) : null;
     const text =
-      `⚠ Approval needed${slug ? ` — ${slug}` : ""}\n${approval.tool}${approval.preview ? `: ${this.mask(slug, approval.preview, { max: 300 }).slice(0, 300)}` : ""}\n` +
+      `⚠ Approval needed${slug ? ` — ${slug}` : ""}\n${approval.tool}${approval.preview ? `: ${clip(this.mask(slug, approval.preview, { max: 300 }), 300)}` : ""}\n` +
       `/approve ${short}  ·  /deny ${short}${secs !== null ? `  (expires in ${secs}s)` : ""}`;
     const targets = [];
     if (slug) {

@@ -131,7 +131,9 @@ nothing.
 
 **Limits, plainly.** It matches shapes, so it cannot find a person's name or an address, nor digits spelled out
 in words, nor a number split by letters. It can mask a harmless number that looks like an ID (a plain 9-digit
-counter). When in doubt it masks. It guards what goes to chat only: the model provider still receives whatever
+counter) or a UUID/long number that happens to contain a phone-shaped run. A line that really ends in "…" loses its
+last word even when nothing was cut. Digit groups separated by 4 or more blanks in a row are not seen. When in doubt it masks.
+A hand-written `"piiGuard": "true"` or `1` counts as ON (anything but absent, null or false does). It guards what goes to chat only: the model provider still receives whatever
 the agents read, and the PM's own transcript on this machine is not changed. It does **not** block a worker lane:
 `allowedHarnesses` only warns (below), because a session that already runs cannot be stopped from here.
 
