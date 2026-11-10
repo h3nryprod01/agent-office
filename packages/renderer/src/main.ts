@@ -31,6 +31,7 @@ import { openTerminalFor, sessionActions } from "./ui/sessionActions";
 import { mountToast } from "./ui/toast";
 import { RadarStore } from "./ui/radar"; // lane L4
 import { mountInterventionStats, type InterventionSummary } from "./ui/interventionStats"; // lane L4
+import { downloadShareImage } from "./ui/waitShare"; // lane R
 import { mountOfficeTabs, TAB_ALL, type TabKey } from "./ui/officeTabs";
 import { mountTimelineBar, type ReplayView } from "./ui/timelineBar";
 import { mountChatBox, type ChatBoxHandle } from "./ui/chatBox";
@@ -528,8 +529,11 @@ async function boot(): Promise<void> {
     const ivRoot = document.createElement("div");
     ivRoot.id = "intervention-stats";
     document.body.appendChild(ivRoot);
-    mountInterventionStats(ivRoot, (): Promise<InterventionSummary> =>
-      fetch("/metrics/intervention?days=7").then((r) => r.json()),
+    mountInterventionStats(
+      ivRoot,
+      (days): Promise<InterventionSummary> => fetch(`/metrics/intervention?days=${days}`).then((r) => r.json()),
+      // Present mode on: the summary arrived already aliased, so project rows may go in the image
+      (summary) => downloadShareImage(summary, { showProjects: isPresentationMode() }),
     );
   }
 
