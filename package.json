@@ -1,11 +1,11 @@
 {
-  "name": "agent-office-app",
+  "name": "waitchime",
   "version": "0.1.0",
   "description": "See which coding agents are waiting on you, and approve from your phone. Local daemon plus a bundled web UI.",
   "type": "module",
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/h3nryprod01/agent-office.git" },
-  "bin": "packages/daemon/bin/office.js",
+  "bin": { "waitchime": "packages/daemon/bin/office.js", "ao": "scripts/ao.mjs" },
   "engines": { "node": ">=20" },
   "dependencies": { "ws": "^8.18.0" },
   "files": [

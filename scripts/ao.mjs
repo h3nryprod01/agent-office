@@ -10,6 +10,7 @@
 //   approvals setup|remove                      answer permission prompts from Telegram
 // The shell wrappers (start.sh, start.ps1, install-ubuntu.sh) forward these verbs here.
 
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { agentOfficeHome, AccessStore } from "../packages/daemon/src/access.js";
@@ -21,8 +22,10 @@ import { runApprovalsCommand } from "../packages/daemon/src/cli/approvals-setup.
 import os from "node:os";
 import readline from "node:readline";
 import { runReport } from "../packages/daemon/src/cli/report.js";
+import { approvalsRefusal, isEphemeralInstall } from "../packages/daemon/bin/office-lib.js";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const pkgName = () => JSON.parse(fs.readFileSync(path.join(repo, "package.json"), "utf8")).name;
 const home = agentOfficeHome();
 
 function flag(argv, name) {
@@ -132,7 +135,13 @@ async function main(argv) {
         return 1;
       }
     }
-    case "approvals":
+    case "approvals": {
+      // also reachable as the package's own `ao` bin, which skips the launcher's checks
+      const refusal = approvalsRefusal([verb, ...rest], isEphemeralInstall(repo), pkgName());
+      if (refusal) {
+        console.error(refusal);
+        return 1;
+      }
       return runApprovalsCommand(rest, {
         repo,
         home: os.homedir(),
@@ -141,6 +150,7 @@ async function main(argv) {
         ask: (q) => prompt(q),
         askHidden: (q) => prompt(q, { hidden: true }),
       });
+    }
     case "report":
       return runReport(rest);
     case "lan":

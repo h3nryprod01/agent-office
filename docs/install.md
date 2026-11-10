@@ -67,12 +67,12 @@ npm --prefix packages/renderer ci   # once
 npm pack                            # builds the renderer, writes <name>-<version>.tgz
 mkdir /tmp/ao && cd /tmp/ao
 npm install /path/to/<name>-<version>.tgz
-./node_modules/.bin/<package-name> --port 8787
+./node_modules/.bin/waitchime --port 8787
 ```
 
 Options: `--port N` (default 8787), `--no-open`, `--install-service [--yes]`, `--help`.
-`<package-name> doctor|backup|...` runs the `ao` CLI (`update` only works on a
-git clone; for the package use `npm i -g <package-name>@latest`). Its workspace
+`waitchime doctor|backup|...` (or `ao doctor|backup|...`, installed alongside) runs the `ao` CLI (`update` only works on a
+git clone; for the package use `npm i -g waitchime@latest`). Its workspace
 (the PM's session file) lives in `~/.agent-office/workspace`, not inside the
 package; `--install-service` writes that location into the service definition
 too. If the port is already serving Agent Office it says so instead of starting a
