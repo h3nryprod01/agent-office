@@ -21,6 +21,23 @@ const POSITIVE = [
   ["id, CCCD grouped", "CCCD 079 099 012 345", "id"],
   ["id, CMND 9 digits", "CMND 123456789", "id"],
   ["id, CMND after colon", "CMND:123456789", "id"],
+  ["phone, followed by a Vietnamese word starting with đ", "0912345678 đã gọi", "phone"],
+  ["phone, đ glued", "0912345678đã gọi", "phone"],
+  ["phone, followed by Đức", "0912345678 Đức", "phone"],
+  ["phone, followed by a name (Tr)", "0912345678 Trần Văn A", "phone"],
+  ["phone, followed by k-word", "0912345678 không nghe máy", "phone"],
+  ["phone, followed by ms", "0912345678 ms Lan", "phone"],
+  ["phone, followed by ty", "0912345678 ty TNHH Sao", "phone"],
+  ["phone, followed by tỷ-word", "0912345678 tỷ lệ", "phone"],
+  ["phone, +84 followed by đã", "+84912345678 đã gọi", "phone"],
+  ["phone, after colon", "SĐT: 0912.345.678", "phone"],
+  ["phone, after comma", "a,0912345678", "phone"],
+  ["phone, after slash", "liên hệ/0912345678", "phone"],
+  ["phone, after dash", "ĐT-0912345678", "phone"],
+  ["phone, after dot", "xong.0912345678", "phone"],
+  ["phone, glued to letters before", "SĐT0912345678", "phone"],
+  ["phone, bare 'k' unit", "0912345678 k", "phone"],
+  ["id, CCCD followed by đ-word", "CCCD 079099012345 đã cấp", "id"],
   ["email", "mail khach.hang+bds@example.com.vn nhé", "email"],
   ["email, upper case", "Mail A.B@EXAMPLE.COM", "email"],
 ];
@@ -36,11 +53,16 @@ for (const [name, input, kind] of POSITIVE) {
   });
 }
 
+// a phone number counted twice would be a bug too: two numbers separated by a comma are TWO values
 const NEGATIVE = [
   ["money with dots", "Giá 1.500.000.000 đồng"],
   ["money with commas", "Total $1,234,567,890"],
   ["money, bare 10 digits starting with 1", "Giá 1500000000 VND"],
   ["money, 9 digits with unit", "Phí 500000000 đ"],
+  ["amount in triệu", "Giá 500 triệu"],
+  ["amount in tỷ", "Giá 1,5 tỷ"],
+  ["date short", "Hạn 12/11/2026"],
+  ["money, 9 digits then triệu", "Giá 123456789 triệu"],
   ["money, 9 digits with USD", "Budget 123456789 USD"],
   ["decimal", "Tỉ lệ 0.912345678"],
   ["date iso", "Ngày 2026-11-10 lúc 15:30"],
@@ -60,7 +82,6 @@ const NEGATIVE = [
   ["short numbers", "có 25 test, 905 pass, 0 fail"],
   ["approval id", "/approve a1b2c3d4"],
   ["duration", "chờ 17 phút 30 giây"],
-  ["hex with letters near digits", "id 0912345678ab"],
 ];
 
 for (const [name, input] of NEGATIVE) {
@@ -109,4 +130,9 @@ test("a long text with many digits stays fast (no catastrophic backtracking)", (
   const t0 = Date.now();
   redactPii(nasty);
   assert.ok(Date.now() - t0 < 1000, "redactPii took too long");
+});
+
+test("two phone numbers separated by a comma are two values", () => {
+  assert.equal(redactPii("0912345678,0987654321").counts.phone, 2);
+  assert.doesNotMatch(redactPii("0912345678,0987654321").text, /\d{6}/);
 });
