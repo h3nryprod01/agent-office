@@ -6,7 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { runUpdate, restartCommand, needsShell, commandLine } from "../src/cli/update.js";
 
-function harness({ platform = "linux", dirty = false, head = ["aaa111", "bbb222"], failOn = null, healthy = true } = {}) {
+function harness({ platform = "linux", toplevel = "/repo", dirty = false, head = ["aaa111", "bbb222"], failOn = null, healthy = true } = {}) {
   const calls = [];
   let revs = 0;
   const run = (cmd, args, opts = {}) => {
@@ -14,6 +14,7 @@ function harness({ platform = "linux", dirty = false, head = ["aaa111", "bbb222"
     calls.push({ line, cwd: opts.cwd });
     if (failOn && line.includes(failOn)) return { status: 1, stdout: "", stderr: "boom" };
     if (line === "git status --porcelain") return { status: 0, stdout: dirty ? " M file.js\n" : "" };
+    if (line === "git rev-parse --show-toplevel") return { status: 0, stdout: `${toplevel}\n` };
     if (line === "git rev-parse HEAD") return { status: 0, stdout: `${head[Math.min(revs++, head.length - 1)]}\n` };
     return { status: 0, stdout: "" };
   };
@@ -34,6 +35,7 @@ function harness({ platform = "linux", dirty = false, head = ["aaa111", "bbb222"
       uid: 501,
       port: 8787,
       run,
+      realpath: (p) => p,
       backup: (a) => (backups.push(a), { archive: "/b/x.tar.gz" }),
       health: async () => healthy,
       swap: (dir) => swaps.push(dir),
@@ -59,6 +61,7 @@ test("happy path: clean tree → backup → pull → npm ci x2 → build → res
     h.calls.map((c) => c.line),
     [
       "git status --porcelain",
+      "git rev-parse --show-toplevel",
       "git rev-parse HEAD",
       "git pull --ff-only",
       "git rev-parse HEAD",
@@ -86,7 +89,7 @@ test("already up to date → no install, no build, no restart", async () => {
   const h = harness({ head: ["same", "same"] });
   const result = await runUpdate(h.opts);
   assert.equal(result.status, "up-to-date");
-  assert.deepEqual(h.calls.map((c) => c.line), ["git status --porcelain", "git rev-parse HEAD", "git pull --ff-only", "git rev-parse HEAD"]);
+  assert.deepEqual(h.calls.map((c) => c.line), ["git status --porcelain", "git rev-parse --show-toplevel", "git rev-parse HEAD", "git pull --ff-only", "git rev-parse HEAD"]);
 });
 
 test("a failed pull stops cold and says nothing was changed", async () => {
@@ -210,4 +213,11 @@ test("only npm goes through a shell on Windows (cmd.exe would eat the | in the P
   assert.equal(needsShell("npm", "win32"), true);
   for (const cmd of ["git", "powershell", "launchctl", "systemctl"]) assert.equal(needsShell(cmd, "win32"), false, cmd);
   assert.equal(needsShell("npm", "linux"), false);
+});
+
+test("refuses to pull when the install sits inside someone else's git repo (e.g. a global install under ~/.nvm)", async () => {
+  const h = harness({ toplevel: "/home/x/.nvm" });
+  await assert.rejects(runUpdate(h.opts), /not the root of its own git checkout/);
+  assert.ok(!h.calls.some((c) => c.line.startsWith("git pull")));
+  assert.equal(h.backups.length, 0);
 });
