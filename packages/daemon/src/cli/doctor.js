@@ -5,7 +5,6 @@
 // failure paths on any OS. It is read-only: nothing on the machine is created or changed.
 
 import fs from "node:fs";
-import { createRequire } from "node:module";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -72,6 +71,14 @@ function serviceInstalled({ platform, exec }) {
  * @param {object} [o] every field is injectable for tests
  * @returns {Promise<{id: string, status: string, title: string, detail?: string, fix?: string, blocking?: boolean}[]>}
  */
+/** True when `node_modules/<name>` exists in `dir` or any folder above it (Node's ESM package lookup). */
+function hasPackageUp(dir, name) {
+  for (let d = path.resolve(dir); ; d = path.dirname(d)) {
+    if (fs.existsSync(path.join(d, "node_modules", name))) return true;
+    if (path.dirname(d) === d) return false;
+  }
+}
+
 export async function runChecks({
   platform = process.platform,
   nodeVersion = process.version,
@@ -181,13 +188,9 @@ export async function runChecks({
   }
 
   if (!preflight) {
-    // resolve ws the way the daemon does at runtime: a clone has it in packages/daemon, the npm package next to or above itself
-    let wsInstalled = true;
-    try {
-      createRequire(path.join(repo, "packages", "daemon", "package.json")).resolve("ws");
-    } catch {
-      wsInstalled = false;
-    }
+    // look where the daemon's ESM `import "ws"` looks: node_modules in packages/daemon and every folder above it
+    // (a clone has it in packages/daemon, the npm package next to or above itself); NODE_PATH does not count for ESM
+    const wsInstalled = hasPackageUp(path.join(repo, "packages", "daemon"), "ws");
     add(
       wsInstalled
         ? { id: "deps", status: "ok", title: "daemon dependencies installed" }

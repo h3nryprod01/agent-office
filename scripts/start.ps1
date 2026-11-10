@@ -54,7 +54,10 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     exit 1
 }
 if ($Command -in @("doctor", "update", "backup", "restore", "lan", "token", "report", "approvals")) {
-    & node (Join-Path $Repo "scripts\ao.mjs") $Command @Rest
+    # -Yes binds to this script's own switch, so hand it on as --yes
+    $Forward = @($Rest | Where-Object { $_ })
+    if ($Yes) { $Forward += "--yes" }
+    & node (Join-Path $Repo "scripts\ao.mjs") $Command @Forward
     exit $LASTEXITCODE
 }
 if ($Command -ne "start") {
