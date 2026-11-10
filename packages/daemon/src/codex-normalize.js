@@ -239,20 +239,30 @@ export class CodexSessionNormalizer {
     return [];
   }
 
+  /** @private one speak event; the same text arriving from the other format right after is a duplicate */
+  _speak(text, source, ts) {
+    if (this.lastSpoken && this.lastSpoken.text === text && this.lastSpoken.source !== source) return [];
+    this.lastSpoken = { text, source };
+    this.speakCount += 1;
+    return [
+      makeEvent({
+        ...this._base(ts),
+        id: `${this.sessionId}:speak:${this.speakCount}`,
+        type: "speak",
+        status: "ok",
+        detail: truncate(text),
+        meta: { kind: "text" },
+      }),
+    ];
+  }
+
   /** @private */
   _fromEventMsg(payload, ts) {
-    if (payload.type === "agent_message" && typeof payload.message === "string") {
-      this.speakCount += 1;
-      return [
-        makeEvent({
-          ...this._base(ts),
-          id: `${this.sessionId}:speak:${this.speakCount}`,
-          type: "speak",
-          status: "ok",
-          detail: truncate(payload.message),
-          meta: { kind: "text" },
-        }),
-      ];
+    if (payload.type === "agent_message" && typeof payload.message === "string") return this._speak(payload.message, "agent_message", ts);
+    // Codex Desktop writes the assistant's text as an item_completed AgentMessage instead
+    if (payload.type === "item_completed" && payload.item?.type === "AgentMessage" && Array.isArray(payload.item.content)) {
+      const text = payload.item.content.filter((c) => c?.type === "Text" && typeof c.text === "string").map((c) => c.text).join("\n");
+      if (text) return this._speak(text, "item_completed", ts);
     }
     // token_count, task_started/complete, turn_aborted, *_end echoes of
     // response_item pairs, sub_agent_activity (the child's own rollout file
