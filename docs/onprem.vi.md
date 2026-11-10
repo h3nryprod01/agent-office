@@ -22,7 +22,33 @@ Bản tiếng Anh: [onprem.md](onprem.md).
 
 Bản thân Agent Office không gửi gì cho ai. Thứ duy nhất rời khỏi máy là những gì các
 agent CLI tự gửi cho nhà cung cấp của chúng, và cầu nối Telegram/Zalo (tuỳ chọn) nếu
-bạn cấu hình.
+bạn cấu hình. [PRIVACY.md](../PRIVACY.md) (tiếng Anh) liệt kê chính xác cái gì được đọc,
+ghi và gửi đi.
+
+### Tài khoản Claude của ai
+
+Điều khoản của Claude Code là của Anthropic, không phải của dự án này. Trang
+[Legal and compliance](https://code.claude.com/docs/en/legal-and-compliance) của
+Anthropic (đọc ngày 10/11/2026; trang này thay đổi, hãy đọc lại) là nguồn cho phần dưới.
+Đây không phải ý kiến pháp lý.
+
+* **Mỗi tổ chức dùng tài khoản của chính mình.** Người dùng văn phòng tự đăng nhập Claude
+  Code bằng gói của họ, hoặc tổ chức cung cấp khoá API Anthropic hay thông tin xác thực
+  của nhà cung cấp đám mây của chính mình.
+* **Nếu bạn cài hộ người khác, đừng trả tiền hộ phần dùng Claude của họ, đừng bán lại,
+  đừng cho đi qua đăng nhập của bạn.** Trang đó nêu khách hàng không được trả tiền hộ,
+  bán lại hay làm trung gian cho lượng dùng Claude của người dùng cuối, và mỗi người dùng
+  cuối xác thực bằng thông tin của chính họ. Không sửa binary Claude Code.
+* **Nếu thu tiền cho một triển khai, dùng khoá API đứng tên khách.** Đây là khuyến nghị
+  của Agent Office, không phải trích dẫn: trang đó nói bên xây sản phẩm trên Claude nên
+  xác thực bằng khoá API và không được chuyển yêu cầu qua thông tin của gói Free, Pro, Max
+  hay Ultra thay mặt người dùng của mình. Trang không nói một dịch vụ có thu tiền điều
+  khiển `claude` CLI của khách bằng gói thuê bao của khách có thuộc trường hợp đó hay
+  không. Cho tới khi Anthropic trả lời bằng văn bản, dùng khoá API của khách.
+* **Bạn dùng cá nhân trên máy mình bằng gói của mình thì giữ nguyên.**
+* **Không đặt "Claude" hay "Claude Code" trong tên sản phẩm/dịch vụ của bạn.** Trang cho
+  phép nói bằng chữ thường rằng sản phẩm chạy Claude Code.
+* Codex CLI và Gemini CLI có điều khoản riêng; đọc tương tự (chưa kiểm ở đây).
 
 Không chắc đã đủ chưa? Cứ cài, rồi chạy bộ kiểm tra (mục 2): nó nói rõ thiếu gì và
 gõ lệnh nào để sửa.
@@ -297,6 +323,25 @@ Chạy `doctor` trước. Nó bao quát phần lớn bảng này.
 | `update` báo "local changes" | Bạn đã sửa file trong thư mục cài. `git stash` chúng rồi chạy lại `update`. |
 | Cổng 8787 đã bị dùng | `doctor` chỉ ra ai đang giữ. Tắt chương trình đó, hoặc chạy cổng khác bằng `DAEMON_WS_PORT`. Các hook tuỳ chọn trong settings Claude Code của bạn chạy trong shell của bạn chứ không trong service: đưa cổng cho chúng nữa, ví dụ `AGENT_OFFICE_PORT=8788 node …/approve-gateway.mjs`. |
 | `claude` đã cài nhưng văn phòng báo không có | Dịch vụ có PATH nhỏ hơn terminal của bạn. Cài lại dịch vụ từ terminal chạy được `claude`: macOS `./scripts/install-daemon-service.sh`, Linux `./scripts/install-daemon-service-linux.sh`, Windows `scripts\install-daemon-service.ps1`. |
+
+## 8. Tuỳ chọn: đọc câu trả lời bằng tiếng Việt (VieNeu)
+
+Mặc định văn phòng đọc bằng giọng của chính trình duyệt và không cần cài thêm gì. Câu trả
+lời tiếng Việt chỉ dùng mô hình cục bộ (VieNeu, chạy bởi một worker Python sau
+`POST /tts`) nếu bạn tự dựng: một môi trường Python có gói `vieneu`, chỉ tới bằng
+`VIENEU_PYTHON` (hoặc thư mục `.venv-tts` ở gốc repo). Không có thì `/tts` trả 503 và văn
+phòng quay về giọng trình duyệt.
+
+**Đọc giấy phép của trọng số mô hình trước khi bật, nhất là trong thứ bạn bán.** Mã
+`vieneu` là Apache-2.0, nhưng trọng số được cấp phép theo từng mô hình và các bản khác
+nhau. Ngày 10/11/2026, trang Hugging Face của tác giả `pnnbao-ump` ghi Apache-2.0 cho
+nhiều mô hình (ví dụ VieNeu-TTS-0.3B, VieNeu-TTS-v2-Turbo, bản GGUF 0.5B) và CC BY-NC 4.0
+(cấm dùng thương mại) cho các bản lượng tử hoá GGUF của 0.3B (`VieNeu-TTS-0.3B-q4-gguf`,
+`-q8-gguf`). Một bản cũ hơn của model card 0.3B còn ghi phí cấp phép thương mại. Bản mô
+hình mà phiên bản `vieneu` bạn cài tải về mặc định là gì thì chưa kiểm. Hãy mở model card
+chính thức của đúng mô hình máy bạn tải, và đừng bật giọng này trong triển khai có thu
+tiền cho tới khi chắc chắn nó cho phép dùng thương mại. File giọng mẫu trong `docs/media`
+chỉ là bản ghi demo, không phải giấy phép.
 
 ## Đã kiểm tra và chưa kiểm tra
 
