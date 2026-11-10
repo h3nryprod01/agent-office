@@ -176,6 +176,8 @@ export function requiredRole(before, after) {
   }
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   if (!same(before.allowedHarnesses, after.allowedHarnesses) || !same(before.allowedLanes, after.allowedLanes)) return "owner";
-  if (before.piiGuard === true && after.piiGuard !== true) return "owner"; // the shield coming off lets personal data out
+  // the shield coming off lets personal data out. Only an EXPLICIT false counts: a save that does not mention the
+  // flag (an older settings panel) leaves it on, because PolicyStore.setPolicy keeps it
+  if (before.piiGuard === true && after.piiGuard === false) return "owner";
   return "manager";
 }

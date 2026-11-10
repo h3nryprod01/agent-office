@@ -36,6 +36,9 @@ function readConfig(env) {
   return { token, chatId };
 }
 
+// NOTE (lane A): the `pollUpdates` bridge below is NOT used by the daemon (index.js wires telegram-channel.js through
+// multi-pm.js, which masks). `sendMessage` is used only by notifier.js, through guardedTelegramSend (which masks).
+// If pollUpdates is ever wired in again, its replies MUST go through PiiGuard (pii-guard.js): they are sent unmasked.
 /**
  * Push one message to the configured chat. No-op when Telegram isn't
  * configured. This is a secondary channel: a network/API failure is

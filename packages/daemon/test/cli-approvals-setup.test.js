@@ -10,7 +10,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
-  gatewayCommand, planInstall, planRemove, readSettings, writeSettings, settingsPath, runApprovalsCommand, GATEWAY_FILE,
+  gatewayCommand, gatewayScript, planInstall, planRemove, readSettings, writeSettings, settingsPath, runApprovalsCommand, GATEWAY_FILE,
 } from "../src/cli/approvals-setup.js";
 import { createMultiPm } from "../src/multi-pm.js";
 import { ApprovalBroker, createApprovalHttpHandler } from "../src/approvals.js";
@@ -21,12 +21,13 @@ import { startFakeTelegram } from "./fixtures/fake-telegram.js";
 
 const REPO = "/opt/agent-office-checkout"; // made up
 const CMD = gatewayCommand({ repo: REPO, port: 8787, platform: "darwin" });
+const SCRIPT = gatewayScript(REPO);
 const mkHome = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ao-setup-home-")));
 const rm = (d) => fs.rmSync(d, { recursive: true, force: true });
 
 // ── pure merge ──
 test("the hook command points at the gateway script, and carries a non-default port", () => {
-  assert.equal(CMD, `node "${REPO}/packages/daemon/hooks/${GATEWAY_FILE}"`);
+  assert.equal(CMD, `node '${REPO}/packages/daemon/hooks/${GATEWAY_FILE}'`);
   assert.match(gatewayCommand({ repo: REPO, port: 18787, platform: "darwin" }), /^AGENT_OFFICE_PORT=18787 node /);
   assert.doesNotMatch(gatewayCommand({ repo: REPO, port: 18787, platform: "win32" }), /AGENT_OFFICE_PORT/);
 });
@@ -67,12 +68,30 @@ test("planInstall refuses shapes it would have to clobber, and a conflicting reg
 
 test("planRemove takes out only our hook, keeps a sibling hook in the same entry, and tidies empty containers", () => {
   const mixed = { hooks: { PermissionRequest: [{ matcher: "Bash", hooks: [{ type: "command", command: "other" }, { type: "command", command: CMD }] }] }, model: "m" };
-  const r = planRemove(mixed);
+  const r = planRemove(mixed, SCRIPT, "darwin");
   assert.equal(r.removed, 1);
   assert.deepEqual(r.next, { hooks: { PermissionRequest: [{ matcher: "Bash", hooks: [{ type: "command", command: "other" }] }] }, model: "m" });
-  const only = planRemove(planInstall({ model: "m" }, CMD).next);
+  const only = planRemove(planInstall({ model: "m" }, CMD).next, SCRIPT, "darwin");
   assert.deepEqual(only.next, { model: "m" });
-  assert.equal(planRemove({ model: "m" }).removed, 0);
+  assert.equal(planRemove({ model: "m" }, SCRIPT, "darwin").removed, 0);
+});
+
+test("the hook path is single-quoted, so a space or an apostrophe in it cannot break the command", () => {
+  const odd = gatewayCommand({ repo: "/Users/o'brien/my repo", port: 8787, platform: "darwin" });
+  assert.equal(odd, `node '/Users/o'\\''brien/my repo/packages/daemon/hooks/${GATEWAY_FILE}'`);
+  assert.equal(gatewayCommand({ repo: "C:\\ao", port: 8787, platform: "win32" }).startsWith('node "'), true);
+});
+
+test("planRemove takes out only THIS checkout's hook and reports the other checkout's as left alone", () => {
+  const other = gatewayCommand({ repo: "/other/checkout", port: 8787, platform: "darwin" });
+  const both = { hooks: { PermissionRequest: [{ matcher: "Bash", hooks: [{ type: "command", command: other }] }, { matcher: "Bash", hooks: [{ type: "command", command: CMD }] }] } };
+  const r = planRemove(both, SCRIPT, "darwin");
+  assert.equal(r.removed, 1);
+  assert.equal(r.foreign, 1);
+  assert.deepEqual(r.next.hooks.PermissionRequest.map((e) => e.hooks[0].command), [other]);
+  const onlyOther = planRemove({ hooks: { PermissionRequest: [{ hooks: [{ command: other }] }] } }, SCRIPT, "darwin");
+  assert.equal(onlyOther.removed, 0);
+  assert.equal(onlyOther.foreign, 1);
 });
 
 // ── files ──
@@ -87,6 +106,21 @@ test("writeSettings backs up first, keeps the file's permissions, and leaves no 
   assert.equal(JSON.parse(fs.readFileSync(file, "utf8")).extra, 1);
   assert.equal(fs.statSync(file).mode & 0o777, 0o640);
   assert.deepEqual(fs.readdirSync(path.dirname(file)).filter((f) => f.includes("tmp")), []);
+  rm(home);
+});
+
+test("writeSettings on a symlinked settings.json writes the target and keeps the link", () => {
+  const home = mkHome();
+  const real = path.join(home, "dotfiles", "claude-settings.json");
+  fs.mkdirSync(path.dirname(real), { recursive: true });
+  fs.writeFileSync(real, JSON.stringify({ model: "opus" }));
+  const link = settingsPath(home);
+  fs.mkdirSync(path.dirname(link), { recursive: true });
+  fs.symlinkSync(real, link);
+  const { backup } = writeSettings(link, { model: "opus", extra: 1 });
+  assert.equal(fs.lstatSync(link).isSymbolicLink(), true, "the link must survive");
+  assert.equal(JSON.parse(fs.readFileSync(real, "utf8")).extra, 1);
+  assert.ok(backup.startsWith(path.dirname(real)), "the backup sits next to the real file");
   rm(home);
 });
 
@@ -267,5 +301,42 @@ test("with several projects, --project picks one and an unknown slug is an error
   const w = await world({ projects: ["crm", "web"] });
   assert.equal(await w.run(["setup", "--dry-run", "--project", "nope"]), 1);
   assert.match(w.text(), /no project "nope"/);
+  await w.close();
+});
+
+test("--port must be a whole number from 1 to 65535", async () => {
+  const w = await world();
+  for (const bad of [NaN, 0, 70000, 8787.5, -1]) {
+    assert.equal(await w.run(["setup", "--dry-run"], { port: bad }), 2, String(bad));
+  }
+  assert.match(w.text(), /--port must be a whole number from 1 to 65535/);
+  await w.close();
+});
+
+test("on Windows a port other than 8787 is refused instead of silently pointing the hook at 8787", async () => {
+  const w = await world();
+  assert.equal(await w.run(["setup", "--yes"], { platform: "win32" }), 2);
+  assert.match(w.text(), /cannot carry a port other than 8787/);
+  assert.equal(fs.existsSync(settingsPath(w.home)), false);
+  await w.close();
+});
+
+test("remove --dry-run does not call the daemon, so it is allowed on the default port and changes nothing", async () => {
+  const w = await world();
+  const file = settingsPath(w.home);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(planInstall({}, gatewayCommand({ repo: REPO, port: 8787, platform: process.platform })).next));
+  const before = fs.readFileSync(file, "utf8");
+  assert.equal(await w.run(["remove", "--dry-run"], { port: 8787, fetchFn: () => { throw new Error("must not touch the network"); } }), 0);
+  assert.equal(fs.readFileSync(file, "utf8"), before);
+  await w.close();
+});
+
+test("the usage text says what --dry-run still does (pairing code, getMe) instead of 'sends nothing'", async () => {
+  const w = await world();
+  await w.run([]);
+  assert.match(w.text(), /still talks to the daemon/);
+  assert.match(w.text(), /pairing code/);
+  assert.doesNotMatch(w.text(), /changes nothing and sends nothing/);
   await w.close();
 });

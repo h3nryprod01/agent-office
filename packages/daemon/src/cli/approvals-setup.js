@@ -6,8 +6,9 @@
 //           and wait for the tap.
 //   remove  take the hook out again (same backup rule).
 //
-// `--dry-run` shows what (b) would change and does (a), (c), (d), but never writes the settings file and
-// never sends the test approval (e). It refuses port 8787 (the default daemon): a dry run is for a test daemon.
+// `--dry-run` shows what (b) would change and does (a), (c), (d) (so it still talks to the daemon and may create a
+// pairing code), but never writes the settings file and never sends the test approval (e). It refuses port 8787
+// (the default daemon): a dry run is for a test daemon.
 //
 // Secrets: the bot token is never printed, never stored by this command, never put in a URL we print.
 // Everything with side effects (fs, network, prompts, clock) is injected so tests run on a temp HOME, a
@@ -26,11 +27,14 @@ const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v)
 const commandsOf = (entry) => (Array.isArray(entry?.hooks) ? entry.hooks.map((h) => (typeof h?.command === "string" ? h.command : "")) : []);
 const isOurs = (entry) => commandsOf(entry).some((c) => c.includes(GATEWAY_FILE));
 
-/** The shell command Claude Code runs. A non-default port is passed through the environment the gateway reads. */
+export const gatewayScript = (repo) => path.join(repo, "packages", "daemon", "hooks", GATEWAY_FILE);
+const shellQuote = (text, platform) => (platform === "win32" ? `"${text}"` : `'${text.replace(/'/g, `'\\''`)}'`);
+
+/** The shell command Claude Code runs. A non-default port is passed through the environment the gateway reads
+ * (not possible in a Windows hook command: setup refuses that case). The path is quoted so spaces and quotes in it are safe. */
 export function gatewayCommand({ repo, port = DEFAULT_PORT, platform = process.platform }) {
-  const script = path.join(repo, "packages", "daemon", "hooks", GATEWAY_FILE);
   const prefix = port !== DEFAULT_PORT && platform !== "win32" ? `AGENT_OFFICE_PORT=${port} ` : "";
-  return `${prefix}node "${script}"`;
+  return `${prefix}node ${shellQuote(gatewayScript(repo), platform)}`;
 }
 
 export function hookEntry(command) {
@@ -53,29 +57,33 @@ export function planInstall(settings, command) {
   return { ok: true, next, state: "added" };
 }
 
-/** @returns {{ok: true, next: object, removed: number} | {ok: false, error: string}} */
-export function planRemove(settings) {
+/**
+ * Remove only the hook that runs THIS checkout's gateway script (`script` = its full path); an Agent Office hook
+ * that points at another checkout is left alone and counted in `foreign`.
+ * @returns {{ok: true, next: object, removed: number, foreign: number} | {ok: false, error: string}}
+ */
+export function planRemove(settings, script, platform = process.platform) {
   if (!isObject(settings)) return { ok: false, error: "settings.json is not a JSON object" };
   const list = settings.hooks?.PermissionRequest;
-  if (list === undefined) return { ok: true, next: settings, removed: 0 };
+  if (list === undefined) return { ok: true, next: settings, removed: 0, foreign: 0 };
   if (!Array.isArray(list)) return { ok: false, error: '"hooks.PermissionRequest" in settings.json is not a list' };
+  const mine = (h) => typeof h?.command === "string" && (h.command.includes(script) || h.command.includes(shellQuote(script, platform)));
   let removed = 0;
+  let foreign = 0;
   const kept = [];
   for (const entry of list) {
-    if (!isOurs(entry)) {
-      kept.push(entry);
-      continue;
-    }
-    // an entry that also holds someone else's hook keeps those
-    const others = (entry.hooks ?? []).filter((h) => !(typeof h?.command === "string" && h.command.includes(GATEWAY_FILE)));
-    removed += (entry.hooks ?? []).length - others.length;
-    if (others.length > 0) kept.push({ ...entry, hooks: others });
+    const hooks = Array.isArray(entry?.hooks) ? entry.hooks : [];
+    const others = hooks.filter((h) => !mine(h));
+    removed += hooks.length - others.length;
+    foreign += others.filter((h) => typeof h?.command === "string" && h.command.includes(GATEWAY_FILE)).length;
+    if (others.length === hooks.length) kept.push(entry);
+    else if (others.length > 0) kept.push({ ...entry, hooks: others }); // an entry that also holds someone else's hook keeps those
   }
-  if (removed === 0) return { ok: true, next: settings, removed: 0 };
+  if (removed === 0) return { ok: true, next: settings, removed: 0, foreign };
   const { PermissionRequest: _old, ...restHooks } = settings.hooks;
   const hooks = kept.length > 0 ? { ...restHooks, PermissionRequest: kept } : restHooks;
   const { hooks: _h, ...rest } = settings;
-  return { ok: true, next: Object.keys(hooks).length > 0 ? { ...rest, hooks } : rest, removed };
+  return { ok: true, next: Object.keys(hooks).length > 0 ? { ...rest, hooks } : rest, removed, foreign };
 }
 
 // ── settings file I/O ────────────────────────────────────────────────────────────────────
@@ -103,7 +111,14 @@ export function readSettings(file) {
 const stamp = (ms) => new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\..*$/, "").replace("T", "-");
 
 /** Back up (when the file exists), then write atomically with the file's own permissions. @returns {{backup: string|null}} */
-export function writeSettings(file, next, { now = Date.now } = {}) {
+export function writeSettings(requested, next, { now = Date.now } = {}) {
+  // a settings.json that is a symlink (dotfiles repo): write the file it points to, so the link survives
+  let file = requested;
+  try {
+    file = fs.realpathSync(requested);
+  } catch {
+    // does not exist yet
+  }
   let mode = 0o600;
   let backup = null;
   if (fs.existsSync(file)) {
@@ -144,7 +159,9 @@ const USAGE = `Usage:
   ao approvals setup  [--dry-run] [--yes] [--project <slug>] [--port N] [--wait <seconds>]
   ao approvals remove [--dry-run] [--yes]
 Registers (or removes) the Claude Code hook that lets you answer permission prompts from Telegram.
---dry-run changes nothing and sends nothing; it refuses port ${DEFAULT_PORT} (the default daemon): use a test daemon.`;
+--dry-run writes no file and sends no test approval, but it still talks to the daemon: it asks which projects exist,
+creates a pairing code (someone who redeems it becomes a member of that daemon's project) and, if you hand it a bot
+token, asks Telegram who the token belongs to. It refuses port ${DEFAULT_PORT} (the default daemon): use a test daemon.`;
 
 const TOKEN_HELP = [
   "No bot token reaches the daemon yet. To make a bot:",
@@ -188,7 +205,15 @@ export async function runApprovalsCommand(argv, ctx) {
     log(USAGE);
     return action ? 2 : 0;
   }
-  if (dryRun && port === DEFAULT_PORT) {
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    log(`--port must be a whole number from 1 to 65535 (got ${JSON.stringify(String(port))}).`);
+    return 2;
+  }
+  if (action === "setup" && platform === "win32" && port !== DEFAULT_PORT && !dryRun) {
+    log(`On Windows the hook cannot carry a port other than ${DEFAULT_PORT} (it would silently talk to ${DEFAULT_PORT}). Run the daemon on ${DEFAULT_PORT}, or set AGENT_OFFICE_PORT for Claude Code yourself.`);
+    return 2;
+  }
+  if (action === "setup" && dryRun && port === DEFAULT_PORT) {
     log(`--dry-run refuses port ${DEFAULT_PORT}: that is the default (real) daemon. Start a test daemon on another port and pass --port <N>.`);
     return 2;
   }
@@ -202,9 +227,10 @@ export async function runApprovalsCommand(argv, ctx) {
     if (!read.ok) return log(`  ✗ ${read.error}`), 1;
     const result = plan(read.settings);
     if (!result.ok) return log(`  ✗ ${result.error}`), 1;
-    if (result.state === "already" || result.removed === 0) return log(`  ✓ ${verb === "remove" ? "no Agent Office hook in" : "already registered in"} ${file}`), 0;
+    if (verb === "remove" && result.foreign > 0) log(`  Left alone: ${result.foreign} Agent Office hook(s) in ${file} that point at another checkout.`);
+    if (result.state === "already" || result.removed === 0) return log(`  ✓ ${verb === "remove" ? "no hook for this checkout in" : "already registered in"} ${file}`), 0;
     log(`  Change to ${file}${read.exists ? "" : " (the file does not exist yet)"}:`);
-    for (const line of JSON.stringify(verb === "remove" ? { removed: `PermissionRequest hook running ${GATEWAY_FILE}` } : { hooks: { PermissionRequest: [hookEntry(command)] } }, null, 2).split("\n")) log(`    ${line}`);
+    for (const line of JSON.stringify(verb === "remove" ? { removed: `PermissionRequest hook running ${gatewayScript(repo)}` } : { hooks: { PermissionRequest: [hookEntry(command)] } }, null, 2).split("\n")) log(`    ${line}`);
     log("  Everything else in the file is kept; the file is re-written as 2-space JSON.");
     if (dryRun) return log("  (dry run: nothing written)"), 0;
     if (!(await confirm(`  Write this to ${file}?`))) return log("  Not written."), 3;
@@ -219,7 +245,7 @@ export async function runApprovalsCommand(argv, ctx) {
 
   if (action === "remove") {
     log("Removing the Agent Office approve hook");
-    const code = await changeSettings(planRemove, { verb: "remove", doneText: "removed. Claude Code shows its normal prompts again (new sessions)." });
+    const code = await changeSettings((s) => planRemove(s, gatewayScript(repo), platform), { verb: "remove", doneText: "removed. Claude Code shows its normal prompts again (new sessions)." });
     return code;
   }
 

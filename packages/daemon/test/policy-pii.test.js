@@ -22,9 +22,10 @@ test("validatePolicy accepts a boolean piiGuard and rejects anything else", () =
   }
 });
 
-test("requiredRole: switching the shield OFF is owner work, switching it on is manager work", () => {
+test("requiredRole: switching the shield OFF explicitly is owner work; a save that just does not mention it is not", () => {
   const n = (raw) => normalizePolicy(raw);
-  assert.equal(requiredRole(n({ piiGuard: true }), n({})), "owner");
+  assert.equal(requiredRole(n({ piiGuard: true }), n({})), "manager"); // the store keeps the flag, so nothing loosens
+  assert.equal(requiredRole(n({ piiGuard: true }), n({ approval: { mode: "deny" } })), "manager");
   assert.equal(requiredRole(n({ piiGuard: true }), n({ piiGuard: false })), "owner");
   assert.equal(requiredRole(n({}), n({ piiGuard: true })), "manager");
   assert.equal(requiredRole(n({ piiGuard: true }), n({ piiGuard: true, approval: { mode: "deny" } })), "manager");
