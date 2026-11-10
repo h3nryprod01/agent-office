@@ -37,7 +37,7 @@ export interface DemoSource {
   stop(): void;
   restart(): void;
   play(): void;
-  onProgress: ((i: { simTimeMs: number; durationMs: number; playing: boolean }) => void) | null;
+  onProgress: ((i: { simTimeMs: number; durationMs: number; playing: boolean; speed: number }) => void) | null;
 }
 
 export interface FirstRunOptions {
