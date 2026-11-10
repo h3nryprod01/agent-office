@@ -22,10 +22,25 @@ param(
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest,
     # Must match install-daemon-service.ps1's default; that script registers the
     # task under this name.
-    [string]$TaskName = "AgentOfficeDaemon"
+    [string]$TaskName = "AgentOfficeDaemon",
+    # Answers yes to "install the daemon as a background task?" (otherwise it asks).
+    [switch]$Yes
 )
 
 $ErrorActionPreference = "Stop"
+
+# Messages are English; Vietnamese when LANG starts with "vi" (or Windows is set to Vietnamese).
+function Test-Vi { return (($env:LANG -like "vi*") -or ((Get-Culture).Name -like "vi*")) }
+function Say([string]$En, [string]$Vi) { if (Test-Vi) { return $Vi } else { return $En } }
+function Confirm-Yes([string]$En, [string]$Vi) {
+    if ($Yes) { return $true }
+    if (-not [Environment]::UserInteractive -or [Console]::IsInputRedirected) {
+        [Console]::Error.WriteLine((Say "$En (no terminal: assuming no; re-run with -Yes to agree)" "$Vi (khong co terminal: coi nhu khong; chay lai voi -Yes de dong y)"))
+        return $false
+    }
+    $ans = Read-Host (Say "$En [y/N]" "$Vi [c/K]")
+    return ($ans -match "^[yYcC]")
+}
 
 $Repo = (Resolve-Path "$PSScriptRoot\..").Path
 # localhost, KHÔNG phải 127.0.0.1: trình duyệt coi đây là hai origin riêng và
@@ -35,7 +50,7 @@ $Url = "http://localhost:8787"
 
 # lane L1: operations verbs, and a readiness check before anything is installed
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-    Write-Error "Node.js 20+ is required: winget install OpenJS.NodeJS.LTS"
+    Write-Error (Say "Node.js 20+ is required: winget install OpenJS.NodeJS.LTS" "Can Node.js 20+: winget install OpenJS.NodeJS.LTS")
     exit 1
 }
 if ($Command -in @("doctor", "update", "backup", "restore", "lan", "token")) {
@@ -72,13 +87,19 @@ foreach ($pkg in @("daemon", "renderer")) {
 npm --prefix (Join-Path $Repo "packages\renderer") run build
 if ($LASTEXITCODE -ne 0) { throw "renderer build failed - not opening a browser on a stale bundle" }
 
+$DaemonProc = $null
 if (-not (Test-Daemon)) {
-    & (Join-Path $Repo "scripts\install-daemon-service.ps1")
+  if (Confirm-Yes "No daemon is running. Install it as a background task that starts at logon?" "Chua co daemon nao chay. Cai no lam tac vu nen tu chay khi dang nhap?") {
+    & (Join-Path $Repo "scripts\install-daemon-service.ps1") -Yes
     # Windows differs from macOS here, and quietly. launchd's RunAtLoad starts the
     # daemon the moment it is bootstrapped; Register-ScheduledTask only arms a
     # logon trigger, so without this line the office would appear at the user's
     # next logon and the wait below would time out for no visible reason.
     Start-ScheduledTask -TaskName $TaskName
+  } else {
+    Write-Output (Say "Running the daemon in this window; Ctrl+C stops it." "Chay daemon ngay trong cua so nay; Ctrl+C de dung.")
+    $DaemonProc = Start-Process node -ArgumentList @("--max-old-space-size=768", (Join-Path $Repo "packages\daemon\src\index.js")) -NoNewWindow -PassThru
+  }
 }
 
 foreach ($attempt in 1..50) {
@@ -88,9 +109,10 @@ foreach ($attempt in 1..50) {
 
 if (-not (Test-Daemon)) {
     $Log = Join-Path $env:LOCALAPPDATA "agent-office\agent-office-daemon.log"
-    Write-Error "daemon im lang o $Url - log: $Log"
+    Write-Error (Say "daemon is silent at $Url - log: $Log" "daemon im lang o $Url - log: $Log")
     exit 1
 }
 
 Write-Output "Agent Office -> $Url"
 Start-Process $Url
+if ($DaemonProc) { Wait-Process -Id $DaemonProc.Id }

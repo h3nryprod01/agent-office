@@ -17,6 +17,7 @@
     "templates",
     "scripts/*.mjs",
     "!scripts/*.test.mjs",
+    "scripts/_ui.sh",
     "scripts/install-*.sh",
     "scripts/install-daemon-service.ps1",
     "LICENSE",

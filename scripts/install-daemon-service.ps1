@@ -4,6 +4,7 @@
 #
 # Usage (in PowerShell, from the repo root):
 #   powershell -ExecutionPolicy Bypass -File scripts\install-daemon-service.ps1
+#   powershell -ExecutionPolicy Bypass -File scripts\install-daemon-service.ps1 -Yes     (skip the question)
 #   powershell -ExecutionPolicy Bypass -File scripts\install-daemon-service.ps1 uninstall
 #
 # R14 NOTE: not linted on macOS (no pwsh). Windows PowerShell 5.1 ships with
@@ -14,10 +15,25 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)][string]$Mode = "install",
-    [string]$TaskName = "AgentOfficeDaemon"
+    [string]$TaskName = "AgentOfficeDaemon",
+    # Answers the "install a background task?" question.
+    [switch]$Yes
 )
 
 $ErrorActionPreference = "Stop"
+
+# Messages are English; Vietnamese when LANG starts with "vi" (or Windows is set to Vietnamese).
+function Test-Vi { return (($env:LANG -like "vi*") -or ((Get-Culture).Name -like "vi*")) }
+function Say([string]$En, [string]$Vi) { if (Test-Vi) { return $Vi } else { return $En } }
+function Confirm-Yes([string]$En, [string]$Vi) {
+    if ($Yes) { return $true }
+    if (-not [Environment]::UserInteractive -or [Console]::IsInputRedirected) {
+        [Console]::Error.WriteLine((Say "$En (no terminal: assuming no; re-run with -Yes to agree)" "$Vi (khong co terminal: coi nhu khong; chay lai voi -Yes de dong y)"))
+        return $false
+    }
+    $ans = Read-Host (Say "$En [y/N]" "$Vi [c/K]")
+    return ($ans -match "^[yYcC]")
+}
 
 $Repo = (Resolve-Path "$PSScriptRoot\..").Path
 $Script = Join-Path $Repo "packages\daemon\src\index.js"
@@ -30,6 +46,11 @@ if ($Mode -eq "uninstall") {
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
     Write-Output "uninstalled $TaskName"
     exit 0
+}
+
+if (-not (Confirm-Yes "Install Agent Office as a scheduled task that starts at logon and restarts on crash?" "Cai Agent Office thanh tac vu tu chay khi dang nhap va tu khoi dong lai khi loi?")) {
+    [Console]::Error.WriteLine((Say "Not installed. To run in the foreground instead: node packages\daemon\src\index.js" "Chua cai. Muon chay o tien canh: node packages\daemon\src\index.js"))
+    exit 1
 }
 
 # Idempotent: drop an existing task before re-registering (re-run to update).

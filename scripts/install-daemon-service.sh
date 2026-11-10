@@ -1,8 +1,13 @@
 #!/bin/bash
 # Install the Agent Office daemon as a macOS launchd user agent:
 # starts at login, restarts on crash, logs to ~/Library/Logs.
-# Usage: ./scripts/install-daemon-service.sh [uninstall]
+# Usage: ./scripts/install-daemon-service.sh [--yes] [uninstall]
+# Asks before installing; --yes answers the question.
 set -euo pipefail
+
+# shellcheck source=_ui.sh
+. "$(dirname "$0")/_ui.sh"
+parse_yes "$@"
 
 LABEL="com.agentoffice.daemon"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
@@ -13,12 +18,16 @@ LOG="$HOME/Library/Logs/agent-office-daemon.log"
 # and bake it into the plist — else POST /chat fails with "spawn claude ENOENT".
 CLAUDE="$(command -v claude || true)"
 
-if [ "${1:-}" = "uninstall" ]; then
+if [ "${1:-}" = "uninstall" ] || [ "${2:-}" = "uninstall" ]; then
   launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
   rm -f "$PLIST"
   echo "uninstalled $LABEL"
   exit 0
 fi
+
+confirm "Install Agent Office as a background service (starts at login, restarts on crash)? This writes $PLIST and runs launchctl." \
+  "Cài Agent Office làm dịch vụ chạy nền (tự chạy khi đăng nhập, tự khởi động lại khi lỗi)? Việc này ghi $PLIST và chạy launchctl." ||
+  die "Not installed. To run in the foreground instead: node packages/daemon/src/index.js" "Chưa cài. Muốn chạy ở tiền cảnh: node packages/daemon/src/index.js"
 
 mkdir -p "$HOME/Library/LaunchAgents"
 cat > "$PLIST" << EOF
@@ -61,8 +70,9 @@ for _ in 1 2 3 4 5; do
   sleep 1
 done
 if [ "$ok" != 1 ]; then
-  echo "launchctl bootstrap failed: $err" >&2
-  echo "finish by hand: launchctl bootstrap gui/$(id -u) '$PLIST'" >&2
+  say_err "launchctl bootstrap failed: $err" "launchctl bootstrap thất bại: $err"
+  say_err "finish by hand: launchctl bootstrap gui/$(id -u) '$PLIST'" "làm nốt bằng tay: launchctl bootstrap gui/$(id -u) '$PLIST'"
   exit 1
 fi
 echo "installed $LABEL (node: $NODE, claude: ${CLAUDE:-<not found, CHAT_CLAUDE_BIN unset>}, repo: $REPO, log: $LOG)"
+say "Remove it any time: ./scripts/install-daemon-service.sh uninstall" "Gỡ bất cứ lúc nào: ./scripts/install-daemon-service.sh uninstall"
