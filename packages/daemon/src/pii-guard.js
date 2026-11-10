@@ -11,12 +11,11 @@
 // deliberately on the safe side: a person who belongs to a shielded project and to a plain one gets the
 // masked text in their private chat for both.
 //
-// Fail closed: if a shielded project's files cannot be read, its chats are masked rather than let through.
+// Fail closed: if the project list or a project.json cannot be read, EVERYTHING is masked (see scan()).
 
 import fs from "node:fs";
 import path from "node:path";
 import { DEFAULT_PROJECTS_DIR, PROJECT_SLUG_RE, readProject } from "./projects.js";
-import { PolicyStore } from "./policy-store.js";
 import { boundChat, CHANNELS } from "./members.js";
 import { dropCutTail, emptyCounts, redactPii, totalCount } from "./redact-pii.js";
 
@@ -28,33 +27,73 @@ export class PiiGuard {
   /**
    * @param {Object} [opts]
    * @param {string} [opts.projectsDir]
-   * @param {PolicyStore} [opts.store]
    * @param {Array<{channel: string, chatId: string}>} [opts.legacy] operator chats from the environment
    * @param {() => number} [opts.now]
+   * @param {{warn: (m: string) => void}} [opts.log]
+   * @param {(dir: string) => import("node:fs").Dirent[]} [opts.readDir] injectable for tests
+   * @param {(file: string) => string} [opts.readFile] injectable for tests
    */
-  constructor({ projectsDir = DEFAULT_PROJECTS_DIR, store = null, legacy = [], now = Date.now } = {}) {
+  constructor({ projectsDir = DEFAULT_PROJECTS_DIR, legacy = [], now = Date.now, log = console, readDir = (d) => fs.readdirSync(d, { withFileTypes: true }), readFile = (f) => fs.readFileSync(f, "utf8") } = {}) {
     this.projectsDir = projectsDir;
-    this.store = store ?? new PolicyStore({ projectsDir, cacheMs: 0 });
     this.legacy = legacy.map((l) => ({ channel: l.channel, chatId: String(l.chatId) }));
     this.now = now;
+    this.log = log;
+    this.readDir = readDir;
+    this.readFile = readFile;
+    this.failing = false;
   }
 
-  /** Slugs of the projects with the shield on (empty = the guard is a no-op). */
-  shielded() {
+  /**
+   * Which projects have the shield on. FAIL CLOSED: if the project list cannot be read, or one project's
+   * project.json exists but cannot be read or parsed (so its flag is unknown), the answer is `all: true`
+   * and everything is masked until it can be read again. The flag is read straight from the file (a
+   * "true" string or anything else that is not false/absent counts as on) so a project that fails the
+   * policy validation in some other field is still shielded.
+   * @returns {{all: boolean, slugs: string[]}}
+   */
+  scan() {
+    const slugs = [];
+    let all = false;
+    let entries = [];
     try {
-      return this.store.projects().filter((p) => p.policy.piiGuard === true).map((p) => p.slug);
-    } catch {
-      return [];
+      entries = this.readDir(this.projectsDir);
+    } catch (error) {
+      if (error?.code !== "ENOENT") all = true; // no projects directory at all = nothing to shield
     }
+    for (const e of entries) {
+      if (!e.isDirectory() || !PROJECT_SLUG_RE.test(e.name)) continue;
+      let meta;
+      try {
+        meta = JSON.parse(this.readFile(path.join(this.projectsDir, e.name, "project.json")));
+      } catch (error) {
+        if (error?.code !== "ENOENT") all = true; // a directory without project.json is not a project
+        continue;
+      }
+      if (meta === null || typeof meta !== "object" || Array.isArray(meta)) {
+        all = true;
+        continue;
+      }
+      const flag = meta.policy?.piiGuard;
+      if (flag !== undefined && flag !== null && flag !== false) slugs.push(e.name);
+    }
+    if (all && !this.failing) this.log.warn("[pii-guard] could not read the project list or a project.json: masking all chat output until it can be read");
+    this.failing = all;
+    return { all, slugs };
   }
 
-  /** The shielded projects this chat belongs to. */
+  /** Slugs of the projects with the shield on (empty = nothing to mask). With `all` true the list is incomplete: see scan(). */
+  shielded() {
+    return this.scan().slugs;
+  }
+
+  /** @returns {{mask: boolean, slugs: string[]}} mask = this chat's text must be masked; slugs = whose audit to count it in */
   projectsFor(channel, chatId) {
-    const slugs = this.shielded();
-    if (slugs.length === 0) return [];
+    const { all, slugs } = this.scan();
+    if (all) return { mask: true, slugs };
+    if (slugs.length === 0) return { mask: false, slugs };
     const id = String(chatId);
-    if (this.legacy.some((l) => l.channel === channel && l.chatId === id)) return slugs;
-    return slugs.filter((slug) => {
+    if (this.legacy.some((l) => l.channel === channel && l.chatId === id)) return { mask: true, slugs };
+    const mine = slugs.filter((slug) => {
       try {
         const project = readProject({ projectsDir: this.projectsDir, slug });
         if (boundChat(project, channel) === id) return true;
@@ -64,13 +103,13 @@ export class PiiGuard {
         return true; // cannot tell → treat as belonging
       }
     });
+    return { mask: mine.length > 0, slugs: mine };
   }
 
   /** @returns {string} the text to send */
   apply(channel, chatId, text) {
-    const slugs = this.projectsFor(channel, chatId);
-    if (slugs.length === 0) return text;
-    return this.#mask(slugs, channel, text);
+    const { mask, slugs } = this.projectsFor(channel, chatId);
+    return mask ? this.#mask(slugs, channel, text) : text;
   }
 
   /**
@@ -80,9 +119,10 @@ export class PiiGuard {
    * untouched (the caller still applies its own length limit).
    */
   maskForProject(slug, text, { max = Infinity, alreadyCut = false } = {}) {
-    const slugs = slug ? this.shielded().filter((s) => s === slug) : this.shielded();
-    if (slugs.length === 0) return text;
-    const masked = this.#mask(slugs, "text", text);
+    const { all, slugs } = this.scan();
+    const mine = slug ? slugs.filter((s) => s === slug) : slugs;
+    if (!all && mine.length === 0) return text;
+    const masked = this.#mask(mine, "text", text);
     const cut = masked.length > max;
     const out = cut ? masked.slice(0, max) : masked;
     return cut || alreadyCut ? dropCutTail(out) : out;
@@ -90,8 +130,8 @@ export class PiiGuard {
 
   /** For a channel that has one fixed operator chat and no project context (the OS-notification push). */
   applyToOperator(channel, text) {
-    const slugs = this.shielded();
-    return slugs.length === 0 ? text : this.#mask(slugs, channel, text);
+    const { all, slugs } = this.scan();
+    return all || slugs.length > 0 ? this.#mask(slugs, channel, text) : text;
   }
 
   #mask(slugs, channel, text) {
