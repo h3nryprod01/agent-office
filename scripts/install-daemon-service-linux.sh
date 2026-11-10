@@ -17,9 +17,21 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 NODE="$(command -v node)"
 ENV_FILE="$HOME/.config/agent-office/env"
 
-confirm "Install Agent Office as a systemd user service (starts at login, keeps running after logout via linger)?" \
-  "Cài Agent Office làm dịch vụ systemd của người dùng (tự chạy khi đăng nhập, chạy tiếp sau khi đăng xuất nhờ linger)?" ||
-  die "Not installed. To run in the foreground instead: node packages/daemon/src/index.js" "Chưa cài. Muốn chạy ở tiền cảnh: node packages/daemon/src/index.js"
+# A unit from another copy (e.g. a git clone) may already exist: say so, installing replaces it.
+OLD=""
+if [ -f "$UNIT" ]; then
+  OLD="$(sed -n 's#^ExecStart=.* \(.*\)/packages/daemon/src/index.js$#\1#p' "$UNIT" | head -n 1)"
+fi
+REPLACE_EN=""
+REPLACE_VI=""
+if [ -n "$OLD" ] && [ "$OLD" != "$REPO" ]; then
+  REPLACE_EN=" This will REPLACE the service currently running from $OLD."
+  REPLACE_VI=" Việc này sẽ THAY dịch vụ đang chạy từ $OLD."
+fi
+
+confirm "Install Agent Office as a systemd user service (starts at login, keeps running after logout via linger)?$REPLACE_EN" \
+  "Cài Agent Office làm dịch vụ systemd của người dùng (tự chạy khi đăng nhập, chạy tiếp sau khi đăng xuất nhờ linger)?$REPLACE_VI" ||
+  die "Not installed. To run in the foreground instead: node $REPO/packages/daemon/src/index.js" "Chưa cài. Muốn chạy ở tiền cảnh: node $REPO/packages/daemon/src/index.js"
 
 # systemd --user does NOT inherit the shell environment, so without an
 # EnvironmentFile the daemon can never see TELEGRAM_BOT_TOKEN and every Telegram
@@ -98,7 +110,8 @@ WorkingDirectory=$REPO
 # systemd --user PATH is sparse (no ~/.local/bin) → the daemon can't find the
 # claude/codex/gemini CLIs it spawns for the PM chat + harness probes (ENOENT).
 Environment=PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
-EnvironmentFile=-$ENV_FILE
+${AGENT_OFFICE_REPO:+Environment=AGENT_OFFICE_REPO=$AGENT_OFFICE_REPO
+}EnvironmentFile=-$ENV_FILE
 Restart=always
 
 [Install]
