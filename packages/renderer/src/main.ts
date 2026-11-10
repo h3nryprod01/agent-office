@@ -47,6 +47,7 @@ import { PolicyAlertsStore } from "./ui/policyAlerts";
 import { mountPolicyPanel, type AuditRow, type PolicyBody, type PolicyPanelHandle, type ProjectPolicy } from "./ui/policyPanel";
 // lane L9: presentation mode (data-layer masking)
 import { installPresentationMode, isPresentationMode, mountCleanHud, mountPresentationToggle } from "./presentation";
+import { mountFirstRun } from "./ui/firstRun"; // lane I
 
 /** "" = the All tab's office; otherwise the repo name. */
 const ALL_KEY = "";
@@ -656,6 +657,8 @@ async function boot(): Promise<void> {
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+
+  if (useWs) mountFirstRun({ getState: () => state, setState: (s) => { state = s; }, resetTab: () => tabs.select(TAB_ALL) }); // lane I: labelled sample when nothing real runs
 
   // debug handle for dev-tools poking; not part of the public surface
   (window as unknown as Record<string, unknown>).__office3d = office3d;
