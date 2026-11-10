@@ -46,13 +46,27 @@ export function attachPolicyWatch(
     if (!project) return;
     // L3 JOIN POINT: the worker lane arrives as event.lane or event.meta.lane once L3 emits it.
     const violation = harnessViolation(project.policy, { harness: event.harness, lane: event.lane ?? event.meta?.lane });
-    if (!violation) return;
-    const key = `${event.sessionId}|${violation.kind}|${violation.value}`;
+    const shield = project.policy.piiGuard === true;
+    // lane A: the personal-data shield only masks what goes to chat. What a session sends to its own model
+    // provider is out of its reach, so a shielded project should say which harnesses may run: warn once when
+    // it does not. This is a warning, never a block (see the header).
+    const noList = shield && !project.policy.allowedHarnesses && !alerted.has(`pii|${project.slug}`);
+    if (!violation && !noList) return;
+    const key = violation ? `${event.sessionId}|${violation.kind}|${violation.value}` : `pii|${project.slug}`;
     if (alerted.has(key)) return;
     alerted.add(key);
 
-    const what = violation.kind === "harness" ? `harness "${violation.value}"` : `lane "${violation.value}"`;
-    const detail = `${what} is not allowed in ${project.name} (allowed: ${violation.allowed.join(", ")})`;
+    let detail;
+    let meta;
+    if (violation) {
+      const what = violation.kind === "harness" ? `harness "${violation.value}"` : `lane "${violation.value}"`;
+      detail = `${what} is not allowed in ${project.name} (allowed: ${violation.allowed.join(", ")})`;
+      if (shield) detail += `. This project handles personal data: that session may send it to another provider. This is a warning only, the session was not stopped`;
+      meta = { kind: violation.kind, value: violation.value, allowed: violation.allowed };
+    } else {
+      detail = `${project.name} has the personal-data shield on, but allowedHarnesses is not set: any harness or worker lane may see the data. Set policy.allowedHarnesses (e.g. ["claude"]). This is a warning only, nothing is blocked`;
+      meta = { kind: "pii_no_allowlist", value: "", allowed: [] };
+    }
     // sessionId/agentId are namespaced: this must not read as "sign of life" for the real agent
     // (notifier.js clears a stuck episode on any event carrying that agentId).
     original(
@@ -67,9 +81,7 @@ export function attachPolicyWatch(
         meta: {
           project: project.slug,
           projectName: project.name,
-          kind: violation.kind,
-          value: violation.value,
-          allowed: violation.allowed,
+          ...meta,
           targetSessionId: event.sessionId,
         },
       }),
@@ -78,7 +90,7 @@ export function attachPolicyWatch(
       deliver({
         title: "Agent Office",
         subtitle: `${project.name} · data rule`,
-        message: `Not allowed here: ${detail}`,
+        message: violation ? `Not allowed here: ${detail}` : detail,
         url: buildOfficeUrl(officeUrl, event.sessionId),
       });
     }

@@ -20,6 +20,7 @@ import os from "node:os";
 import { canApprove, canChat, findMemberByIdentity, listMembers, bindChat, unbindChat, projectForChat, boundChat, roleIn, projectSlugs, CHANNELS } from "./members.js";
 import { DEFAULT_PROJECTS_DIR, readItems, readProject } from "./projects.js";
 import { JsonState } from "./json-state.js";
+import { clip } from "./approvals.js";
 
 const MIN_APPROVAL_PREFIX = 4;
 const OPEN_ITEM_LIMIT = 15;
@@ -67,7 +68,7 @@ function parseCommand(text) {
 }
 
 /** A display name goes into the PM's prompt: no brackets or line breaks to fake another speaker. */
-const safeName = (name) => String(name ?? "").replace(/[\[\]\r\n]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40);
+const safeName = (name) => clip(String(name ?? "").replace(/[\[\]\r\n]/g, " ").replace(/\s+/g, " ").trim(), 40);
 
 function realOr(p) {
   try {
@@ -92,6 +93,7 @@ export class ChannelRouter {
    * @param {string|null} [opts.stateFile]
    * @param {import("./json-state.js").JsonState} [opts.state] share one instance with other writers of the same file
    * @param {(ctx: {project: object, role: string, approval: object}) => boolean} [opts.policyAllows]
+   * @param {(slug: string|null, text: string, opts?: {max?: number, alreadyCut?: boolean}) => string} [opts.mask] personal-data shield (lane A): masks the WHOLE text, then cuts to `max`
    * @param {Partial<typeof DEFAULT_LIMITS>} [opts.limits]
    * @param {() => number} [opts.now]
    */
@@ -106,6 +108,7 @@ export class ChannelRouter {
     stateFile = null,
     state = null,
     policyAllows = defaultPolicyAllows,
+    mask = (_slug, text) => text,
     limits = {},
     now = Date.now,
   }) {
@@ -117,6 +120,7 @@ export class ChannelRouter {
     this.legacyAsk = legacyAsk;
     this.state = state ?? new JsonState(stateFile);
     this.policyAllows = policyAllows;
+    this.mask = mask;
     this.limits = { ...DEFAULT_LIMITS, ...limits };
     this.now = now;
     this.limiter = new RateLimiter({ now });
@@ -355,7 +359,7 @@ export class ChannelRouter {
       `Pending approvals: ${approvals}`,
     ];
     // never in a group: the last reply may have been a private conversation
-    if (pm?.lastText && !room && showLast) lines.push(`Last PM reply: ${pm.lastText}`);
+    if (pm?.lastText && !room && showLast) lines.push(`Last PM reply: ${this.mask(slug, pm.lastText, { alreadyCut: pm.lastText.length >= 190 })}`);
     return lines.join("\n");
   }
 
@@ -405,7 +409,7 @@ export class ChannelRouter {
     const rows = [];
     for (const slug of this.#visibleSlugs(ctx)) {
       if (!canApprove(this.#roleOf(ctx, slug))) continue;
-      for (const a of this.approvalsOf(slug)) rows.push(`${a.id.slice(0, 8)} — ${slug} — ${a.tool}: ${a.preview.slice(0, 120)}`);
+      for (const a of this.approvalsOf(slug)) rows.push(`${a.id.slice(0, 8)} — ${slug} — ${a.tool}: ${clip(this.mask(slug, a.preview, { max: 120 }), 120)}`);
     }
     if (ctx.memberships.length > 0 && !ctx.legacy && !ctx.memberships.some((x) => canApprove(x.member.role))) {
       return "Your role cannot see or answer approvals.";
@@ -447,7 +451,7 @@ export class ChannelRouter {
     const short = approval.id.slice(0, 8);
     const secs = approval.expiresAt ? Math.max(0, Math.round((approval.expiresAt - this.now()) / 1000)) : null;
     const text =
-      `⚠ Approval needed${slug ? ` — ${slug}` : ""}\n${approval.tool}${approval.preview ? `: ${approval.preview.slice(0, 300)}` : ""}\n` +
+      `⚠ Approval needed${slug ? ` — ${slug}` : ""}\n${approval.tool}${approval.preview ? `: ${clip(this.mask(slug, approval.preview, { max: 300 }), 300)}` : ""}\n` +
       `/approve ${short}  ·  /deny ${short}${secs !== null ? `  (expires in ${secs}s)` : ""}`;
     const targets = [];
     if (slug) {

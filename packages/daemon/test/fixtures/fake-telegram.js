@@ -54,6 +54,7 @@ export async function startFakeTelegram({ token = "123456:FAKE-TOKEN", holdMs = 
         sent.push({ chat_id: String(body.chat_id), text: body.text, ...(body.reply_markup ? { reply_markup: body.reply_markup } : {}) });
         return json(200, { ok: true, result: { message_id: sent.length } });
       }
+      if (m[2] === "getMe") return json(200, { ok: true, result: { id: 1, is_bot: true, username: "fake_ao_bot" } });
       if (m[2] === "answerCallbackQuery") {
         answered.push(String(body.callback_query_id));
         return json(200, { ok: true, result: true });

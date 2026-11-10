@@ -14,6 +14,7 @@ import { ChannelRouter } from "./channel-router.js";
 import { DigestService } from "./digest.js";
 import { JsonState } from "./json-state.js";
 import { PmHub } from "./pm-hub.js";
+import { PiiGuard } from "./pii-guard.js";
 import { createTelegramChannel } from "./telegram-channel.js";
 import { createZaloChannel } from "./zalo-channel.js";
 import {
@@ -128,8 +129,11 @@ export function createMultiPm({
   // the other's keys (/use choices vs. which digests already went out).
   const state = new JsonState(path.join(stateDir, "channels-state.json"));
 
+  // lane A: every string that leaves for a chat passes the personal-data shield first (a no-op unless a
+  // project has policy.piiGuard). If the shield throws, the message is not sent (the router swallows that).
+  const piiGuard = new PiiGuard({ projectsDir, legacy, now });
   const send = async (channel, chatId, text, opts) => {
-    await channels[channel]?.send(chatId, text, opts);
+    await channels[channel]?.send(chatId, piiGuard.apply(channel, chatId, text), opts);
   };
   const router = new ChannelRouter({
     projectsDir,
@@ -140,6 +144,7 @@ export function createMultiPm({
     legacy,
     legacyAsk,
     state,
+    mask: (slug, text, opts) => piiGuard.maskForProject(slug, text, opts),
     now,
   });
 
@@ -147,7 +152,11 @@ export function createMultiPm({
     listSlugs: () => projectSlugs(projectsDir),
     loadProject: (slug) => readProject({ projectsDir, slug }),
     loadItems: (slug) => readItems({ projectsDir, slug }),
-    pmOf: (slug) => hub.list().find((p) => p.slug === slug) ?? null,
+    pmOf: (slug) => {
+      const pm = hub.list().find((p) => p.slug === slug) ?? null;
+      // the PM's last reply is cut at 200 characters by the hub: mask it, and drop a value cut in half
+      return pm?.lastText ? { ...pm, lastText: piiGuard.maskForProject(slug, pm.lastText, { alreadyCut: pm.lastText.length >= 190 }) } : pm;
+    },
     approvalsOf: (slug) => router.approvalsOf(slug).length,
     fetchMetrics: async (slug) => {
       const url = metricsUrl(slug);
