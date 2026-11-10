@@ -20,7 +20,8 @@ HTTP and WebSocket**; a viewer token is read-only. Tokens are 256 random bits, s
 only as SHA-256 hashes in `~/.agent-office/access.json` (mode 600). Requests carrying
 proxy headers (`X-Forwarded-For` etc.) are treated as remote even from 127.0.0.1.
 The transport is plain HTTP, so on a LAN the token is visible to anyone who can sniff
-it — trusted networks only, or a VPN / HTTPS proxy in front.
+it — trusted networks only, or a VPN / HTTPS proxy in front (see
+[HTTPS on a LAN](#https-on-a-lan)).
 
 | Surface | Protection |
 |---|---|
@@ -30,11 +31,41 @@ it — trusted networks only, or a VPN / HTTPS proxy in front.
 | `POST /zalo/webhook` | Reachable without a token **only while the Zalo channel is configured** (`ZALO_OA_TOKEN` + `ZALO_APP_ID` + `ZALO_OA_SECRET`; Zalo's servers cannot send a token); body capped at 64 KB. Each event is checked against Zalo's `X-ZEvent-Signature` before it is read, and only paired project members (plus the optional owner chat `ZALO_ALLOWED_USER`) are heard. |
 | Telegram channel | Long polling only (no inbound port). Hears `TELEGRAM_CHAT_ID` and paired project members; every approve/deny is checked against the member's role. |
 
+### Requests that carry no `Origin`
+
+The origin check refuses a request whose `Origin` header names a foreign site. A request
+with **no** `Origin` header is allowed, because curl, an address-bar visit and the served
+app's own simple GETs send none. The same is true of an `<img>` tag or a link click on a
+foreign page, so a web page you open can make your browser send such a request to the
+daemon. A page cannot read the response, but the request still arrives.
+
+Every route that changes state is a POST, which a browser sends with an `Origin` (or
+preflights). The one GET route that had a side effect was `/harnesses?probe=<key>`, which
+runs the harness CLI: for Claude it runs `claude auth status` (no tokens), for Gemini it
+sends a real prompt. It now also refuses a request the browser marks `Sec-Fetch-Site:
+cross-site` or `same-site`. The served app, curl and the address bar are unaffected.
+This relies on the browser sending Fetch Metadata headers (all current browsers do); an
+old browser that does not looks like curl and is not stopped. Other GET routes only read (the one exception is `GET /docs*` renaming a corrupt `docs-meta.json` aside, which an outside page cannot cause: it needs the file to be corrupt already and changes nothing else).
+
 Known limits: DNS rebinding against the loopback interface is closed — a loopback request only
 counts as the local user when its `Host` is a loopback name (`localhost`, `127.0.0.1`,
 `::1`, `0.0.0.0`); any other name needs a token. Opening the office by the machine's own hostname
 therefore asks for an access link. And anyone with a shell on
 the machine is the owner.
+
+## HTTPS on a LAN
+
+LAN mode serves plain HTTP; the daemon has no TLS of its own. To keep the access token
+off the wire, put a TLS terminator in front and keep the daemon itself on loopback.
+
+- **VPN (for example Tailscale):** traffic between devices is already encrypted, so
+  plain HTTP over the VPN address is acceptable. Not tested here.
+- **`tailscale serve` or a reverse proxy with a self-signed certificate** (Caddy, nginx)
+  that forwards to `127.0.0.1:8787`: not tested here, so no commands are given. Check
+  that the proxy forwards the WebSocket upgrade and keeps the `Host` header. Note that a
+  proxy on the same machine makes every request arrive from loopback; the daemon treats
+  requests carrying proxy headers (`X-Forwarded-For` and friends) as remote, so the proxy
+  must send them or the token check is bypassed. Verify with a request from another device.
 
 ## Do not do this
 
