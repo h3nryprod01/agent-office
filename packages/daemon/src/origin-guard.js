@@ -1,20 +1,38 @@
 // The daemon binds 127.0.0.1, but any web page the user opens can still fetch it
-// and open a WebSocket to it. CORS only governs whether JS may *read* a response
-// — a simple GET like /harnesses?probe= still reaches the daemon and runs its
-// side effect (spawns `claude -p`, spends a token); POST /templates/apply still
-// overwrites the roster. So decide on the Origin header BEFORE processing:
+// and open a WebSocket to it. CORS only governs whether JS may *read* a response,
+// so the request itself still arrives. The guard decides on the Origin header
+// BEFORE any route runs:
 //
-//   - No Origin        → allow. curl, a top-level navigation, and same-origin
-//                        simple GETs send none.
+//   - No Origin        → allow. curl, a top-level navigation, an <img> tag and
+//                        same-origin simple GETs send none.
 //   - Origin == self   → allow. The served app (http://<host>) fetching itself.
-//   - Loopback origin  → allow ONLY in dev (AGENT_OFFICE_DEV=1), so Vite on
-//                        another localhost port can reach the daemon. A remote
+//   - Loopback origin  → allow. Any loopback origin is the user's own machine (the
+//                        Vite dev server on another port, a local tool); a remote
 //                        site's Origin is never loopback.
 //   - anything else    → reject 403.
 //
-// This is the request-level defense. The per-route CORS `*` headers stay: in dev
-// they let the (now allowed) Vite origin read the response; in prod the app is
-// same-origin so they're ignored. A rejected origin never reaches a handler.
+// KNOWN GAP: "no Origin → allow" means a foreign page can still reach a GET route
+// with an <img>/<link>/navigation, and CORS cannot stop it. So a GET route that has a
+// side effect must also call isCrossSiteRequest() and refuse (the only one today is
+// /harnesses?probe=, which spawns the harness CLI). Routes that only read are left
+// alone: a foreign page cannot read the response. State-changing routes use POST,
+// which a browser sends with an Origin (or as a preflighted request).
+// A rejected origin never reaches a handler.
+
+/**
+ * Browsers that implement Fetch Metadata (all current ones) label every request with
+ * Sec-Fetch-Site. "cross-site" / "same-site" means a page on another site caused it
+ * (an <img>, a link click, a form). "same-origin" is the served app, "none" is the
+ * address bar, a missing header is curl or a script. Only the first two are refused.
+ * A very old browser without the header looks like curl and is not caught.
+ *
+ * @param {{headers?: Record<string, string|string[]|undefined>}} req
+ * @returns {boolean} true if a page on another site triggered this request
+ */
+export function isCrossSiteRequest(req) {
+  const site = req.headers?.["sec-fetch-site"];
+  return site === "cross-site" || site === "same-site";
+}
 
 /**
  * The threat is a REMOTE web page (evil.com) whose JS fetches/opens a WS to the

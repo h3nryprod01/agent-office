@@ -99,3 +99,24 @@ mất tiếng hoàn toàn). EN giữ nguyên speechSynthesis (Samantha tốt s�
   `GET /tts/warm`), hoặc tăng `idleMs`. Chưa làm — chờ cảm nhận thực tế.
 - Path venv demo-app nằm 1 chỗ trong `tts.js` (`DEFAULT_PYTHON`) — máy khác đặt
   `VIENEU_PYTHON`. venv thiếu → available()=false → 503 → fallback, không crash.
+
+## Giấy phép trọng số — đọc trước khi bán (thêm 10/11/2026)
+
+Phần trên là biên bản kỹ thuật ngày 08/07/2026 và không nói gì về giấy phép. Bổ sung:
+
+- Mã `vieneu` là Apache-2.0, nhưng **trọng số được cấp phép theo từng mô hình**, và các
+  bản khác nhau. Ngày 10/11/2026, trang Hugging Face của tác giả `pnnbao-ump` ghi
+  Apache-2.0 cho nhiều mô hình (VieNeu-TTS-0.3B, VieNeu-TTS-v2-Turbo, bản GGUF 0.5B) và
+  **CC BY-NC 4.0 (cấm thương mại)** cho các bản lượng tử hoá GGUF của 0.3B
+  (`VieNeu-TTS-0.3B-q4-gguf`, `-q8-gguf`). Một bản cũ hơn của model card 0.3B còn ghi phí
+  cấp phép thương mại. Các trang này đổi theo thời gian: mở lại trước khi quyết.
+- **Chưa kiểm:** `tts_worker.py` gọi `Vieneu()` không tham số, nên mô hình nào được tải
+  tuỳ phiên bản gói `vieneu` đã cài. Xác định đúng mô hình của máy đang dùng rồi đọc model
+  card chính thức của nó.
+- Repo không đóng gói trọng số. File `docs/media/voice-vi-vieneu-doan.m4a` là bản ghi
+  demo, không phải giấy phép.
+- **Mặc định giọng trình duyệt.** Không có venv + gói `vieneu` thì `/tts` trả 503 và văn
+  phòng đọc bằng giọng trình duyệt. Không bật VieNeu trong gói giao cho khách có thu
+  tiền cho tới khi xác nhận được bản đang dùng cho phép thương mại.
+- Ghi chú "mặc định hardcode path máy này" ở mục Daemon phía trên đã cũ: `tts.js` nay mặc
+  định tìm `.venv-tts/` ở gốc repo, hoặc `VIENEU_PYTHON`.
