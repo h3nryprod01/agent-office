@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DEFAULT_PROJECTS_DIR, PROJECT_SLUG_RE, readProject } from "./projects.js";
 import { boundChat, CHANNELS } from "./members.js";
-import { dropCutTail, emptyCounts, redactPii, totalCount } from "./redact-pii.js";
+import { dropCutTail, dropMarkedCuts, emptyCounts, redactPii, totalCount } from "./redact-pii.js";
 
 const AUDIT_FILE = "pii-audit.jsonl";
 const AUDIT_MAX_BYTES = 256 * 1024;
@@ -137,7 +137,9 @@ export class PiiGuard {
   #mask(slugs, channel, text) {
     const { text: masked, counts } = redactPii(text);
     if (totalCount(counts) > 0) for (const slug of slugs) this.#audit(slug, channel, counts);
-    return masked;
+    // every adapter and the broker mark a cut with a trailing "…": drop the half-cut tail of such a line,
+    // whichever project the text came from (a masked chat treats all text the same)
+    return dropMarkedCuts(masked);
   }
 
   #audit(slug, channel, counts) {

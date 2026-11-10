@@ -19,7 +19,7 @@ import { PiiGuard } from "../src/pii-guard.js";
 
 // made-up values; every one must be masked when the shield is on
 const PHONES = ["0912345678", "+84 987 654 321", "0912.345.678", "091-234-5678"];
-const CCCD = "079099012345";
+const CCCD = "001000000000";
 const CMND = "123456789";
 const EMAIL = "khach.hang@example.com";
 const SECRETS = [...PHONES, CCCD, CMND, EMAIL, "345678", "654321", "012345"];

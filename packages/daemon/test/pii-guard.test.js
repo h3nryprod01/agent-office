@@ -59,7 +59,7 @@ test("the operator's own chat is masked as soon as ANY project has the shield on
 test("the audit counts what was masked and never stores a value", () => {
   mkProject("crm", { policy: { piiGuard: true }, channels: { telegram: { chatId: "-1001" } } });
   const g = guard();
-  g.apply("telegram", "-1001", `${PHONE} và khach@example.com và 079099012345`);
+  g.apply("telegram", "-1001", `${PHONE} và khach@example.com và 001000000000`);
   g.apply("telegram", "-1001", "không có gì để che");
   const rows = g.readAudit("crm");
   assert.equal(rows.length, 1); // a message with nothing masked leaves no row
@@ -67,7 +67,7 @@ test("the audit counts what was masked and never stores a value", () => {
   assert.equal(rows[0].kind, "pii_redacted");
   assert.equal(rows[0].ts, 1_700_000_000_000);
   const raw = fs.readFileSync(path.join(projectsDir, "crm", "pii-audit.jsonl"), "utf8");
-  assert.doesNotMatch(raw, /0912345678|example\.com|079099012345|345678/);
+  assert.doesNotMatch(raw, /0912345678|example\.com|001000000000|345678/);
   assert.deepEqual(sumAudit(rows), { phone: 1, id: 1, email: 1 });
 });
 

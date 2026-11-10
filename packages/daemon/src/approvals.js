@@ -76,7 +76,7 @@ export class ApprovalBroker {
       id,
       sessionId: typeof payload.sessionId === "string" ? payload.sessionId : "",
       tool: typeof payload.tool === "string" ? payload.tool : "unknown",
-      preview: typeof payload.preview === "string" ? payload.preview.slice(0, 500) : "",
+      preview: typeof payload.preview === "string" ? clip(payload.preview, 500) : "",
       cwd: typeof payload.cwd === "string" ? payload.cwd : null,
       expiresAt: Date.now() + this.ttlMs,
       budgetExceeded: this.isOverBudget(),
@@ -129,7 +129,7 @@ export class ApprovalBroker {
       id,
       sessionId: typeof payload.sessionId === "string" ? payload.sessionId : "",
       tool: typeof payload.tool === "string" ? payload.tool : "unknown",
-      preview: typeof payload.preview === "string" ? payload.preview.slice(0, 500) : "",
+      preview: typeof payload.preview === "string" ? clip(payload.preview, 500) : "",
       cwd: typeof payload.cwd === "string" ? payload.cwd : null,
       expiresAt: Date.now(),
       budgetExceeded: this.isOverBudget(),
@@ -205,6 +205,9 @@ const ROLE_RE = /^[A-Za-z0-9_.-]{1,40}$/;
 const NAME_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const clean = (value, re) => (typeof value === "string" && re.test(value) ? value : undefined);
 
+/** Cut to `max` characters and SAY so with a trailing "…" (lane A: the personal-data shield drops the half-cut tail of a marked cut). */
+const clip = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+
 /** One-line summary of a tool_input for the queue UI. Built daemon-side so
  * the hook stays dumb; input arrives already truncated by the hook. */
 export function previewToolInput(tool, toolInput) {
@@ -212,7 +215,7 @@ export function previewToolInput(tool, toolInput) {
   if (typeof toolInput.command === "string") return toolInput.command;
   if (typeof toolInput.file_path === "string") return toolInput.file_path;
   try {
-    return JSON.stringify(toolInput).slice(0, 200);
+    return clip(JSON.stringify(toolInput), 200);
   } catch {
     return "";
   }

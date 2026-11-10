@@ -46,7 +46,7 @@ Codes live only in daemon memory: a restart invalidates them.
 
 ```
 ao approvals setup            # (a) daemon up? (b) hook in ~/.claude/settings.json (c) bot token (d) pair (e) test approval
-ao approvals setup --dry-run  # same, but writes nothing and sends no test approval (needs a test daemon: --port N, not 8787)
+ao approvals setup --dry-run  # writes no file and sends no test approval; still asks the daemon (creates a pairing code). Needs a test daemon: --port N, not 8787
 ao approvals remove           # take the hook out again
 ```
 
@@ -113,14 +113,21 @@ policy mode to `read-only`, which stops managers from approving remotely.
 For a project that handles customers' personal data, set `"policy": { "piiGuard": true }` in its `project.json`
 (owner only to turn it off). Then everything the daemon sends to Telegram or Zalo for that project passes a
 masker first: PM replies, approval alerts (and `/pending`), `/status`, the daily digest, and the notification push.
-Masked: Vietnamese phone numbers (`0912 345 678`, `+84 …`, with spaces, dots or dashes), CCCD (12 digits) and CMND
-(9 digits) numbers, e-mail addresses. Only the last 2-3 characters stay: `[phone ***678]`. The count of masked
-values (never the values) goes to `projects/<slug>/pii-audit.jsonl`. Text is masked as a whole before it is
-shortened, and a half-cut tail is dropped, so a number cannot straddle a cut.
+Masked: Vietnamese phone numbers (`0912 345 678`, `+84 (0) 912…`, `0084…`, written with spaces, tabs, dots, dashes,
+slashes, brackets, invisible characters or full-width digits), CCCD (12 digits) and CMND (9 digits, also `123.456.789`)
+numbers, e-mail addresses. Only the last 2-3 characters stay: `[phone ***678]`. The shield searches a normalised copy of
+the text but replaces the matched value in the original, so nothing else in the message is rewritten. The count of
+masked values (never the values) goes to `projects/<slug>/pii-audit.jsonl`.
+
+**Cuts.** Text is masked as a whole BEFORE it is shortened, so a value cannot straddle a cut. Text that arrives already
+cut (the approval preview, the transcript detail every adapter shortens, the PM's last reply) carries a trailing `…`
+or is a known length; in a masked chat every line ending in `…` drops its half-cut last word and any trailing run of
+digits. This applies to ALL text sent to a masked chat, whichever project it came from.
 
 It applies to the project's bound room, to the private chat of each member, and to the operator's own chat while
-any project has the shield on. **If the project list or a `project.json` cannot be read, everything is masked**
-(one warning in the log) rather than nothing.
+any project has the shield on (that chat is trusted as owner of every project, so it may receive any project's text).
+**If the project list or a `project.json` cannot be read, everything is masked** (one warning in the log) rather than
+nothing.
 
 **Limits, plainly.** It matches shapes, so it cannot find a person's name or an address, nor digits spelled out
 in words, nor a number split by letters. It can mask a harmless number that looks like an ID (a plain 9-digit
