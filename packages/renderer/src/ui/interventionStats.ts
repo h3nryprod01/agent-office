@@ -22,6 +22,8 @@ export interface InterventionSummary {
   longest?: { durationMs: number; kind: string; project: string; harness: string; endTs: number } | null;
   permission?: { count: number; denied: number; denyRate: number };
   autoApproved?: number | null;
+  /** false = nothing was ever recorded; undefined (older daemon) is treated as a quiet window */
+  anyRecords?: boolean;
   byProject?: Record<string, Stat>;
   byHarness?: Array<Stat & { harness: string }>;
 }
@@ -66,7 +68,10 @@ export function interventionStatsHtml(summary: InterventionSummary): string {
   const controls = `<div class="iv-actions">${PERIODS.map(
     (n) => `<button type="button" data-days="${n}"${n === days ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"'}>${t("intervention.days", { n })}</button>`,
   ).join("")}<button type="button" class="iv-share" title="${escapeHtml(t("intervention.shareTitle"))}">${t("intervention.share")}</button></div>`;
-  if (summary.total.count === 0) return `${head}<p class="iv-empty">${t("intervention.emptyHook")}</p>${controls}`;
+  if (summary.total.count === 0) {
+    const why = summary.anyRecords === false ? t("intervention.emptyHook") : t("intervention.emptyWindow", { n: days });
+    return `${head}<p class="iv-empty">${why}</p>${controls}`;
+  }
   const kinds = KIND_ORDER.filter((k) => (summary.byKind[k]?.count ?? 0) > 0)
     .map((k) => `<li><span class="iv-kind">${t(`intervention.kind.${k}` as Key)}</span> ${statLine(summary.byKind[k])}</li>`)
     .join("");

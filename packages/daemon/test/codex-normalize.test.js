@@ -262,3 +262,12 @@ test("the same text said twice in one format is still two speaks", () => {
   assert.equal(n.normalizeLine(agentItem("OK", "a")).length, 1);
   assert.equal(n.normalizeLine(agentItem("OK", "b")).length, 1);
 });
+
+test("the same text said again after a tool call is a new speak, not a cross-format duplicate", () => {
+  const n = new CodexSessionNormalizer(SID);
+  n.normalizeLine(sessionMeta);
+  assert.equal(n.normalizeLine(line("event_msg", { type: "agent_message", message: "Done." })).length, 1);
+  const call = line("response_item", { type: "function_call", call_id: "c9", name: "shell", arguments: "{}" });
+  assert.ok(n.normalizeLine(call).length > 0);
+  assert.equal(n.normalizeLine(agentItem("Done.")).length, 1);
+});

@@ -151,6 +151,8 @@ export class CodexSessionNormalizer {
         })
       );
     }
+    // any other activity in between means a repeated text is a new utterance, not the other format's echo
+    if (events.length > 0 && !events.some((e) => e.type === "speak")) this.lastSpoken = null;
     return events;
   }
 

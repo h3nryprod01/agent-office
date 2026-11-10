@@ -341,10 +341,11 @@ function episodeEnd(e) {
  * @param {string} [q.date] a single local day, overrides days
  * @param {string} [q.project] project slug or repo name
  * @param {string} [q.kind] one of KINDS
- * @param {{autoApproved: number, autoDenied: number, byProject: Record<string, number>}|null} [q.audit]
+ * @param {{autoApproved: number, autoDenied: number}|null} [q.audit]
  * @param {number} [q.open] agents currently waiting (live daemon only)
+ * @param {number} [q.badLines] unreadable lines met while loading (disk reads only)
  */
-export function summarizeEpisodes(episodes, { now, days = 7, date, project, kind, audit = null, open = 0 }) {
+export function summarizeEpisodes(episodes, { now, days = 7, date, project, kind, audit = null, open = 0, badLines = 0 }) {
   const dates = date ? [date] : windowDates(now, Math.max(Math.trunc(days) || 7, 1));
   const inWindow = new Set(dates);
   let skipped = 0;
@@ -389,6 +390,9 @@ export function summarizeEpisodes(episodes, { now, days = 7, date, project, kind
     }),
     open,
     skipped,
+    badLines,
+    // false = nothing was ever recorded (as opposed to a quiet window): the card/CLI can say why
+    anyRecords: episodes.length > 0,
   };
 }
 
@@ -397,13 +401,13 @@ export function summarizeEpisodes(episodes, { now, days = 7, date, project, kind
  * constructor it never deletes old files, so it is safe to point at data you do not own.
  */
 export function readEpisodesFromDir(dir) {
-  const episodes = [];
+  const byId = new Map(); // same dedupe as the daemon's loader: an id seen twice counts once
   let badLines = 0;
   let files = [];
   try {
     files = fs.readdirSync(dir).filter((f) => DAY_FILE_RE.test(f));
   } catch {
-    return { episodes, badLines };
+    return { episodes: [], badLines };
   }
   for (const f of files.sort()) {
     let text;
@@ -416,14 +420,14 @@ export function readEpisodesFromDir(dir) {
       if (!line) continue;
       try {
         const ep = JSON.parse(line);
-        if (ep && typeof ep === "object") episodes.push(ep);
+        if (ep && typeof ep === "object") byId.set(ep.id ?? `${f}:${byId.size}`, ep);
         else badLines++;
       } catch {
         badLines++;
       }
     }
   }
-  return { episodes, badLines };
+  return { episodes: [...byId.values()], badLines };
 }
 
 /**
@@ -438,7 +442,7 @@ export function readAutoApprovals(projectsDir, { now, days = 7 }) {
     return null;
   }
   const inWindow = new Set(windowDates(now, Math.max(Math.trunc(days) || 7, 1)));
-  const out = { autoApproved: 0, autoDenied: 0, byProject: {} };
+  const out = { autoApproved: 0, autoDenied: 0 };
   for (const d of entries) {
     if (!d.isDirectory()) continue;
     let text;
@@ -452,10 +456,8 @@ export function readAutoApprovals(projectsDir, { now, days = 7 }) {
       try {
         const row = JSON.parse(line);
         if (!Number.isFinite(row.ts) || !inWindow.has(localDay(row.ts))) continue;
-        if (row.decision === "allow") {
-          out.autoApproved++;
-          out.byProject[d.name] = (out.byProject[d.name] ?? 0) + 1;
-        } else if (row.decision === "deny") out.autoDenied++;
+        if (row.decision === "allow") out.autoApproved++;
+        else if (row.decision === "deny") out.autoDenied++;
       } catch {
         // torn line
       }
@@ -479,7 +481,10 @@ export function formatDuration(ms) {
 export function formatReport(r) {
   const head = `Agent wait report: ${r.window.from} to ${r.window.to} (${r.window.days} days)`;
   if (r.total.count === 0) {
-    return `${head}\n\nNo data yet. Waits are only recorded once the approval hook is installed\n(and agents have run since): run  ao approvals setup  to install it.`;
+    if (r.anyRecords === false) {
+      return `${head}\n\nNothing has been recorded yet. The daemon records tool errors and denied calls from agent transcripts\nwhile it runs (no hook needed); waits for approval are recorded only when a hook reports them\n(hooks/notify.mjs, or the approval gateway). Either no agent has run since the daemon started,\nor no such hook is installed.`;
+    }
+    return `${head}\n\nNo waits in the last ${r.window.days} days.`;
   }
   const f = formatDuration;
   const lines = [
@@ -499,7 +504,7 @@ export function formatReport(r) {
   lines.push(...rows("By kind", Object.entries(r.byKind).sort(byTotal)));
   lines.push(...rows("By project", Object.entries(r.byProject).sort(byTotal)));
   lines.push(...rows("By harness", r.byHarness.map(({ harness, ...s }) => [harness, s]).sort(byTotal)));
-  if (r.skipped) lines.push("", `Skipped ${r.skipped} record(s) with no usable time.`);
+  if (r.skipped || r.badLines) lines.push("", `Skipped ${r.skipped ?? 0} record(s) with no usable time and ${r.badLines ?? 0} unreadable line(s).`);
   return lines.join("\n");
 }
 

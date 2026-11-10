@@ -124,14 +124,13 @@ test("readAutoApprovals: counts allow entries per project inside the window, tol
   const r = readAutoApprovals(dir, { now: NOW, days: 7 });
   assert.equal(r.autoApproved, 3);
   assert.equal(r.autoDenied, 1);
-  assert.deepEqual(r.byProject, { "acme-web": 2, "acme-api": 1 });
-  assert.equal(readAutoApprovals(path.join(dir, "missing"), { now: NOW, days: 7 }), null);
+    assert.equal(readAutoApprovals(path.join(dir, "missing"), { now: NOW, days: 7 }), null);
 });
 
 test("summarizeEpisodes: attaches autoApproved only when an audit result is given", () => {
   const without = summarizeEpisodes([ep(0, 1000)], { now: NOW, days: 7 });
   assert.equal(without.autoApproved, null);
-  const withAudit = summarizeEpisodes([ep(0, 1000)], { now: NOW, days: 7, audit: { autoApproved: 4, autoDenied: 1, byProject: { "acme-web": 4 } } });
+  const withAudit = summarizeEpisodes([ep(0, 1000)], { now: NOW, days: 7, audit: { autoApproved: 4, autoDenied: 1 } });
   assert.equal(withAudit.autoApproved, 4);
 });
 
@@ -143,8 +142,13 @@ test("formatReport: text carries the headline numbers; empty data points at the 
   assert.match(text, /acme-web/);
   assert.match(text, /claude-code/);
   const empty = formatReport(summarizeEpisodes([], { now: NOW, days: 7 }));
-  assert.match(empty, /ao approvals setup/);
-  assert.match(empty, /hook/i);
+  assert.match(empty, /Nothing has been recorded/);
+  assert.match(empty, /notify\.mjs/);
+  assert.doesNotMatch(empty, /ao approvals setup/);
+  // records exist but the window is quiet: no hook advice
+  const quiet = formatReport(summarizeEpisodes([ep(60, 1000)], { now: NOW, days: 7 }));
+  assert.match(quiet, /No waits in the last 7 days/);
+  assert.doesNotMatch(quiet, /hook/i);
 });
 
 test("InterventionMetrics.summary: auditDir adds the policy's auto-approvals, no auditDir leaves it null", () => {
@@ -159,4 +163,20 @@ test("InterventionMetrics.summary: auditDir adds the policy's auto-approvals, no
   const s = withAudit.summary({ days: 7 });
   assert.equal(s.autoApproved, 1);
   assert.equal(s.total.count, 1);
+});
+
+test("readEpisodesFromDir: an id present twice (two day files) counts once", () => {
+  const dir = tmp();
+  const e = ep(0, 1000);
+  fs.writeFileSync(path.join(dir, "2026-11-09.jsonl"), `${JSON.stringify(e)}\n`);
+  fs.writeFileSync(path.join(dir, "2026-11-10.jsonl"), `${JSON.stringify(e)}\n`);
+  assert.equal(readEpisodesFromDir(dir).episodes.length, 1);
+});
+
+test("summarizeEpisodes: anyRecords tells 'nothing ever recorded' from 'quiet window'; badLines is carried", () => {
+  assert.equal(summarizeEpisodes([], { now: NOW, days: 7 }).anyRecords, false);
+  const r = summarizeEpisodes([ep(60, 1000)], { now: NOW, days: 7, badLines: 2 });
+  assert.equal(r.total.count, 0);
+  assert.equal(r.anyRecords, true);
+  assert.match(formatReport({ ...summarizeEpisodes([ep(0, 1000), { id: "bad" }], { now: NOW, days: 7, badLines: 2 }) }), /1 record\(s\).*2 unreadable/);
 });

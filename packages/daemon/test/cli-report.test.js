@@ -44,7 +44,7 @@ test("report --dir: reads that directory instead of the default", () => {
   const other = tmp();
   const r = run(["--dir", other]);
   assert.equal(r.code, 0);
-  assert.match(r.out, /ao approvals setup/);
+  assert.match(r.out, /Nothing has been recorded/);
 });
 
 test("report: bad --days is a usage error", () => {

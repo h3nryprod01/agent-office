@@ -27,9 +27,9 @@ export function runReport(argv, { dir = DEFAULT_METRICS_DIR, auditDir = DEFAULT_
   }
   const metricsDir = option(argv, "--dir") ?? dir;
   const projectsDir = option(argv, "--audit-dir") ?? auditDir;
-  const { episodes } = readEpisodesFromDir(metricsDir);
+  const { episodes, badLines } = readEpisodesFromDir(metricsDir);
   const audit = projectsDir ? readAutoApprovals(projectsDir, { now: now(), days }) : null;
-  const report = summarizeEpisodes(episodes, { now: now(), days, audit });
+  const report = summarizeEpisodes(episodes, { now: now(), days, audit, badLines });
   log(argv.includes("--json") ? JSON.stringify(report, null, 2) : formatReport(report));
   return 0;
 }

@@ -36,9 +36,16 @@ describe("interventionStatsHtml", () => {
 
   it("empty window says so instead of showing zeros", () => {
     const html = interventionStatsHtml(summary({ total: stat(0, 0, 0), byKind: {} }));
-    expect(html).toContain("approval hook");
-    expect(html).toContain("ao approvals setup");
+    expect(html).toContain("No waits in the last 7 days");
+    expect(html).not.toContain("hook");
     expect(html).not.toContain("median");
+  });
+
+  it("says why only when nothing was ever recorded (errors need no hook; approval waits do)", () => {
+    const html = interventionStatsHtml(summary({ total: stat(0, 0, 0), byKind: {}, anyRecords: false }));
+    expect(html).toContain("notify.mjs");
+    expect(html).toContain("transcripts");
+    expect(html).not.toContain("ao approvals setup");
   });
 
   it("speaks Vietnamese when asked", () => {
@@ -51,12 +58,12 @@ describe("interventionStatsHtml", () => {
 const full = (over: Partial<InterventionSummary> = {}): InterventionSummary =>
   summary({
     window: { from: "2026-10-12", to: "2026-11-10", days: 30 },
-    total: { count: 171, medianMs: 30_000, p90Ms: 1_020_000, totalMs: 4_800_000 },
-    longest: { durationMs: 21_240_000, kind: "waiting_permission", project: "acme-web", harness: "claude-code", endTs: 0 },
-    permission: { count: 171, denied: 7, denyRate: 7 / 171 },
-    autoApproved: 12,
-    byProject: { "acme-web": { count: 100, medianMs: 1, p90Ms: 1, totalMs: 3_000_000 }, "acme-api": { count: 71, medianMs: 1, p90Ms: 1, totalMs: 1_800_000 } },
-    byHarness: [{ harness: "claude-code", count: 150, medianMs: 1, p90Ms: 1, totalMs: 4_000_000 }, { harness: "claude-worker", count: 21, medianMs: 1, p90Ms: 1, totalMs: 800_000 }],
+    total: { count: 120, medianMs: 40_000, p90Ms: 720_000, totalMs: 4_800_000 },
+    longest: { durationMs: 11_400_000, kind: "waiting_permission", project: "acme-web", harness: "claude-code", endTs: 0 },
+    permission: { count: 120, denied: 5, denyRate: 5 / 120 },
+    autoApproved: 9,
+    byProject: { "acme-web": { count: 70, medianMs: 1, p90Ms: 1, totalMs: 3_000_000 }, "acme-api": { count: 50, medianMs: 1, p90Ms: 1, totalMs: 1_800_000 } },
+    byHarness: [{ harness: "claude-code", count: 100, medianMs: 1, p90Ms: 1, totalMs: 4_000_000 }, { harness: "claude-worker", count: 20, medianMs: 1, p90Ms: 1, totalMs: 800_000 }],
     ...over,
   });
 
@@ -67,9 +74,9 @@ describe("interventionStatsHtml (report fields)", () => {
     const html = interventionStatsHtml(full());
     expect(html).toContain("last 30 days");
     expect(html).toContain("1h 20m"); // total wait
-    expect(html).toContain("5h 54m"); // longest
-    expect(html).toContain("4%"); // 7 of 171
-    expect(html).toContain("<b>12</b>"); // auto-approved
+    expect(html).toContain("3h 10m"); // longest
+    expect(html).toContain("4%"); // 5 of 120
+    expect(html).toContain("<b>9</b>"); // auto-approved
   });
 
   it("lists projects and harnesses, biggest total wait first", () => {
