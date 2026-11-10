@@ -12,13 +12,13 @@ const POSITIVE = [
   ["phone, +84 no spaces", "+84912345678", "phone"],
   ["phone, 84 no plus", "zalo 84912345678", "phone"],
   ["phone, (+84)", "tel (+84) 912345678", "phone"],
-  ["phone, landline", "văn phòng 02838123456", "phone"],
+  ["phone, landline", "văn phòng 02800000000", "phone"],
   ["phone, old 11 digits", "máy cũ 01201234567", "phone"],
   ["phone, at end of sentence", "Số của khách là 0987654321.", "phone"],
   ["phone, no-break space", "0912 345 678", "phone"],
   ["phone, zero-width space", "0912​345​678", "phone"],
-  ["id, CCCD 12 digits", "CCCD 079099012345", "id"],
-  ["id, CCCD grouped", "CCCD 079 099 012 345", "id"],
+  ["id, CCCD 12 digits", "CCCD 001000000000", "id"],
+  ["id, CCCD grouped", "CCCD 001 000 000 000", "id"],
   ["id, CMND 9 digits", "CMND 123456789", "id"],
   ["id, CMND after colon", "CMND:123456789", "id"],
   ["phone, followed by a Vietnamese word starting with đ", "0912345678 đã gọi", "phone"],
@@ -37,7 +37,7 @@ const POSITIVE = [
   ["phone, after dot", "xong.0912345678", "phone"],
   ["phone, glued to letters before", "SĐT0912345678", "phone"],
   ["phone, bare 'k' unit", "0912345678 k", "phone"],
-  ["id, CCCD followed by đ-word", "CCCD 079099012345 đã cấp", "id"],
+  ["id, CCCD followed by đ-word", "CCCD 001000000000 đã cấp", "id"],
   ["email", "mail khach.hang+bds@example.com.vn nhé", "email"],
   ["email, upper case", "Mail A.B@EXAMPLE.COM", "email"],
 ];
@@ -95,13 +95,13 @@ for (const [name, input] of NEGATIVE) {
 test("keeps only the last characters, in a recognisable placeholder", () => {
   assert.equal(redactPii("0912345678").text, "[phone ***678]");
   assert.equal(redactPii("+84 912 345 678").text, "[phone ***678]");
-  assert.equal(redactPii("079099012345").text, "[id ***45]");
+  assert.equal(redactPii("001000000000").text, "[id ***00]");
   assert.equal(redactPii("123456789").text, "[id ***89]");
   assert.equal(redactPii("khach@example.com").text, "[email ***com]");
 });
 
 test("several values in one text are all masked and counted", () => {
-  const out = redactPii("A 0912345678, B +84 987 654 321, mail a@b.vn, CCCD 079099012345, CMND 123456789.");
+  const out = redactPii("A 0912345678, B +84 987 654 321, mail a@b.vn, CCCD 001000000000, CMND 123456789.");
   assert.deepEqual(out.counts, { phone: 2, id: 2, email: 1 });
   assert.doesNotMatch(out.text, /\d{6}/);
 });

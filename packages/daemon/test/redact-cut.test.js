@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { safePreview, redactPii } from "../src/redact-pii.js";
 
 const PHONES = ["0912345678", "0912 345 678", "0912​345​678", "+84 912 345 678", "(+84) 912.345.678", "091-234-5678", "0912 345 678"];
-const EMAIL = "nguyen.van.a@gmail.com";
+const EMAIL = "nguyen.van.a@example.com";
 const digitsOf = (s) => s.replace(/\D/g, "");
 /** no run of 4+ digits of the original number survives in `out` (after dropping separators) */
 function leaksDigits(out, phone) {
@@ -36,7 +36,7 @@ test("mask first, then cut: a cut at any position through an e-mail leaks no par
   const text = `gửi tới ${EMAIL} nhé`;
   for (let max = 1; max <= text.length; max++) {
     const out = safePreview(text, max);
-    assert.doesNotMatch(out, /nguyen|van\.a|@|gmail/i, `max=${max}: ${JSON.stringify(out)}`);
+    assert.doesNotMatch(out, /nguyen|van\.a|@|example/i, `max=${max}: ${JSON.stringify(out)}`);
   }
 });
 
@@ -44,7 +44,7 @@ test("e-mail ALREADY cut upstream at any position leaks neither the local part n
   const text = `gửi tới ${EMAIL}`;
   for (let k = 1; k <= text.length; k++) {
     const out = safePreview(text.slice(0, k), 1000, { alreadyCut: true });
-    assert.doesNotMatch(out, /nguyen|@|gmai/i, `cut=${k}: ${JSON.stringify(out)}`);
+    assert.doesNotMatch(out, /nguyen|@|exam/i, `cut=${k}: ${JSON.stringify(out)}`);
   }
 });
 
