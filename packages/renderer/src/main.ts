@@ -47,7 +47,7 @@ import { PolicyAlertsStore } from "./ui/policyAlerts";
 import { mountPolicyPanel, type AuditRow, type PolicyBody, type PolicyPanelHandle, type ProjectPolicy } from "./ui/policyPanel";
 // lane L9: presentation mode (data-layer masking)
 import { installPresentationMode, isPresentationMode, mountCleanHud, mountPresentationToggle } from "./presentation";
-import { mountFirstRun } from "./ui/firstRun"; // lane I
+import { mountFirstRun, withoutDemo } from "./ui/firstRun"; // lane I
 
 /** "" = the All tab's office; otherwise the repo name. */
 const ALL_KEY = "";
@@ -623,7 +623,7 @@ async function boot(): Promise<void> {
       }
     }
     queue.render(current());
-    notifier.sync(current());
+    notifier.sync(withoutDemo(current())); // lane I: the labelled sample must never raise an OS toast or dock badge
     sidePanel.render(current(), replayView?.now);
     tabs.render(current());
   }, 250);

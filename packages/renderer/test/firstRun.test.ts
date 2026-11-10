@@ -140,3 +140,19 @@ describe("mountFirstRun", () => {
     expect(el().hidden).toBe(true);
   });
 });
+
+describe("sample data never leaves the page", () => {
+  it("the notifier is fed state without sample agents", async () => {
+    const { interventionQueue } = await import("../src/sim/selectors");
+    const demo = { agentId: "d", sessionId: DEMO_SESSION, status: "waiting_permission", despawnedAt: null, statusSince: 0 } as unknown as AgentModel;
+    const s = stateOf(demo);
+    expect(interventionQueue(s)).toHaveLength(1); // would raise an OS toast
+    expect(interventionQueue(withoutDemo(s))).toHaveLength(0);
+  });
+
+  it("main.ts hands the notifier withoutDemo(...) and nothing else", async () => {
+    const src = (await import("../src/main.ts?raw")).default as string;
+    expect(src).toMatch(/notifier\.sync\(withoutDemo\(current\(\)\)\)/);
+    expect(src).not.toMatch(/notifier\.sync\(current\(\)\)/);
+  });
+});
