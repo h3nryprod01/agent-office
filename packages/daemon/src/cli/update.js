@@ -168,7 +168,7 @@ export async function runUpdate({
   if (!ownRoot) {
     throw new UpdateError(
       `${repo} is not the root of its own git checkout (it sits inside another repository, or is an installed package), so \`update\` will not pull.\n` +
-        "  Installed from npm?  npm install -g <package-name>@latest",
+        "  Installed from npm?  npm install -g waitchime@latest",
     );
   }
   if (status.stdout.trim() !== "") {

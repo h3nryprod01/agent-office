@@ -71,7 +71,7 @@ npm install /path/to/<name>-<version>.tgz
 ```
 
 Options: `--port N` (default 8787), `--no-open`, `--install-service [--yes]`, `--help`.
-`waitchime doctor|backup|...` (or `ao doctor|backup|...`, installed alongside) runs the `ao` CLI (`update` only works on a
+`waitchime doctor|backup|...` (or `ao doctor|backup|...`, installed alongside; if another global package already owns an `ao` command, `npm i -g` stops with EEXIST, and `waitchime <verb>` does the same job) runs the `ao` CLI (`update` only works on a
 git clone; for the package use `npm i -g waitchime@latest`). Its workspace
 (the PM's session file) lives in `~/.agent-office/workspace`, not inside the
 package; `--install-service` writes that location into the service definition
