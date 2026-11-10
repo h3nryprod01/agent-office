@@ -59,7 +59,7 @@ The Telegram channel starts when `TELEGRAM_BOT_TOKEN` is set. The one-way alert 
 
 ### Sent out
 
-- Approval request: the project name, the tool name, and the first 300 characters of the command, file path or tool input that is waiting for a yes or no, plus the short id and two buttons.
+- Approval request: the project name, the tool name, and the first 300 characters of the command, file path or tool input that is waiting for a yes or no, plus the short id (and two one-tap buttons where the channel has them, as Telegram does).
 - Approval requests go to the project's bound chat, or else to the DMs of its owners and managers, or else to your operator chat.
 - Stuck-agent alert (Telegram only, to `TELEGRAM_CHAT_ID`): the agent name, the repo, "Waiting for approval" or "Error" or "Blocked", up to 2000 characters of the agent's last detail text, and a link to your office.
 - The PM's answer, in full, to whoever asked, split into messages of at most 4096 characters.
@@ -69,7 +69,7 @@ The Telegram channel starts when `TELEGRAM_BOT_TOKEN` is set. The one-way alert 
 ### Received
 
 - Each incoming message gives the daemon the text, the chat id, the sender's id and first name or username.
-- A message from someone who is neither a member of the project nor your operator chat is dropped with no reply and nothing stored.
+- A message from someone who is neither a member of the project nor your operator chat is dropped with no reply and nothing written to disk, except that a pairing attempt is answered.
 - A member's text is passed to that project's PM: it becomes a `claude -p` turn run in the project's folder, prefixed with the speaker's name, role and channel.
 - The PM's tool use goes through the same approval gate as any other agent.
 - Bot and Official Account tokens are removed from the environment of the PM process.
