@@ -9,6 +9,9 @@ import {
   nodeMajorOk,
   browserCommand,
   daemonEnv,
+  updateRefusal,
+  serviceCommand,
+  looksLikeOffice,
 } from "../bin/office-lib.js";
 
 test("parseArgs: defaults", () => {
@@ -73,4 +76,27 @@ test("daemonEnv: workspace default lives under the home dir, explicit values win
   assert.equal(env.AGENT_OFFICE_REPO, "/h/.agent-office/workspace");
   const own = daemonEnv({ AGENT_OFFICE_REPO: "/mine" }, 9005, "/h");
   assert.equal(own.AGENT_OFFICE_REPO, "/mine");
+});
+
+test("updateRefusal: `update` only from a git checkout of this package", () => {
+  assert.equal(updateRefusal(["update"], true, "pkg"), null);
+  assert.equal(updateRefusal(["doctor"], false, "pkg"), null);
+  assert.equal(updateRefusal(null, false, "pkg"), null);
+  assert.match(updateRefusal(["update", "--dry-run"], false, "pkg"), /npm i(nstall)? -g pkg@latest/);
+});
+
+test("serviceCommand: the --yes spelling differs per platform", () => {
+  assert.deepEqual(serviceCommand("darwin", "/p", true), ["bash", ["/p/scripts/install-daemon-service.sh", "--yes"]]);
+  assert.deepEqual(serviceCommand("linux", "/p", false), ["bash", ["/p/scripts/install-daemon-service-linux.sh"]]);
+  const [cmd, args] = serviceCommand("win32", "C:\\p", true);
+  assert.equal(cmd, "powershell");
+  assert.equal(args.at(-1), "-Yes");
+  assert.ok(!args.includes("--yes"));
+  assert.ok(!serviceCommand("win32", "C:\\p", false)[1].includes("-Yes"));
+});
+
+test("looksLikeOffice: recognises our page, not any other web server", () => {
+  assert.equal(looksLikeOffice("<!doctype html><title>Agent Office — renderer skeleton</title>"), true);
+  assert.equal(looksLikeOffice("<html><title>Grafana</title></html>"), false);
+  assert.equal(looksLikeOffice(""), false);
 });

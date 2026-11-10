@@ -57,3 +57,24 @@ export function daemonEnv(base, port, home) {
     AGENT_OFFICE_REPO: base.AGENT_OFFICE_REPO || path.join(home, ".agent-office", "workspace"),
   };
 }
+
+/** `update` pulls with git: refuse unless this package is itself a git checkout. Returns a message or null. */
+export function updateRefusal(passthrough, hasGit, pkgName) {
+  if (!passthrough || passthrough[0] !== "update" || hasGit) return null;
+  return `\`update\` works on a git clone. This is an installed package; to update it run: npm i -g ${pkgName}@latest`;
+}
+
+/** [command, args] for the login-service installer; PowerShell spells the switch -Yes. */
+export function serviceCommand(platform, pkgRoot, yes) {
+  if (platform === "win32") {
+    const file = `${pkgRoot}\\scripts\\install-daemon-service.ps1`;
+    return ["powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", file, ...(yes ? ["-Yes"] : [])]];
+  }
+  const script = platform === "linux" ? "install-daemon-service-linux.sh" : "install-daemon-service.sh";
+  return ["bash", [`${pkgRoot}/scripts/${script}`, ...(yes ? ["--yes"] : [])]];
+}
+
+/** True when an HTTP body is Agent Office's own page. */
+export function looksLikeOffice(body) {
+  return /<title>\s*Agent Office/i.test(body);
+}

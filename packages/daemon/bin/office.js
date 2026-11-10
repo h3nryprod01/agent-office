@@ -9,7 +9,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { browserCommand, daemonEnv, isEphemeralInstall, nodeMajorOk, parseArgs } from "./office-lib.js";
+import { browserCommand, daemonEnv, isEphemeralInstall, looksLikeOffice, nodeMajorOk, parseArgs, serviceCommand, updateRefusal } from "./office-lib.js";
 
 const PKG_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const PKG_NAME = JSON.parse(readFileSync(path.join(PKG_ROOT, "package.json"), "utf8")).name;
@@ -27,7 +27,7 @@ Usage: ${PKG_NAME} [--port N] [--no-open]
        ${PKG_NAME} --install-service [--yes]     (start at login; needs a global install)
        ${PKG_NAME} doctor|backup|...             (passed to the ao CLI)
 
-  --port N           port to listen on (default 8787, this machine only)
+  --port N           port to listen on (default 8787; this machine only unless LAN mode is on)
   --no-open          do not open the browser
   --install-service  install a login service; asks first, --yes skips the question
 `,
@@ -37,7 +37,7 @@ Dùng: ${PKG_NAME} [--port N] [--no-open]
       ${PKG_NAME} --install-service [--yes]     (tự chạy khi đăng nhập; cần cài global)
       ${PKG_NAME} doctor|backup|...             (chuyển sang CLI ao)
 
-  --port N           cổng lắng nghe (mặc định 8787, chỉ máy này)
+  --port N           cổng lắng nghe (mặc định 8787; chỉ máy này trừ khi bật chế độ LAN)
   --no-open          không mở trình duyệt
   --install-service  cài dịch vụ chạy nền khi đăng nhập; hỏi trước, --yes để bỏ qua câu hỏi
 `,
@@ -56,6 +56,9 @@ if (!nodeMajorOk(process.version)) {
 const run = (cmd, argv, opts = {}) => spawn(cmd, argv, { stdio: "inherit", ...opts });
 const exitWith = (child) => child.on("exit", (code, sig) => process.exit(code ?? (sig ? 1 : 0)));
 
+const refusal = updateRefusal(args.passthrough, existsSync(path.join(PKG_ROOT, ".git")), PKG_NAME);
+if (refusal) die(refusal);
+
 if (args.passthrough) {
   exitWith(run(process.execPath, [path.join(PKG_ROOT, "scripts", "ao.mjs"), ...args.passthrough]));
 } else if (args.installService) {
@@ -65,13 +68,11 @@ if (args.passthrough) {
       `Bản này nằm trong cache tạm của npx; dịch vụ trỏ vào đây sẽ hỏng.\nCài trước:  npm install -g ${PKG_NAME}  rồi chạy lại  ${PKG_NAME} --install-service`,
     ));
   }
-  const yes = args.yes ? ["--yes"] : [];
-  const dir = path.join(PKG_ROOT, "scripts");
-  const [cmd, argv] =
-    process.platform === "win32"
-      ? ["powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(dir, "install-daemon-service.ps1"), ...yes]]
-      : ["bash", [path.join(dir, process.platform === "linux" ? "install-daemon-service-linux.sh" : "install-daemon-service.sh"), ...yes]];
-  exitWith(run(cmd, argv));
+  // the service must keep the PM workspace out of the package folder (lost on update, maybe read-only)
+  const env = daemonEnv(process.env, args.port, os.homedir());
+  mkdirSync(env.AGENT_OFFICE_REPO, { recursive: true });
+  const [cmd, argv] = serviceCommand(process.platform, PKG_ROOT, args.yes);
+  exitWith(run(cmd, argv, { env }));
 } else {
   await launch();
 }
@@ -82,6 +83,24 @@ function portBusy(port) {
     s.once("connect", () => (s.destroy(), resolve(true)));
     s.once("error", () => resolve(false));
   });
+}
+
+function fetchBody(url) {
+  return new Promise((resolve) => {
+    http
+      .get(url, { timeout: 2000 }, (res) => {
+        let body = "";
+        res.setEncoding("utf8");
+        res.on("data", (c) => (body += body.length < 4096 ? c : ""));
+        res.on("end", () => resolve(body));
+      })
+      .on("error", () => resolve(""));
+  });
+}
+
+function openBrowser(url) {
+  const [cmd, argv] = browserCommand(process.platform, url);
+  spawn(cmd, argv, { stdio: "ignore", detached: true }).on("error", () => console.log(say(`Open ${url} in your browser.`, `Mở ${url} trong trình duyệt.`))).unref();
 }
 
 function ping(url) {
@@ -98,9 +117,16 @@ async function launch() {
     ));
   }
   if (await portBusy(args.port)) {
+    const url = `http://localhost:${args.port}`;
+    if (looksLikeOffice(await fetchBody(url))) {
+      // a second daemon would write the same ~/.agent-office, so point at the running one
+      console.log(say(`Agent Office is already running at ${url}. Open it.`, `Agent Office đã chạy ở ${url}. Mở nó.`));
+      if (args.open) openBrowser(url);
+      process.exit(0);
+    }
     die(say(
-      `Port ${args.port} is already in use. If it is Agent Office, open http://localhost:${args.port}; otherwise pick another: ${PKG_NAME} --port ${args.port + 1}`,
-      `Cổng ${args.port} đang bị chiếm. Nếu đó là Agent Office, mở http://localhost:${args.port}; không thì chọn cổng khác: ${PKG_NAME} --port ${args.port + 1}`,
+      `Port ${args.port} is in use by something else. Pick another: ${PKG_NAME} --port ${args.port + 1}`,
+      `Cổng ${args.port} đang bị chương trình khác dùng. Chọn cổng khác: ${PKG_NAME} --port ${args.port + 1}`,
     ));
   }
   const env = daemonEnv(process.env, args.port, os.homedir());
@@ -124,8 +150,5 @@ async function launch() {
     die(say(`The daemon did not answer at ${url} within 15 s.`, `Daemon không trả lời ở ${url} sau 15 giây.`));
   }
   console.log(`Agent Office -> ${url}  ${say("(Ctrl+C to stop)", "(Ctrl+C để dừng)")}`);
-  if (args.open) {
-    const [cmd, argv] = browserCommand(process.platform, url);
-    spawn(cmd, argv, { stdio: "ignore", detached: true }).on("error", () => console.log(say(`Open ${url} in your browser.`, `Mở ${url} trong trình duyệt.`))).unref();
-  }
+  if (args.open) openBrowser(url);
 }
